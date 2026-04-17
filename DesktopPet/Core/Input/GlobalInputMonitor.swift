@@ -55,11 +55,17 @@ final class GlobalInputMonitor {
     }
 
     private func dispatch(_ event: NSEvent) {
-        if event.modifierFlags.contains(.command),
-           event.charactersIgnoringModifiers?.lowercased() == "k" {
+        if isCommandK(event) {
             onCommandK?()
             return
         }
         onKeyDown?(event)
+    }
+
+    /// Prefer character match; fall back to physical key code so non‑US keyboard layouts still get ⌘K.
+    private func isCommandK(_ event: NSEvent) -> Bool {
+        guard event.modifierFlags.contains(.command) else { return false }
+        if event.charactersIgnoringModifiers?.lowercased() == "k" { return true }
+        return event.keyCode == 40
     }
 }

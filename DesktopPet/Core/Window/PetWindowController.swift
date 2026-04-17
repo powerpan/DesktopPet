@@ -18,6 +18,12 @@ final class PetWindowController: NSWindowController {
         shouldCascadeWindows = false
         passthroughRoot = root
         window.isReleasedWhenClosed = false
+        let vf = ScreenGeometry.visibleFrameContainingMouse()
+        if !vf.isEmpty {
+            var f = window.frame
+            f.origin = ScreenGeometry.clampedOrigin(f.size, origin: f.origin, in: vf, margin: 24)
+            window.setFrameOrigin(f.origin)
+        }
     }
 
     required init?(coder: NSCoder) {
