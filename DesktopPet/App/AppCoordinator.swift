@@ -72,6 +72,14 @@ final class AppCoordinator: ObservableObject {
             window.center()
             window.isReleasedWhenClosed = false
             onboardingWindow = window
+            NotificationCenter.default.publisher(for: NSWindow.willCloseNotification, object: window)
+                .prefix(1)
+                .sink { [weak self] _ in
+                    if self?.onboardingWindow === window {
+                        self?.onboardingWindow = nil
+                    }
+                }
+                .store(in: &cancellables)
         }
         onboardingWindow?.makeKeyAndOrderFront(nil)
     }
@@ -176,7 +184,18 @@ final class AppCoordinator: ObservableObject {
 
     private func bumpActivity() {
         idleSleepTimer?.invalidate()
-        guard stateMachine.state != .sleep else { return }
+        if stateMachine.state == .sleep {
+            idleSleepTimer = Timer.scheduledTimer(
+                withTimeInterval: PetConfig.default.idleToSleepInterval,
+                repeats: false
+            ) { [weak self] _ in
+                self?.stateMachine.handle(.idleTimeout)
+            }
+            if let idleSleepTimer {
+                RunLoop.main.add(idleSleepTimer, forMode: .common)
+            }
+            return
+        }
         idleSleepTimer = Timer.scheduledTimer(
             withTimeInterval: PetConfig.default.idleToSleepInterval,
             repeats: false

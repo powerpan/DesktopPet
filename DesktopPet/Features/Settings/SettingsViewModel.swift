@@ -35,6 +35,7 @@ final class SettingsViewModel: ObservableObject {
         } else {
             petScale = defaults.double(forKey: SettingsKeys.scale)
         }
+        petScale = min(max(petScale, 0.6), 1.8)
 
         $isClickThroughEnabled
             .dropFirst()

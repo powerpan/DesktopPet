@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// Hosts SwiftUI content but forwards mouse hits to windows below when ``passthroughEnabled`` is on,
-/// except for a fixed top-trailing control region (matches ``SettingsFloatingButton`` layout).
+/// except for a fixed **visual** top-trailing control region (``SettingsFloatingButton`` in a flipped view sits at the bottom-trailing AppKit rect).
 final class PetRootContainerView: NSView {
     private let hostingView: NSHostingView<AnyView>
 
@@ -37,9 +37,9 @@ final class PetRootContainerView: NSView {
 
     private func controlBounds(in bounds: CGRect) -> CGRect {
         let w = bounds.width
-        let h = bounds.height
         let side = controlPadding + controlSize
-        return CGRect(x: w - side, y: h - side, width: side, height: side)
+        // `isFlipped == true`: y grows downward; SwiftUI `.topTrailing` maps to bottom-trailing in this view.
+        return CGRect(x: w - side, y: 0, width: side, height: side)
     }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
