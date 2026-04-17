@@ -43,8 +43,8 @@ final class PetWindowController: NSWindowController {
             CGPoint(x: visibleFrame.maxX - frame.width - margin, y: visibleFrame.minY + margin),
             CGPoint(x: visibleFrame.midX - frame.width / 2, y: visibleFrame.maxY - frame.height - margin),
         ]
-        if let target = candidates.randomElement() {
-            frame.origin = target
+        if let raw = candidates.randomElement() {
+            frame.origin = ScreenGeometry.clampedOrigin(frame.size, origin: raw, in: visibleFrame, margin: margin)
             window.setFrame(frame, display: true, animate: true)
         }
     }
