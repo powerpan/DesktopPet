@@ -1,5 +1,6 @@
 import ApplicationServices
 import Foundation
+import SwiftUI
 
 @MainActor
 final class AccessibilityPermissionManager: ObservableObject {
