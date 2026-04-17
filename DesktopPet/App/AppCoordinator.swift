@@ -29,6 +29,11 @@ final class AppCoordinator: ObservableObject {
         permissionManager.refreshStatus(prompt: false)
         mouseTracker.start()
 
+        if permissionManager.isGranted {
+            configureGlobalInputHandlers()
+            globalInput.start()
+        }
+
         if !permissionManager.isGranted {
             presentOnboardingWindow()
         }
@@ -159,7 +164,12 @@ final class AppCoordinator: ObservableObject {
         NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                self?.permissionManager.refreshStatus(prompt: false)
+                guard let self else { return }
+                self.permissionManager.refreshStatus(prompt: false)
+                if self.permissionManager.isGranted {
+                    self.configureGlobalInputHandlers()
+                    self.globalInput.start()
+                }
             }
             .store(in: &cancellables)
     }
