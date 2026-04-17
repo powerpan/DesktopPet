@@ -2,7 +2,8 @@ import CoreGraphics
 
 enum InteractionEvent {
     case keyboardInput
-    case mouseMoved(location: CGPoint, speed: CGFloat)
+    case mouseMovedFast(speed: CGFloat)
+    case mouseHoverNear(distance: CGFloat)
     case patrolRequested
     case idleTimeout
 }

@@ -11,8 +11,7 @@
 		C3D4E5F60718293A4B5C6D7E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8F /* ContentView.swift */; };
 		C10000000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000001 /* AppDelegate.swift */; };
 		C10000000000000000000002 /* AppCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000002 /* AppCoordinator.swift */; };
-		C10000000000000000000003 /* GlobalHotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000003 /* GlobalHotkeyManager.swift */; };
-		C10000000000000000000004 /* KeyboardMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000004 /* KeyboardMonitor.swift */; };
+		C10000000000000000000016 /* GlobalInputMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000016 /* GlobalInputMonitor.swift */; };
 		C10000000000000000000005 /* MouseTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000005 /* MouseTracker.swift */; };
 		C10000000000000000000006 /* InteractionEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000006 /* InteractionEvent.swift */; };
 		C10000000000000000000007 /* PetConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000007 /* PetConfig.swift */; };
@@ -30,6 +29,9 @@
 		C10000000000000000000013 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000013 /* SettingsViewModel.swift */; };
 		C10000000000000000000014 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000014 /* Logger.swift */; };
 		C10000000000000000000015 /* ScreenGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000015 /* ScreenGeometry.swift */; };
+		C10000000000000000000017 /* PetRootContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000017 /* PetRootContainerView.swift */; };
+		C10000000000000000000018 /* AnimationDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000018 /* AnimationDriver.swift */; };
+		C10000000000000000000019 /* AccessibilityOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000019 /* AccessibilityOnboardingView.swift */; };
 		E5F60718293A4B5C6D7E8F90 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F60718293A4B5C6D7E8F90AB /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -37,9 +39,8 @@
 		0718293A4B5C6D7E8F90AB12 /* DesktopPet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DesktopPet.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B100000000000000000000001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		B100000000000000000000002 /* AppCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCoordinator.swift; sourceTree = "<group>"; };
-		B100000000000000000000003 /* GlobalHotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotkeyManager.swift; sourceTree = "<group>"; };
-		B100000000000000000000004 /* KeyboardMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardMonitor.swift; sourceTree = "<group>"; };
 		B100000000000000000000005 /* MouseTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseTracker.swift; sourceTree = "<group>"; };
+		B100000000000000000000016 /* GlobalInputMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalInputMonitor.swift; sourceTree = "<group>"; };
 		B100000000000000000000006 /* InteractionEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractionEvent.swift; sourceTree = "<group>"; };
 		B100000000000000000000007 /* PetConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetConfig.swift; sourceTree = "<group>"; };
 		B100000000000000000000008 /* AccessibilityPermissionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPermissionManager.swift; sourceTree = "<group>"; };
@@ -56,6 +57,9 @@
 		B100000000000000000000013 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
 		B100000000000000000000014 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		B100000000000000000000015 /* ScreenGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenGeometry.swift; sourceTree = "<group>"; };
+		B100000000000000000000017 /* PetRootContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRootContainerView.swift; sourceTree = "<group>"; };
+		B100000000000000000000018 /* AnimationDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationDriver.swift; sourceTree = "<group>"; };
+		B100000000000000000000019 /* AccessibilityOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityOnboardingView.swift; sourceTree = "<group>"; };
 		B2C3D4E5F60718293A4B5C6D /* DesktopPetApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPetApp.swift; sourceTree = "<group>"; };
 		D4E5F60718293A4B5C6D7E8F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		F60718293A4B5C6D7E8F90AB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -108,6 +112,7 @@
 			children = (
 				A10000000000000000000005 /* Input */,
 				A10000000000000000000006 /* Models */,
+				A1000000000000000000000C /* Animation */,
 				A10000000000000000000007 /* Permissions */,
 				A10000000000000000000008 /* PetState */,
 				A10000000000000000000009 /* Window */,
@@ -119,6 +124,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000000000000000000000A /* PetView */,
+				A1000000000000000000000D /* Onboarding */,
 				A1000000000000000000000B /* Settings */,
 			);
 			path = Features;
@@ -136,8 +142,7 @@
 		A10000000000000000000005 /* Input */ = {
 			isa = PBXGroup;
 			children = (
-				B100000000000000000000003 /* GlobalHotkeyManager.swift */,
-				B100000000000000000000004 /* KeyboardMonitor.swift */,
+				B100000000000000000000016 /* GlobalInputMonitor.swift */,
 				B100000000000000000000005 /* MouseTracker.swift */,
 			);
 			path = Input;
@@ -150,6 +155,14 @@
 				B100000000000000000000007 /* PetConfig.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000000C /* Animation */ = {
+			isa = PBXGroup;
+			children = (
+				B100000000000000000000018 /* AnimationDriver.swift */,
+			);
+			path = Animation;
 			sourceTree = "<group>";
 		};
 		A10000000000000000000007 /* Permissions */ = {
@@ -174,6 +187,7 @@
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000000C /* HitTestPassthroughView.swift */,
+				B100000000000000000000017 /* PetRootContainerView.swift */,
 				B10000000000000000000000D /* PetWindow.swift */,
 				B10000000000000000000000E /* PetWindowController.swift */,
 			);
@@ -188,6 +202,14 @@
 				B100000000000000000000011 /* SettingsFloatingButton.swift */,
 			);
 			path = PetView;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000000D /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				B100000000000000000000019 /* AccessibilityOnboardingView.swift */,
+			);
+			path = Onboarding;
 			sourceTree = "<group>";
 		};
 		A1000000000000000000000B /* Settings */ = {
@@ -281,8 +303,7 @@
 				C3D4E5F60718293A4B5C6D7E /* ContentView.swift in Sources */,
 				C10000000000000000000001 /* AppDelegate.swift in Sources */,
 				C10000000000000000000002 /* AppCoordinator.swift in Sources */,
-				C10000000000000000000003 /* GlobalHotkeyManager.swift in Sources */,
-				C10000000000000000000004 /* KeyboardMonitor.swift in Sources */,
+				C10000000000000000000016 /* GlobalInputMonitor.swift in Sources */,
 				C10000000000000000000005 /* MouseTracker.swift in Sources */,
 				C10000000000000000000006 /* InteractionEvent.swift in Sources */,
 				C10000000000000000000007 /* PetConfig.swift in Sources */,
@@ -300,6 +321,9 @@
 				C10000000000000000000013 /* SettingsViewModel.swift in Sources */,
 				C10000000000000000000014 /* Logger.swift in Sources */,
 				C10000000000000000000015 /* ScreenGeometry.swift in Sources */,
+				C10000000000000000000017 /* PetRootContainerView.swift in Sources */,
+				C10000000000000000000018 /* AnimationDriver.swift in Sources */,
+				C10000000000000000000019 /* AccessibilityOnboardingView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -434,7 +458,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -465,7 +489,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;

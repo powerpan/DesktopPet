@@ -1,20 +1,23 @@
 import AppKit
 
-final class PetWindow: NSWindow {
+final class PetWindow: NSPanel {
     init(contentRect: NSRect) {
         super.init(
             contentRect: contentRect,
-            styleMask: [.borderless],
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
 
+        isFloatingPanel = true
+        becomesKeyOnlyIfNeeded = true
+        hidesOnDeactivate = false
         isOpaque = false
         hasShadow = false
         backgroundColor = .clear
         level = .floating
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         isMovableByWindowBackground = true
-        ignoresMouseEvents = true
+        ignoresMouseEvents = false
     }
 }

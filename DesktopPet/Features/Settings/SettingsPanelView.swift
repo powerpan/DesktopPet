@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SettingsPanelView: View {
-    @StateObject private var viewModel = SettingsViewModel()
+    @EnvironmentObject private var viewModel: SettingsViewModel
 
     var body: some View {
         Form {
@@ -22,4 +22,5 @@ struct SettingsPanelView: View {
 
 #Preview {
     SettingsPanelView()
+        .environmentObject(SettingsViewModel())
 }

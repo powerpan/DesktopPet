@@ -10,6 +10,9 @@ final class PatrolScheduler {
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             self?.onPatrolTick?()
         }
+        if let timer {
+            RunLoop.main.add(timer, forMode: .common)
+        }
         Logger.shared.info("Patrol scheduler started.")
     }
 

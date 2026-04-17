@@ -1,5 +1,7 @@
 # DesktopPet 需求文档（PRD）
 
+> **仓库实现备注（2026）**：当前工程已关闭 App Sandbox，采用菜单栏 accessory 形态启动；宠物窗口为 `NSPanel` 浮动层，全局键盘与 `⌘K` 通过 `GlobalInputMonitor` 单路监听；设置项已接入 `UserDefaults`。细节以 `README.md` 与源码为准。
+
 ## 1. 项目概述
 
 DesktopPet 是一个完全本地运行的 macOS 原生桌面宠物系统，使用 Swift + SwiftUI + AppKit 实现。宠物以透明、无边框、常驻顶层窗口形式展示，核心价值是为用户提供轻量互动与陪伴，同时尽量减少对日常操作的干扰。

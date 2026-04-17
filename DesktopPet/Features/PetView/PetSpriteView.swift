@@ -1,12 +1,16 @@
 import SwiftUI
 
 struct PetSpriteView: View {
+    @EnvironmentObject private var stateMachine: PetStateMachine
+
     var body: some View {
         VStack(spacing: 10) {
-            Text("CAT")
-                .font(.headline)
-            Text("动画播放器占位")
-                .font(.caption)
+            Text(PetAnimationDriver.title(for: stateMachine.state))
+                .font(.system(size: 40, weight: .bold, design: .rounded))
+                .accessibilityLabel(PetAnimationDriver.accessibilityLabel(for: stateMachine.state))
+
+            Text(stateMachine.state.rawValue)
+                .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

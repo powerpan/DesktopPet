@@ -1,14 +1,13 @@
 # DesktopPet
 
-基于 Swift + SwiftUI + AppKit 的 macOS 桌面宠物项目骨架。  
-当前版本已完成核心架构分层（窗口、权限、输入、状态机、设置）并保留可扩展实现位点。
+基于 Swift + SwiftUI + AppKit 的 macOS 桌面宠物应用。运行后以**菜单栏图标**常驻，宠物使用**透明浮动面板**（`NSPanel` + `.floating`）显示在桌面上方；全局键盘与 `⌘K` 显隐依赖**辅助功能**授权。
 
 ## 环境要求
 
 - macOS 14.0+
 - Xcode（建议最新稳定版）
 - Swift 5+
-- 已安装并切换到完整 Xcode Toolchain（非仅 Command Line Tools）
+- 完整 Xcode（非仅 Command Line Tools）
 
 ## 快速开始
 
@@ -19,42 +18,47 @@
    cd DesktopPet
    ```
 
-2. 用 Xcode 打开 `DesktopPet.xcodeproj`
-3. 选择 `My Mac` 运行（⌘R）
-4. 首次运行时，按引导开启“辅助功能”权限（Accessibility）
+2. 用 Xcode 打开 `DesktopPet.xcodeproj`，选择 **My Mac**，按 **⌘R** 运行。
+3. 在菜单栏点击 **爪印图标**，使用「辅助功能与权限说明」或首次弹窗完成 **辅助功能** 授权。
+4. 系统设置中也可搜索「辅助功能」，勾选 **DesktopPet**。
 
-## 当前代码结构
+## 使用说明
+
+- **菜单栏**：点击爪印图标可显示/隐藏宠物、打开权限说明、进入系统「设置…」面板（`⌘,`）、退出应用。
+- **⌘K**：全局快捷键，切换宠物窗口显示（需已授予辅助功能）。
+- **鼠标穿透**：宠物窗口右上角按钮可切换；开启时仅按钮区域接收点击，其余穿透到下层应用（由 `PetRootContainerView` 的 hit-test 实现）。
+- **设置**：菜单栏图标 → **设置…**，可调整穿透、巡逻、缩放；选项写入 `UserDefaults`，重启后保留。
+
+## 分发与沙盒
+
+当前目标为**非 Mac App Store**（本地自用 / Developer ID）。工程内 **`ENABLE_APP_SANDBOX = NO`**，以便全局键盘监听与桌宠交互；若日后上架 Mac App Store，需重新评估沙盒能力与权限组合。
+
+## 代码结构（摘要）
 
 ```text
 DesktopPet/
-├── App/                # 应用入口与协调器
+├── App/                 # AppDelegate、AppCoordinator（生命周期与模块编排）
 ├── Core/
-│   ├── Window/         # 浮动透明窗口、穿透控制
-│   ├── Permissions/    # 辅助功能权限检测与请求
-│   ├── Input/          # 全局键盘监听、鼠标追踪、快捷键
-│   ├── PetState/       # 状态机与巡逻调度
-│   └── Models/         # 配置与交互事件模型
+│   ├── Window/          # PetWindow(NSPanel)、PetWindowController、穿透根视图
+│   ├── Animation/       # AnimationDriver（状态到展示占位，可替换为序列帧/视频）
+│   ├── Permissions/    # 辅助功能检测
+│   ├── Input/           # GlobalInputMonitor（合并全局键与 ⌘K）、MouseTracker
+│   ├── PetState/        # 状态机、巡逻调度
+│   └── Models/          # 配置与交互事件
 ├── Features/
-│   ├── PetView/        # 宠物容器、精灵视图、悬浮设置按钮
-│   └── Settings/       # 设置面板与 ViewModel
-└── Utils/              # 日志与屏幕几何工具
+│   ├── PetView/         # 宠物 SwiftUI 层
+│   ├── Onboarding/      # 权限说明 SwiftUI 视图
+│   └── Settings/        # 设置表单与持久化 ViewModel
+└── Utils/
 ```
 
-## 关键能力（骨架已就位）
+## 已实现行为（相对上一版骨架）
 
-- 透明无边框顶层窗口（`.floating`）
-- 全局键盘监听入口（需辅助功能权限）
-- 鼠标追踪入口与交互事件模型
-- `Cmd+K` 快捷键监听入口
-- 宠物状态机（idle / walk / keyTap / jump / sleep）
-
-## 下一步开发建议
-
-1. 将新建骨架文件加入 `project.pbxproj` 的编译目标（当前仅仓库结构完成）
-2. 将 `PetContainerView` 接入 `PetWindowController` 的点击穿透状态同步
-3. 完成动画驱动层（序列帧 / GIF / HEVC Alpha）与状态机联动
-4. 实现巡逻路径与活动窗口顶部贴边策略
-5. 增加单元测试：`PetStateMachine`、`PatrolScheduler`、权限流程
+- 启动后由 `AppCoordinator` 创建宠物窗口；无独立 `WindowGroup` 主窗口，避免与桌宠双窗口干扰。
+- 全局 `keyDown` 单路监听；`⌘K` 与「敲击」反馈分流。
+- 巡逻定时器在可见桌面范围内随机移动宠物窗口（占位路径，可再换为贴边/活动窗口逻辑）。
+- 空闲约 `PetConfig.default.idleToSleepInterval` 秒后进入睡眠状态；键鼠或巡逻可唤醒。
+- 设置项（穿透、巡逻、缩放）持久化。
 
 ## 需求文档
 
