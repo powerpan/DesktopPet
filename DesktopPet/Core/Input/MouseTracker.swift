@@ -7,6 +7,8 @@ final class MouseTracker {
     var onInteraction: ((InteractionEvent) -> Void)?
     var petFrameProvider: (() -> CGRect?)?
     private var lastLocation: CGPoint = .zero
+    private var lastHoverEmit: TimeInterval = 0
+    private let hoverThrottle: TimeInterval = 0.25
 
     func start() {
         guard timer == nil else { return }
@@ -42,7 +44,11 @@ final class MouseTracker {
             let center = CGPoint(x: frame.midX, y: frame.midY)
             let distance = hypot(current.x - center.x, current.y - center.y)
             if distance < 120 {
-                onInteraction?(.mouseHoverNear(distance: distance))
+                let now = ProcessInfo.processInfo.systemUptime
+                if now - lastHoverEmit >= hoverThrottle {
+                    lastHoverEmit = now
+                    onInteraction?(.mouseHoverNear(distance: distance))
+                }
             }
         }
     }
