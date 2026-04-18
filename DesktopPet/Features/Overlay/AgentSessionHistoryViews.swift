@@ -250,4 +250,6 @@ enum DesktopPetNotificationUserInfoKey {
     static let channelId = "channelId"
     /// `AgentTriggerRule` 的 JSON 字符串（与 `JSONEncoder` 默认输出一致）。
     static let triggerRuleJSON = "triggerRuleJSON"
+    /// 饲养互动旁白：由应用拼好的多行说明，替换模板中的 `{careContext}`。
+    static let careContext = "careContext"
 }

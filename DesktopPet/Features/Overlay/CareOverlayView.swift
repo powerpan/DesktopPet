@@ -18,18 +18,43 @@ struct CareOverlayView: View {
             Text("今日陪伴 \(care.state.todayCompanionSeconds / 60) 分钟")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            Text("互动成功时的猫猫反应由「智能体设置 → 触发器 → 饲养互动」旁白请求模型生成（若已启用该规则）；此处仅在操作失败时提示。")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
             HStack(spacing: 12) {
                 Button("喂食") {
-                    toast = care.feedIfAllowed() ? "喵～" : "还在冷却哦"
+                    let before = care.state
+                    if care.feedIfAllowed() {
+                        let line = PetCareNarrativeContext.summaryLine(isFeed: true, before: before, after: care.state)
+                        NotificationCenter.default.post(
+                            name: .desktopPetCareInteractionForNarrative,
+                            object: nil,
+                            userInfo: [DesktopPetNotificationUserInfoKey.careContext: line]
+                        )
+                        toast = nil
+                    } else {
+                        toast = "还在冷却哦"
+                    }
                 }
                 Button("戳戳") {
-                    toast = care.petIfAllowed() ? "呼噜…" : "稍后再戳嘛"
+                    let before = care.state
+                    if care.petIfAllowed() {
+                        let line = PetCareNarrativeContext.summaryLine(isFeed: false, before: before, after: care.state)
+                        NotificationCenter.default.post(
+                            name: .desktopPetCareInteractionForNarrative,
+                            object: nil,
+                            userInfo: [DesktopPetNotificationUserInfoKey.careContext: line]
+                        )
+                        toast = nil
+                    } else {
+                        toast = "稍后再戳嘛"
+                    }
                 }
             }
             if let toast {
                 Text(toast)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.orange)
             }
         }
         .padding(14)

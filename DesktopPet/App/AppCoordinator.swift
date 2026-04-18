@@ -57,6 +57,7 @@ final class AppCoordinator: ObservableObject {
         wirePresentChatContinuingChannelFromSettings()
         wireCloseChatOverlayFromPanel()
         wireForceFireTriggerFromSettings()
+        wireCareInteractionFromPetPanel()
 
         petCareModel.startCompanionTicking { [weak self] in self?.isPetVisible ?? false }
         triggerEngine.start()
@@ -140,6 +141,7 @@ final class AppCoordinator: ObservableObject {
             AgentSettingsView()
                 .environmentObject(agentSettingsStore)
                 .environmentObject(agentSessionStore)
+                .environmentObject(petCareModel)
         ))
     }
 
@@ -234,6 +236,19 @@ final class AppCoordinator: ObservableObject {
                 else { return }
                 Task { @MainActor in
                     await self.triggerEngine.forceFireTrigger(ruleSnapshot: rule)
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    private func wireCareInteractionFromPetPanel() {
+        NotificationCenter.default.publisher(for: .desktopPetCareInteractionForNarrative)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] note in
+                guard let self else { return }
+                guard let line = note.userInfo?[DesktopPetNotificationUserInfoKey.careContext] as? String else { return }
+                Task { @MainActor in
+                    await self.triggerEngine.fireCareInteractionNarrative(contextLine: line)
                 }
             }
             .store(in: &cancellables)

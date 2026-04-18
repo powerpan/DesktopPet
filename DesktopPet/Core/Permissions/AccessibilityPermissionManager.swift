@@ -19,6 +19,8 @@ extension Notification.Name {
     static let desktopPetCloseChatOverlay = Notification.Name("desktopPetCloseChatOverlay")
     /// 触发器编辑页「立即触发当前触发器」：`userInfo["triggerRuleJSON"]` 为 `AgentTriggerRule` 的 JSON 字符串（UTF-8）。
     static let desktopPetForceFireTriggerRule = Notification.Name("desktopPetForceFireTriggerRule")
+    /// 饲养面板喂食/戳戳成功：`userInfo["careContext"]` 为拼进旁白模板的说明文字。
+    static let desktopPetCareInteractionForNarrative = Notification.Name("desktopPetCareInteractionForNarrative")
 }
 
 @MainActor

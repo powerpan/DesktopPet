@@ -61,6 +61,8 @@ enum AgentTriggerKind: String, CaseIterable, Identifiable, Codable {
     case keyboardPattern
     case frontApp
     case screenSnap
+    /// 饲养面板「喂食 / 戳戳」成功时请求旁白（不走定时 tick；由应用发通知触发）。
+    case careInteraction
 
     var id: String { rawValue }
 
@@ -71,6 +73,7 @@ enum AgentTriggerKind: String, CaseIterable, Identifiable, Codable {
         case .keyboardPattern: return "键盘模式"
         case .frontApp: return "前台应用"
         case .screenSnap: return "截屏（规划中）"
+        case .careInteraction: return "饲养互动"
         }
     }
 
@@ -165,6 +168,11 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             （截屏类触发仍为规划能力，当前不会真的截屏或读画面。）{extra}
             请用一两句简体中文像桌宠一样打个招呼即可，勿假定已看到用户屏幕。触发类型：{triggerKind}
             """
+        case .careInteraction:
+            return """
+            用户刚在饲养面板完成了一次互动，以下为应用整理的数值与操作摘要（含在 {careContext}）。
+            请用一两句简体中文，以桌宠口吻给出**动作反馈**（开心、呼噜、蹭手、撒娇等小描写均可），不要像报表一样复读数字列表。{extra}
+            """
         }
     }
 
@@ -195,6 +203,11 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             return """
             （截屏能力占位。）本路由条件：{matchedCondition}。{extra}
             请用一两句简体中文像桌宠一样简短回应，勿假设已取得屏幕或图像内容。
+            """
+        case .careInteraction:
+            return """
+            本条为饲养互动旁白路由。摘要：{careContext}；条件概要：{matchedCondition}。{extra}
+            请用一两句简体中文像桌宠一样对刚才的互动做出可爱反馈，不要机械罗列数字。
             """
         }
     }
@@ -346,7 +359,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
                 promptTemplate: def
             )
             return ([route], def)
-        case .timer, .randomIdle, .screenSnap:
+        case .timer, .randomIdle, .screenSnap, .careInteraction:
             let route = TriggerPromptRoute(enabled: true, priority: 0, conditions: [.always], promptTemplate: def)
             return ([route], def)
         }
@@ -359,7 +372,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         let kbd: String
         let front: String
         switch kind {
-        case .timer, .randomIdle, .screenSnap:
+        case .timer, .randomIdle, .screenSnap, .careInteraction:
             defaultRoutes = [TriggerPromptRoute(enabled: true, priority: 0, conditions: [.always], promptTemplate: routeTmpl)]
             kbd = ""
             front = ""
@@ -374,11 +387,13 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
                 TriggerPromptRoute(enabled: true, priority: 0, conditions: [.frontAppContains("Xcode")], promptTemplate: routeTmpl),
             ]
         }
+        let defaultEnabled = kind == .timer || kind == .randomIdle
+        let defaultCooldown: Double = kind == .careInteraction ? 3 : 120
         return AgentTriggerRule(
             id: UUID(),
-            enabled: kind == .timer || kind == .randomIdle,
+            enabled: defaultEnabled,
             kind: kind,
-            cooldownSeconds: 120,
+            cooldownSeconds: defaultCooldown,
             lastFiredAt: nil,
             timerIntervalMinutes: 45,
             randomIdleSeconds: 90,

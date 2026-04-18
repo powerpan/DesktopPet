@@ -9,19 +9,27 @@ import SwiftUI
 
 private enum PetCareKeys {
     static let state = "DesktopPet.care.state"
+    static let feedCooldownSeconds = "DesktopPet.care.feedCooldownSeconds"
+    static let petCooldownSeconds = "DesktopPet.care.petCooldownSeconds"
 }
 
 @MainActor
 final class PetCareModel: ObservableObject {
     @Published private(set) var state: PetCareState
+    /// 喂食冷却（秒），默认 4 小时；可在「智能体设置 → 成长」调整。
+    @Published var feedCooldownSeconds: Int
+    /// 戳戳冷却（秒），默认 30 秒。
+    @Published var petCooldownSeconds: Int
 
     private let defaults = UserDefaults.standard
     private var companionTick: Timer?
+    private var cancellables = Set<AnyCancellable>()
 
-    /// 喂食冷却（秒）
-    let feedCooldown: TimeInterval = 4 * 60 * 60
-    /// 戳戳冷却
-    let petCooldown: TimeInterval = 30
+    private var feedCooldown: TimeInterval { TimeInterval(feedCooldownSeconds) }
+    private var petCooldown: TimeInterval { TimeInterval(petCooldownSeconds) }
+
+    private static func clampFeedCooldown(_ v: Int) -> Int { min(86_400, max(300, v)) }
+    private static func clampPetCooldown(_ v: Int) -> Int { min(600, max(5, v)) }
 
     init() {
         if let data = defaults.data(forKey: PetCareKeys.state),
@@ -30,7 +38,38 @@ final class PetCareModel: ObservableObject {
         } else {
             state = PetCareState.neutral
         }
+        let feedDef = 4 * 60 * 60
+        let petDef = 30
+        feedCooldownSeconds = Self.clampFeedCooldown(defaults.object(forKey: PetCareKeys.feedCooldownSeconds) as? Int ?? feedDef)
+        petCooldownSeconds = Self.clampPetCooldown(defaults.object(forKey: PetCareKeys.petCooldownSeconds) as? Int ?? petDef)
         ensureDayResetIfNeeded()
+
+        $feedCooldownSeconds
+            .dropFirst()
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .sink { [weak self] v in
+                guard let self else { return }
+                let c = Self.clampFeedCooldown(v)
+                if c != v {
+                    self.feedCooldownSeconds = c
+                } else {
+                    self.defaults.set(c, forKey: PetCareKeys.feedCooldownSeconds)
+                }
+            }
+            .store(in: &cancellables)
+        $petCooldownSeconds
+            .dropFirst()
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .sink { [weak self] v in
+                guard let self else { return }
+                let c = Self.clampPetCooldown(v)
+                if c != v {
+                    self.petCooldownSeconds = c
+                } else {
+                    self.defaults.set(c, forKey: PetCareKeys.petCooldownSeconds)
+                }
+            }
+            .store(in: &cancellables)
     }
 
     func startCompanionTicking(isPetVisible: @escaping () -> Bool) {
@@ -106,5 +145,30 @@ final class PetCareModel: ObservableObject {
         if let data = try? JSONEncoder().encode(state) {
             defaults.set(data, forKey: PetCareKeys.state)
         }
+    }
+}
+
+/// 饲养动作成功后，拼进「饲养互动」触发器 user 模板 `{careContext}` 的说明段。
+enum PetCareNarrativeContext {
+    static func summaryLine(isFeed: Bool, before: PetCareState, after: PetCareState) -> String {
+        let actionName = isFeed ? "喂食" : "戳一戳（抚摸）"
+        func pct(_ v: Double) -> String {
+            let c = min(1, max(0, v))
+            return String(format: "%.0f%%", c * 100)
+        }
+        func deltaLine(_ d: Double) -> String {
+            if abs(d) < 0.0005 { return "基本持平" }
+            let pts = abs(d) * 100
+            return d > 0 ? "约升 \(String(format: "%.0f", pts)) 个百分点" : "约降 \(String(format: "%.0f", pts)) 个百分点"
+        }
+        let moodDelta = after.mood - before.mood
+        let energyDelta = after.energy - before.energy
+        let companionMin = after.todayCompanionSeconds / 60
+        return """
+        「\(actionName)」已成功生效（非冷却拒绝）。
+        心情：操作前约 \(pct(before.mood)) → 操作后约 \(pct(after.mood))（\(deltaLine(moodDelta))）。
+        能量：操作前约 \(pct(before.energy)) → 操作后约 \(pct(after.energy))（\(deltaLine(energyDelta))）。
+        今日在宠物窗口可见时累计陪伴约 \(companionMin) 分钟（为当前快照，供你写反应时参考，勿像报表一样对用户复读数字）。
+        """
     }
 }

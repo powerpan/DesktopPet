@@ -8,6 +8,8 @@ import Foundation
 import SwiftUI
 
 private enum AgentSettingsKeys {
+    /// 仅一次：为旧配置插入「饲养互动」默认规则（用户可删除且不会再次自动插入）。
+    static let careTriggerMigrationDone = "DesktopPet.agent.careTriggerMigrationDone"
     static let baseURL = "DesktopPet.agent.baseURL"
     static let model = "DesktopPet.agent.model"
     static let systemPrompt = "DesktopPet.agent.systemPrompt"
@@ -64,6 +66,12 @@ final class AgentSettingsStore: ObservableObject {
                 .new(kind: .timer),
                 .new(kind: .randomIdle),
             ]
+        }
+        if !defaults.bool(forKey: AgentSettingsKeys.careTriggerMigrationDone) {
+            if !triggers.contains(where: { $0.kind == .careInteraction }) {
+                triggers.append(.new(kind: .careInteraction))
+            }
+            defaults.set(true, forKey: AgentSettingsKeys.careTriggerMigrationDone)
         }
 
         let triggersVer = defaults.integer(forKey: AgentSettingsKeys.triggersFormatVersion)

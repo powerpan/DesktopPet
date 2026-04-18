@@ -8,6 +8,7 @@ import SwiftUI
 struct AgentSettingsView: View {
     @EnvironmentObject private var settings: AgentSettingsStore
     @EnvironmentObject private var session: AgentSessionStore
+    @EnvironmentObject private var petCare: PetCareModel
 
     @State private var apiKeyDraft: String = ""
     @State private var keychainMessage: String?
@@ -29,6 +30,8 @@ struct AgentSettingsView: View {
                 .tabItem { Label("触发器", systemImage: "bolt.horizontal") }
             privacyTab
                 .tabItem { Label("隐私", systemImage: "hand.raised") }
+            growthTab
+                .tabItem { Label("成长", systemImage: "leaf.fill") }
         }
         .frame(minWidth: 480, minHeight: 520)
         .padding(12)
@@ -192,6 +195,7 @@ struct AgentSettingsView: View {
                     Text("触发器在满足条件时会自动请求模型写一句短旁白：写入旁白历史，并以宠窗旁云气泡展示。")
                     Text("轻点气泡会关闭气泡、以该旁白为上下文新建一个手动会话频道，并打开对话面板续聊。")
                     Text("在规则编辑页底部可点「立即触发当前触发器」，用当前表单内容向模型请求一次旁白（与自动触发相同链路），便于试跑提示语与路由。")
+                    Text("「饲养互动」在喂食/戳戳成功时请求旁白（不在此列表里自动轮询）；数值摘要写入模板占位符 {careContext}。首次升级会插入一条默认规则（默认关闭），可在编辑页打开开关。")
                     Text("每条规则有独立冷却，避免刷屏。定时与随机空闲适合日常使用；键盘与前台应用属于进阶能力，请谨慎开启。")
                 }
                 .font(.caption)
@@ -301,6 +305,55 @@ struct AgentSettingsView: View {
         }
         .formStyle(.grouped)
     }
+
+    private var growthTab: some View {
+        Form {
+            Section {
+                Stepper(
+                    value: Binding(
+                        get: {
+                            let minutes = petCare.feedCooldownSeconds / 60
+                            return min(24 * 60, max(5, minutes))
+                        },
+                        set: { petCare.feedCooldownSeconds = min(86_400, max(300, $0 * 60)) }
+                    ),
+                    in: 5...(24 * 60),
+                    step: 1
+                ) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("喂食冷却")
+                        Text("当前约 \(growthFeedCooldownLabel)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Stepper(
+                    "戳戳冷却：\(petCare.petCooldownSeconds) 秒",
+                    value: $petCare.petCooldownSeconds,
+                    in: 5 ... 600,
+                    step: 5
+                )
+            } header: {
+                Text("猫猫互动")
+            } footer: {
+                Text("喂食：5 分钟～24 小时（按分钟调节）。戳戳：5～600 秒。会写入本机偏好，重启后仍生效；冷却中是否立刻按新值生效取决于距离上次操作的时间。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private var growthFeedCooldownLabel: String {
+        let s = petCare.feedCooldownSeconds
+        let h = s / 3600
+        let m = (s % 3600) / 60
+        if h > 0, m > 0 { return "\(h) 小时 \(m) 分钟" }
+        if h > 0 { return "\(h) 小时" }
+        if m > 0 { return "\(m) 分钟" }
+        return "\(s) 秒"
+    }
 }
 
 private struct TriggerRuleRow: View {
@@ -373,6 +426,7 @@ private struct TriggerRuleRow: View {
             if r.routes.isEmpty, !r.frontAppNameContains.isEmpty { return "前台包含「\(r.frontAppNameContains)」" }
             return "前台路由\(routeHint)"
         case .screenSnap: return "占位，不触发\(routeHint)"
+        case .careInteraction: return "饲养面板成功后·旁白\(routeHint)"
         }
     }
 }
@@ -389,6 +443,7 @@ private struct PromptPlaceholderHelp: View {
                 Text("· {triggerKind} — 替换为当前规则的类型中文名，例如「键盘模式」「定时」「随机空闲」。")
                 Text("· {matchedCondition} — 替换为本次命中的那条旁白路由的条件摘要（例如「按键含「abc」且 空闲≥120s」），便于模型理解命中分支。")
                 Text("· {keySummary} — 仅键入摘要的短片段（与 {extra} 里可能带的摘要同源）；未开「附带键入摘要」时为空字符串。适合在模板中间单独引用摘要、而不想整段复述 {extra} 时使用。")
+                Text("· {careContext} — 仅「饲养互动」类型：喂食或戳戳成功时，由应用自动填入心情/能量变化与陪伴时长等摘要；未触发饲养操作或试跑占位时可能为空。")
             }
             .font(.caption2)
             .foregroundStyle(.secondary)
@@ -503,7 +558,7 @@ private struct TriggerRuleEditorSheet: View {
                             switch rule.kind {
                             case .keyboardPattern: return [.keyboardContains("")]
                             case .frontApp: return [.frontAppContains("")]
-                            case .timer, .randomIdle, .screenSnap: return [.always]
+                            case .timer, .randomIdle, .screenSnap, .careInteraction: return [.always]
                             }
                         }()
                         rule.routes.append(
@@ -608,6 +663,22 @@ private struct TriggerRuleEditorSheet: View {
                         Text("截屏")
                     } footer: {
                         Text("开启后也不会请求截屏权限；与「隐私」Tab 中的截屏总开关为后续版本预留。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                case .careInteraction:
+                    Section {
+                        Text("由饲养面板的「喂食」「戳戳」在**成功生效**后触发（动作处于冷却失败时不会请求模型）。应用会把当前心情、能量、今日陪伴时长及本次数值变化写入旁白模板的 {careContext}。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("冷却：两次饲养旁白请求之间的最短间隔；与喂食 4 小时、戳戳 30 秒的动作冷却无关，用于防止连点造成重复请求。")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    } header: {
+                        Text("饲养互动")
+                    } footer: {
+                        Text("列表中若有多条「饲养互动」规则，仅**第一条已启用**的会收到面板事件；可在模板中用 {careContext}、{extra}、{matchedCondition} 等占位符。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)

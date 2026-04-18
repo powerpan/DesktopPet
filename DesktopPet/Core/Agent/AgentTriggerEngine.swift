@@ -127,7 +127,40 @@ final class AgentTriggerEngine: ObservableObject {
         var stored = settings.triggers[i]
         stored.lastFiredAt = now
         settings.triggers[i] = stored
-        await firePrologue(trigger: ruleForEval, matchedRoute: matchedRoute, trimKeyboardBufferIfFired: false)
+        let careDryRun = ruleForEval.kind == .careInteraction
+            ? "（以下为设置页「立即触发」试跑，未发生真实喂食或戳戳。）"
+            : nil
+        await firePrologue(
+            trigger: ruleForEval,
+            matchedRoute: matchedRoute,
+            trimKeyboardBufferIfFired: false,
+            careContextAppendix: careDryRun
+        )
+    }
+
+    /// 饲养面板喂食/戳戳成功后：若存在已启用的「饲养互动」规则，则按冷却与旁白链路请求模型。
+    func fireCareInteractionNarrative(contextLine: String) async {
+        let trimmed = contextLine.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard let i = settings.triggers.firstIndex(where: { $0.enabled && $0.kind == .careInteraction }) else { return }
+        guard !session.isSending else { return }
+        let now = Date()
+        var stored = settings.triggers[i]
+        if let last = stored.lastFiredAt, now.timeIntervalSince(last) < stored.cooldownSeconds {
+            return
+        }
+        var ruleForEval = stored
+        ruleForEval.lastFiredAt = stored.lastFiredAt
+        let ctx = buildTriggerEvalContext(now: now)
+        let matchedRoute = selectMatchedRouteForForceFire(rule: ruleForEval, ctx: ctx)
+        stored.lastFiredAt = now
+        settings.triggers[i] = stored
+        await firePrologue(
+            trigger: ruleForEval,
+            matchedRoute: matchedRoute,
+            trimKeyboardBufferIfFired: false,
+            careContextAppendix: trimmed
+        )
     }
 
     private func tick() async {
@@ -154,7 +187,7 @@ final class AgentTriggerEngine: ObservableObject {
                 fired = evaluateKeyboard(rule: rule, ctx: ctx)
             case .frontApp:
                 fired = evaluateFrontApp(rule: rule, ctx: ctx)
-            case .screenSnap:
+            case .screenSnap, .careInteraction:
                 fired = false
             }
             if fired {
@@ -164,7 +197,8 @@ final class AgentTriggerEngine: ObservableObject {
                 await firePrologue(
                     trigger: rule,
                     matchedRoute: matchedRoute,
-                    trimKeyboardBufferIfFired: rule.kind == .keyboardPattern
+                    trimKeyboardBufferIfFired: rule.kind == .keyboardPattern,
+                    careContextAppendix: nil
                 )
             }
         }
@@ -288,7 +322,8 @@ final class AgentTriggerEngine: ObservableObject {
         trigger: AgentTriggerRule,
         matchedRoute: TriggerPromptRoute?,
         extra: String,
-        keySummaryLine: String
+        keySummaryLine: String,
+        careContext: String? = nil
     ) -> String {
         let rawTemplate: String = {
             if let r = matchedRoute, !r.promptTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -298,11 +333,18 @@ final class AgentTriggerEngine: ObservableObject {
             if !d.isEmpty { return d }
             return AgentTriggerRule.defaultPromptTemplate(for: trigger.kind)
         }()
-        return rawTemplate
+        let care = careContext?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let hadCareSlot = rawTemplate.contains("{careContext}")
+        var merged = rawTemplate
             .replacingOccurrences(of: "{extra}", with: extra)
             .replacingOccurrences(of: "{triggerKind}", with: trigger.kind.displayName)
             .replacingOccurrences(of: "{matchedCondition}", with: matchedRoute.map { Self.describeRouteConditions($0) } ?? "")
             .replacingOccurrences(of: "{keySummary}", with: keySummaryLine)
+            .replacingOccurrences(of: "{careContext}", with: care)
+        if !care.isEmpty, !hadCareSlot {
+            merged += "\n\n" + care
+        }
+        return merged
     }
 
     /// 自动触发键盘旁白成功后，从按键缓冲中截掉「各匹配子串最后一次出现」的右端点及其之前内容，避免同一缓冲内重复命中。
@@ -341,7 +383,12 @@ final class AgentTriggerEngine: ObservableObject {
         recentKeyBuffer = String(recentKeyBuffer[maxEnd...])
     }
 
-    private func firePrologue(trigger: AgentTriggerRule, matchedRoute: TriggerPromptRoute?, trimKeyboardBufferIfFired: Bool) async {
+    private func firePrologue(
+        trigger: AgentTriggerRule,
+        matchedRoute: TriggerPromptRoute?,
+        trimKeyboardBufferIfFired: Bool,
+        careContextAppendix: String? = nil
+    ) async {
         session.setSending(true)
         session.lastError = nil
         let key = KeychainStore.readAPIKey()
@@ -355,7 +402,13 @@ final class AgentTriggerEngine: ObservableObject {
                 keySummaryLine = clipped
             }
         }
-        let userLine = renderUserPrompt(trigger: trigger, matchedRoute: matchedRoute, extra: extra, keySummaryLine: keySummaryLine)
+        let userLine = renderUserPrompt(
+            trigger: trigger,
+            matchedRoute: matchedRoute,
+            extra: extra,
+            keySummaryLine: keySummaryLine,
+            careContext: careContextAppendix
+        )
         let personality = settings.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
         let userPayload: String
         if personality.isEmpty {
