@@ -16,6 +16,8 @@ private enum AgentSettingsKeys {
     static let attachKeySummary = "DesktopPet.agent.attachKeySummary"
     static let keyboardTriggerEnabled = "DesktopPet.agent.keyboardTriggerEnabled"
     static let screenSnapTriggerEnabled = "DesktopPet.agent.screenSnapTriggerEnabled"
+    static let triggerDefaultTemperature = "DesktopPet.agent.triggerDefaultTemperature"
+    static let triggerDefaultMaxTokens = "DesktopPet.agent.triggerDefaultMaxTokens"
     static let triggers = "DesktopPet.agent.triggers"
     /// 2 = 含旁白路由 `routes` / `defaultPromptTemplate` 的结构；用于首次升级后回写 UserDefaults。
     static let triggersFormatVersion = "DesktopPet.agent.triggersFormatVersion"
@@ -33,6 +35,10 @@ final class AgentSettingsStore: ObservableObject {
     /// 键盘模式触发总开关（仍受每条 trigger 控制）
     @Published var keyboardTriggerMasterEnabled: Bool
     @Published var screenSnapTriggerMasterEnabled: Bool
+    /// 条件旁白请求的默认温度（与「连接」里长对话温度独立）。
+    @Published var triggerDefaultTemperature: Double
+    /// 条件旁白请求的默认 max_tokens（与长对话独立）。
+    @Published var triggerDefaultMaxTokens: Int
     @Published var triggers: [AgentTriggerRule]
 
     private var cancellables = Set<AnyCancellable>()
@@ -48,6 +54,8 @@ final class AgentSettingsStore: ObservableObject {
         attachKeySummary = defaults.bool(forKey: AgentSettingsKeys.attachKeySummary)
         keyboardTriggerMasterEnabled = defaults.bool(forKey: AgentSettingsKeys.keyboardTriggerEnabled)
         screenSnapTriggerMasterEnabled = defaults.bool(forKey: AgentSettingsKeys.screenSnapTriggerEnabled)
+        triggerDefaultTemperature = defaults.object(forKey: AgentSettingsKeys.triggerDefaultTemperature) as? Double ?? 0.7
+        triggerDefaultMaxTokens = defaults.object(forKey: AgentSettingsKeys.triggerDefaultMaxTokens) as? Int ?? 256
         if let data = defaults.data(forKey: AgentSettingsKeys.triggers),
            let decoded = try? JSONDecoder().decode([AgentTriggerRule].self, from: data) {
             triggers = decoded
@@ -72,6 +80,8 @@ final class AgentSettingsStore: ObservableObject {
         $attachKeySummary.dropFirst().sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.attachKeySummary) }.store(in: &cancellables)
         $keyboardTriggerMasterEnabled.dropFirst().sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.keyboardTriggerEnabled) }.store(in: &cancellables)
         $screenSnapTriggerMasterEnabled.dropFirst().sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.screenSnapTriggerEnabled) }.store(in: &cancellables)
+        $triggerDefaultTemperature.dropFirst().debounce(for: .milliseconds(200), scheduler: DispatchQueue.main).sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.triggerDefaultTemperature) }.store(in: &cancellables)
+        $triggerDefaultMaxTokens.dropFirst().debounce(for: .milliseconds(200), scheduler: DispatchQueue.main).sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.triggerDefaultMaxTokens) }.store(in: &cancellables)
 
         $triggers
             .dropFirst()

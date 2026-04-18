@@ -127,7 +127,7 @@ final class AgentTriggerEngine: ObservableObject {
         var stored = settings.triggers[i]
         stored.lastFiredAt = now
         settings.triggers[i] = stored
-        await firePrologue(trigger: ruleForEval, matchedRoute: matchedRoute)
+        await firePrologue(trigger: ruleForEval, matchedRoute: matchedRoute, trimKeyboardBufferIfFired: false)
     }
 
     private func tick() async {
@@ -161,7 +161,11 @@ final class AgentTriggerEngine: ObservableObject {
                 let matchedRoute = selectMatchedRoute(rule: rule, ctx: ctx)
                 rule.lastFiredAt = now
                 settings.triggers[i] = rule
-                await firePrologue(trigger: rule, matchedRoute: matchedRoute)
+                await firePrologue(
+                    trigger: rule,
+                    matchedRoute: matchedRoute,
+                    trimKeyboardBufferIfFired: rule.kind == .keyboardPattern
+                )
             }
         }
     }
@@ -301,7 +305,43 @@ final class AgentTriggerEngine: ObservableObject {
             .replacingOccurrences(of: "{keySummary}", with: keySummaryLine)
     }
 
-    private func firePrologue(trigger: AgentTriggerRule, matchedRoute: TriggerPromptRoute?) async {
+    /// 自动触发键盘旁白成功后，从按键缓冲中截掉「各匹配子串最后一次出现」的右端点及其之前内容，避免同一缓冲内重复命中。
+    private func keyboardSubstringsForBufferTrim(trigger: AgentTriggerRule, matchedRoute: TriggerPromptRoute?) -> [String] {
+        if let route = matchedRoute, !trigger.routes.isEmpty {
+            return route.conditions.compactMap { c -> String? in
+                guard case let .keyboardContains(s) = c else { return nil }
+                let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+                return t.isEmpty ? nil : t
+            }
+        }
+        let p = trigger.keyboardPattern.trimmingCharacters(in: .whitespacesAndNewlines)
+        return p.isEmpty ? [] : [p]
+    }
+
+    private func lastRange(of needle: String, in haystack: String) -> Range<String.Index>? {
+        guard !needle.isEmpty, !haystack.isEmpty else { return nil }
+        var slice = haystack[...]
+        var found: Range<String.Index>?
+        while let r = slice.range(of: needle) {
+            found = r
+            slice = slice[r.upperBound...]
+        }
+        return found
+    }
+
+    private func trimRecentKeyBufferAfterKeyboardFire(trigger: AgentTriggerRule, matchedRoute: TriggerPromptRoute?) {
+        let subs = keyboardSubstringsForBufferTrim(trigger: trigger, matchedRoute: matchedRoute)
+        guard !subs.isEmpty else { return }
+        var maxEnd = recentKeyBuffer.startIndex
+        for s in subs {
+            guard let r = lastRange(of: s, in: recentKeyBuffer) else { continue }
+            if r.upperBound > maxEnd { maxEnd = r.upperBound }
+        }
+        guard maxEnd > recentKeyBuffer.startIndex else { return }
+        recentKeyBuffer = String(recentKeyBuffer[maxEnd...])
+    }
+
+    private func firePrologue(trigger: AgentTriggerRule, matchedRoute: TriggerPromptRoute?, trimKeyboardBufferIfFired: Bool) async {
         session.setSending(true)
         session.lastError = nil
         let key = KeychainStore.readAPIKey()
@@ -316,21 +356,34 @@ final class AgentTriggerEngine: ObservableObject {
             }
         }
         let userLine = renderUserPrompt(trigger: trigger, matchedRoute: matchedRoute, extra: extra, keySummaryLine: keySummaryLine)
+        let personality = settings.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let userPayload: String
+        if personality.isEmpty {
+            userPayload = userLine
+        } else {
+            userPayload = "\(personality)\n\n\(userLine)"
+        }
         let apiMessages: [[String: String]] = [
-            ["role": "user", "content": userLine],
+            ["role": "user", "content": userPayload],
         ]
+        let effTemp = trigger.triggerTemperature ?? settings.triggerDefaultTemperature
+        let rawMax = trigger.triggerMaxTokens ?? settings.triggerDefaultMaxTokens
+        let effMax = min(max(rawMax, 32), 1024)
         do {
             let text = try await client.completeChat(
                 baseURL: settings.baseURL,
                 model: settings.model,
                 apiKey: key,
-                systemPrompt: settings.systemPrompt,
+                systemPrompt: " ",
                 messages: apiMessages,
-                temperature: settings.temperature,
-                maxTokens: min(settings.maxTokens, 256)
+                temperature: effTemp,
+                maxTokens: effMax
             )
+            if trimKeyboardBufferIfFired, trigger.kind == .keyboardPattern {
+                trimRecentKeyBufferAfterKeyboardFire(trigger: trigger, matchedRoute: matchedRoute)
+            }
             if let onTriggerSpeech {
-                onTriggerSpeech(TriggerSpeechPayload(text: text, triggerKind: trigger.kind, userPrompt: userLine))
+                onTriggerSpeech(TriggerSpeechPayload(text: text, triggerKind: trigger.kind, userPrompt: userPayload))
             } else {
                 session.appendAssistant(text)
             }

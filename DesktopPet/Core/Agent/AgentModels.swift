@@ -215,6 +215,10 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
     var routes: [TriggerPromptRoute]
     /// 无路由命中时使用的 user 模板（可为空，引擎再回退到 `standardPrologueTemplate`）。
     var defaultPromptTemplate: String
+    /// 本条旁白请求专用温度；`nil` 表示使用 `AgentSettingsStore.triggerDefaultTemperature`。
+    var triggerTemperature: Double?
+    /// 本条旁白请求的 `max_tokens`；`nil` 表示使用 `AgentSettingsStore.triggerDefaultMaxTokens`。
+    var triggerMaxTokens: Int?
 
     init(
         id: UUID,
@@ -228,7 +232,9 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         keyboardPattern: String,
         frontAppNameContains: String,
         routes: [TriggerPromptRoute],
-        defaultPromptTemplate: String
+        defaultPromptTemplate: String,
+        triggerTemperature: Double? = nil,
+        triggerMaxTokens: Int? = nil
     ) {
         self.id = id
         self.enabled = enabled
@@ -242,6 +248,8 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         self.frontAppNameContains = frontAppNameContains
         self.routes = routes
         self.defaultPromptTemplate = defaultPromptTemplate
+        self.triggerTemperature = triggerTemperature
+        self.triggerMaxTokens = triggerMaxTokens
     }
 
     init(from decoder: Decoder) throws {
@@ -267,6 +275,8 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         )
         routes = migrated.routes
         defaultPromptTemplate = migrated.defaultPromptTemplate
+        triggerTemperature = try c.decodeIfPresent(Double.self, forKey: .triggerTemperature)
+        triggerMaxTokens = try c.decodeIfPresent(Int.self, forKey: .triggerMaxTokens)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -283,6 +293,8 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         try c.encode(frontAppNameContains, forKey: .frontAppNameContains)
         try c.encode(routes, forKey: .routes)
         try c.encode(defaultPromptTemplate, forKey: .defaultPromptTemplate)
+        try c.encodeIfPresent(triggerTemperature, forKey: .triggerTemperature)
+        try c.encodeIfPresent(triggerMaxTokens, forKey: .triggerMaxTokens)
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -290,6 +302,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         case timerIntervalMinutes, randomIdleSeconds, randomIdleProbability
         case keyboardPattern, frontAppNameContains
         case routes, defaultPromptTemplate
+        case triggerTemperature, triggerMaxTokens
     }
 
     /// 旧数据无 `routes` 时，从单字段生成等价路由，避免升级后行为突变。
@@ -373,7 +386,9 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             keyboardPattern: kbd,
             frontAppNameContains: front,
             routes: defaultRoutes,
-            defaultPromptTemplate: def
+            defaultPromptTemplate: def,
+            triggerTemperature: nil,
+            triggerMaxTokens: nil
         )
     }
 }

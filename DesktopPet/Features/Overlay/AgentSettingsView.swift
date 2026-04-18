@@ -17,6 +17,7 @@ struct AgentSettingsView: View {
     @State private var showConversationChannelsSheet = false
     @State private var showTriggerSpeechHistorySheet = false
     @State private var showTriggerUserPromptHistorySheet = false
+    @State private var showNewKeyboardTriggerPrivacyHint = false
 
     var body: some View {
         TabView {
@@ -47,6 +48,11 @@ struct AgentSettingsView: View {
             Button("好的", role: .cancel) {}
         } message: {
             Text("截屏/画面理解类触发仍在规划中。即使打开总开关，当前版本也不会发起截屏或上传图像。")
+        }
+        .alert("请打开键盘模式总开关", isPresented: $showNewKeyboardTriggerPrivacyHint) {
+            Button("好的", role: .cancel) {}
+        } message: {
+            Text("你刚添加了「键盘模式」触发器，但「隐私」Tab 中的「允许键盘模式触发」总开关仍为关闭，规则不会生效。请切换到「隐私」阅读说明并打开开关。")
         }
     }
 
@@ -170,7 +176,7 @@ struct AgentSettingsView: View {
             } header: {
                 Text("系统提示（人格）")
             } footer: {
-                Text("每次请求都会作为 system 消息发给模型，用来设定语气、称呼、回答语言等。对话面板里的聊天内容会接在它的后面。")
+                Text("每次请求都会作为 system 消息发给模型，用来设定语气、称呼、回答语言等；对话面板里的聊天内容会接在它的后面。条件触发的旁白请求会把同一段人格文字拼在 user 消息最开头（旁白单独走一套温度与 max_tokens，见「触发器」Tab），与长对话的 system 用法区分开。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -192,6 +198,23 @@ struct AgentSettingsView: View {
                 .foregroundStyle(.secondary)
             }
             Section {
+                HStack {
+                    Text("温度 (temperature)")
+                    Slider(value: $settings.triggerDefaultTemperature, in: 0 ... 1.5, step: 0.05)
+                    Text(String(format: "%.2f", settings.triggerDefaultTemperature))
+                        .font(.caption.monospacedDigit())
+                        .frame(width: 44, alignment: .trailing)
+                }
+                Stepper("max_tokens：\(settings.triggerDefaultMaxTokens)", value: $settings.triggerDefaultMaxTokens, in: 32 ... 1024, step: 32)
+            } header: {
+                Text("旁白生成参数（默认）")
+            } footer: {
+                Text("仅作用于「条件触发 / 立即触发」的短旁白请求，与「连接」Tab 里长对话的温度、max_tokens 相互独立。各条触发器可在编辑页单独覆盖；未覆盖时使用这里的默认值。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Section {
                 ForEach(settings.triggers) { rule in
                     TriggerRuleRow(rule: rule)
                 }
@@ -205,6 +228,9 @@ struct AgentSettingsView: View {
                     ForEach(AgentTriggerKind.allCases.filter { $0 != .screenSnap }) { k in
                         Button(k.displayName) {
                             settings.triggers.append(.new(kind: k))
+                            if k == .keyboardPattern, !settings.keyboardTriggerMasterEnabled {
+                                showNewKeyboardTriggerPrivacyHint = true
+                            }
                         }
                     }
                     Button("截屏（占位）") {
@@ -233,7 +259,7 @@ struct AgentSettingsView: View {
             } header: {
                 Text("请求增强（高风险）")
             } footer: {
-                Text("开启后，会把桌镜里显示的「键位标签摘要」拼进发给模型的系统提示或触发旁白请求，仅在你主动发消息或触发器触发时才会上网。")
+                Text("开启后，会把桌镜里显示的「键位标签摘要」拼进长对话的系统提示或触发旁白请求的 user 内容，仅在你主动发消息或触发器触发时才会上网。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -380,6 +406,7 @@ private struct TriggerRuleEditorSheet: View {
     @EnvironmentObject private var session: AgentSessionStore
     @Binding var isPresented: Bool
     @State private var editingRouteIndex: Int?
+    @State private var showKeyboardMasterOffOnFinish = false
 
     var body: some View {
         NavigationStack {
@@ -399,6 +426,20 @@ private struct TriggerRuleEditorSheet: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if rule.kind == .keyboardPattern, !settings.keyboardTriggerMasterEnabled {
+                    Section {
+                        Label {
+                            Text("「隐私」Tab 中的「允许键盘模式触发」总开关当前为关闭，本键盘规则不会匹配按键。请切换到「隐私」阅读风险提示后打开开关。")
+                                .font(.callout)
+                        } icon: {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                        }
+                    } header: {
+                        Text("需要操作")
+                    }
                 }
 
                 Section {
@@ -535,10 +576,17 @@ private struct TriggerRuleEditorSheet: View {
                     } header: {
                         Text("键盘模式（兼容）")
                     } footer: {
-                        Text("推荐在「旁白路由」里为不同子串配置不同提示语；优先级数字越大越先匹配。此处旧字段仅在路由表为空时作为单条子串回退；大小写敏感。需已授予辅助功能。")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("推荐在「旁白路由」里为不同子串配置不同提示语；优先级数字越大越先匹配。此处旧字段仅在路由表为空时作为单条子串回退；大小写敏感。需已授予辅助功能。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            if !settings.keyboardTriggerMasterEnabled {
+                                Text("总开关关闭时引擎不会评估键盘子串；请务必到「隐私」打开「允许键盘模式触发」。")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 case .frontApp:
                     Section {
@@ -564,6 +612,67 @@ private struct TriggerRuleEditorSheet: View {
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                }
+
+                Section {
+                    Toggle("单独设置旁白温度", isOn: Binding(
+                        get: { rule.triggerTemperature != nil },
+                        set: { on in
+                            if on {
+                                if rule.triggerTemperature == nil {
+                                    rule.triggerTemperature = settings.triggerDefaultTemperature
+                                }
+                            } else {
+                                rule.triggerTemperature = nil
+                            }
+                        }
+                    ))
+                    if rule.triggerTemperature != nil {
+                        HStack {
+                            Text("温度")
+                            Slider(
+                                value: Binding(
+                                    get: { rule.triggerTemperature ?? settings.triggerDefaultTemperature },
+                                    set: { rule.triggerTemperature = $0 }
+                                ),
+                                in: 0 ... 1.5,
+                                step: 0.05
+                            )
+                            Text(String(format: "%.2f", rule.triggerTemperature ?? settings.triggerDefaultTemperature))
+                                .font(.caption.monospacedDigit())
+                                .frame(width: 44, alignment: .trailing)
+                        }
+                    }
+                    Toggle("单独设置旁白 max_tokens", isOn: Binding(
+                        get: { rule.triggerMaxTokens != nil },
+                        set: { on in
+                            if on {
+                                if rule.triggerMaxTokens == nil {
+                                    rule.triggerMaxTokens = settings.triggerDefaultMaxTokens
+                                }
+                            } else {
+                                rule.triggerMaxTokens = nil
+                            }
+                        }
+                    ))
+                    if rule.triggerMaxTokens != nil {
+                        Stepper(
+                            "max_tokens: \(rule.triggerMaxTokens ?? settings.triggerDefaultMaxTokens)",
+                            value: Binding(
+                                get: { rule.triggerMaxTokens ?? settings.triggerDefaultMaxTokens },
+                                set: { rule.triggerMaxTokens = $0 }
+                            ),
+                            in: 32 ... 1024,
+                            step: 32
+                        )
+                    }
+                } header: {
+                    Text("旁白生成参数（本条）")
+                } footer: {
+                    Text("关闭开关时使用「触发器」Tab 的默认温度与 max_tokens。从气泡进入长对话后，发送消息仍使用「连接」Tab 的设置。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 Section {
@@ -603,10 +712,23 @@ private struct TriggerRuleEditorSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") {
-                        settings.upsertTrigger(rule)
-                        isPresented = false
+                        if rule.kind == .keyboardPattern, !settings.keyboardTriggerMasterEnabled {
+                            showKeyboardMasterOffOnFinish = true
+                        } else {
+                            settings.upsertTrigger(rule)
+                            isPresented = false
+                        }
                     }
                 }
+            }
+            .alert("键盘模式总开关未开启", isPresented: $showKeyboardMasterOffOnFinish) {
+                Button("仍保存并关闭") {
+                    settings.upsertTrigger(rule)
+                    isPresented = false
+                }
+                Button("留在编辑页", role: .cancel) {}
+            } message: {
+                Text("「隐私」Tab 中的「允许键盘模式触发」仍为关闭，键盘规则不会生效。若要启用匹配，请切换到「隐私」阅读说明并打开总开关。")
             }
         }
         .frame(minWidth: 400, minHeight: 360)
