@@ -22,24 +22,23 @@ struct DeskMirrorTextView: View {
         let keyboardW = max(12, w - gap - split.padW)
         HStack(alignment: .top, spacing: gap) {
             keyboardBlock(width: keyboardW)
-            mousePadBlock(width: split.padW, cell: split.cell)
+            mousePadBlock(width: split.padW)
         }
         .frame(width: w, alignment: .leading)
     }
 
     /// 键盘 + 鼠标垫宽度之和不超过 `layoutW - gap`。
-    private func splitKeyboardAndPad(layoutW: CGFloat, gap: CGFloat) -> (keyboardW: CGFloat, padW: CGFloat, cell: CGFloat) {
+    private func splitKeyboardAndPad(layoutW: CGFloat, gap: CGFloat) -> (keyboardW: CGFloat, padW: CGFloat) {
         let w = max(1, layoutW)
         let total = max(6, w - gap)
         if total < 22 {
-            let padW = max(8, total * 0.28)
+            let padW = max(8, total * 0.34)
             let keyboardW = total - padW
-            let cell = max(2, (padW - 6 * u) / CGFloat(max(1, padCols)))
-            return (keyboardW, padW, cell)
+            return (keyboardW, padW)
         }
-        // 鼠标垫只占窄条即可，把宽度让给键盘；idealPad 上限约 7 列 + 内边距。
+        // 鼠标垫略加宽，与 `padGrid` 左右 padding（各 3*u）用同一套算式，避免垫内右侧空一截。
         let idealPad = CGFloat(padCols) * max(3, 4 * u) + 6 * u
-        let padTarget = min(idealPad, total * 0.24)
+        let padTarget = min(idealPad, total * 0.31)
         var padW = max(CGFloat(padCols) * 2 + 2 * u, min(padTarget, total - 18))
         var keyboardW = total - padW
         if keyboardW < 14 {
@@ -48,8 +47,7 @@ struct DeskMirrorTextView: View {
         }
         padW = min(padW, total - 12)
         keyboardW = total - padW
-        let cell = max(2, (padW - 8 * u) / CGFloat(padCols))
-        return (keyboardW, padW, cell)
+        return (keyboardW, padW)
     }
 
     @ViewBuilder
@@ -146,17 +144,19 @@ struct DeskMirrorTextView: View {
         }
     }
 
-    private func mousePadBlock(width padW: CGFloat, cell: CGFloat) -> some View {
+    private func mousePadBlock(width padW: CGFloat) -> some View {
         VStack(alignment: .center, spacing: 2 * u) {
             Text("垫")
                 .font(.system(size: max(6, 8 * u), design: .rounded))
                 .foregroundStyle(.tertiary)
-            padGrid(cellSize: cell, padW: padW)
+            padGrid(padW: padW)
         }
         .frame(width: max(1, padW), alignment: .center)
     }
 
-    private func padGrid(cellSize: CGFloat, padW: CGFloat) -> some View {
+    private func padGrid(padW: CGFloat) -> some View {
+        let hPadding = 3 * u * 2
+        let cell = max(2, (max(1, padW) - hPadding) / CGFloat(padCols))
         let nx = max(-1, min(1, deskMirror.padCursorNormalized.x))
         let ny = max(-1, min(1, deskMirror.padCursorNormalized.y))
         let cx = (nx + 1) * 0.5 * CGFloat(padCols - 1)
@@ -169,8 +169,8 @@ struct DeskMirrorTextView: View {
                 HStack(spacing: 0) {
                     ForEach(0 ..< padCols, id: \.self) { c in
                         Text(r == iy && c == ix ? "●" : "·")
-                            .frame(width: cellSize, height: max(cellSize * 1.1, 7))
-                            .font(.system(size: max(5, 7 * u), weight: .medium, design: .monospaced))
+                            .frame(width: cell, height: max(cell * 1.1, 7))
+                            .font(.system(size: max(5, min(8 * u, cell * 0.85)), weight: .medium, design: .monospaced))
                     }
                 }
             }
