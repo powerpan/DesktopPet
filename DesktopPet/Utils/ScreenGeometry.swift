@@ -4,10 +4,14 @@ import CoreGraphics
 enum ScreenGeometry {
     static func visibleFrameContainingMouse() -> CGRect {
         let mousePoint = NSEvent.mouseLocation
-        for screen in NSScreen.screens where screen.frame.contains(mousePoint) {
+        let screens = NSScreen.screens
+        if let screen = screens.first(where: { $0.frame.contains(mousePoint) }) {
             return screen.visibleFrame
         }
-        return NSScreen.main?.visibleFrame ?? .zero
+        if let screen = screens.first(where: { $0.visibleFrame.contains(mousePoint) }) {
+            return screen.visibleFrame
+        }
+        return NSScreen.main?.visibleFrame ?? screens.first?.visibleFrame ?? .zero
     }
 
     static func clampedPoint(_ point: CGPoint, in frame: CGRect) -> CGPoint {

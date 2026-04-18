@@ -19,5 +19,6 @@ final class PetWindow: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         isMovableByWindowBackground = true
         ignoresMouseEvents = false
+        isExcludedFromWindowsMenu = true
     }
 }

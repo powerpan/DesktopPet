@@ -4,6 +4,8 @@ import Foundation
 @MainActor
 final class MouseTracker {
     private var timer: Timer?
+    /// When false (e.g. pet hidden), sampling still runs but does not emit interactions — avoids stale wakeups off-screen.
+    var interactionSamplingEnabled = true
     var onInteraction: ((InteractionEvent) -> Void)?
     var petFrameProvider: (() -> CGRect?)?
     private var lastLocation: CGPoint = .zero
@@ -30,6 +32,10 @@ final class MouseTracker {
 
     private func sample() {
         let current = NSEvent.mouseLocation
+        guard interactionSamplingEnabled else {
+            lastLocation = current
+            return
+        }
         let dx = current.x - lastLocation.x
         let dy = current.y - lastLocation.y
         let speed = sqrt(dx * dx + dy * dy)
