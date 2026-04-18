@@ -65,44 +65,46 @@ struct DeskMirrorTextView: View {
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 ForEach(Array(PhysicalKeyLayout.keyboardRows.enumerated()), id: \.offset) { _, row in
+                    let n = CGFloat(row.count)
+                    let slotW = max(3, (keyboardW - keySpacing * max(0, n - 1)) / max(n, 1))
                     HStack(spacing: keySpacing) {
                         ForEach(Array(row.enumerated()), id: \.offset) { _, code in
-                            keyCell(code: code)
+                            keyCell(code: code, slotWidth: slotW)
                                 .frame(maxWidth: .infinity)
                         }
                     }
                     .frame(width: max(1, keyboardW))
                 }
-                if let code = deskMirror.highlightedKeyCode, PhysicalKeyLayout.cell(forKeyCode: code) == nil {
-                    Text("其它 \(deskMirror.lastKeyLabel)")
-                        .font(.system(size: max(6, 8 * u), design: .monospaced))
-                        .foregroundStyle(.secondary)
-                }
                 if !deskMirror.recentKeyLabelsSummary.isEmpty {
                     Text(deskMirror.recentKeyLabelsSummary)
                         .font(.system(size: max(6, 8 * u), design: .monospaced))
                         .foregroundStyle(.tertiary)
-                        .lineLimit(2)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.45)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
         .frame(width: max(1, keyboardW), alignment: .leading)
     }
 
-    private func keyCell(code: UInt16) -> some View {
+    private func keyCell(code: UInt16, slotWidth: CGFloat) -> some View {
         let label = shortLabel(for: code)
         let on = deskMirror.highlightedKeyCode == code
             && deskMirror.accessibilityKeyboardMirrorGranted
             && settings.isDeskKeyMirrorEnabled
-        let cellFont = max(6, min(10, 9 * u))
-        let padH = max(0.5, 1.2 * u)
-        let padV = max(0.5, 1.5 * u)
-        let rowMinH = max(10, cellFont + padV * 2 + 2)
+        // 字号与内边距随「本行每键宽度」与缩放 u 双约束，避免放大/缩小时格内仍叠字。
+        let fromSlot = slotWidth * 0.58
+        let fromScale = 9 * u
+        let cellFont = max(5, min(fromSlot, fromScale, 12))
+        let padH = max(0.5, min(2 * u, slotWidth * 0.14))
+        let padV = max(0.5, min(2 * u, slotWidth * 0.12))
+        let rowMinH = max(9, cellFont + padV * 2 + max(1, slotWidth * 0.08))
         return Text(label)
             .font(.system(size: cellFont, weight: on ? .bold : .regular, design: .monospaced))
             .multilineTextAlignment(.center)
             .lineLimit(1)
-            .minimumScaleFactor(0.75)
+            .minimumScaleFactor(0.5)
             .padding(.horizontal, padH)
             .padding(.vertical, padV)
             .frame(minHeight: rowMinH)
