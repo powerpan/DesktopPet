@@ -14,11 +14,12 @@ struct SettingsFloatingButton: View {
         } label: {
             Image(systemName: isClickThrough ? "hand.tap.fill" : "hand.raised.fill")
                 .font(.system(size: 14, weight: .medium))
-                .frame(width: 28, height: 28)
+                .frame(width: 30, height: 30)
         }
         .buttonStyle(.plain)
         .background(.regularMaterial, in: Circle())
-        .help(isClickThrough ? "当前穿透：开" : "当前穿透：关")
-        .padding(6)
+        .contentShape(Rectangle())
+        .help(isClickThrough ? "点击：关闭穿透（可拖宠物）" : "点击：开启穿透（点击穿透到下层）")
+        .padding(8)
     }
 }

@@ -13,8 +13,8 @@ final class PetRootContainerView: NSView {
         didSet { needsDisplay = true }
     }
 
-    private let controlPadding: CGFloat = 6
-    private let controlSize: CGFloat = 44
+    private let controlPadding: CGFloat = 4
+    private let controlSize: CGFloat = 52
 
     init<V: View>(rootView: V) {
         hostingView = NSHostingView(rootView: AnyView(rootView))
@@ -51,7 +51,8 @@ final class PetRootContainerView: NSView {
             let rect = controlBounds(in: bounds)
             if rect.contains(point) {
                 let local = hostingView.convert(point, from: self)
-                return hostingView.hitTest(local)
+                // SwiftUI 在透明区域常返回 nil，仍应吃掉事件，否则会穿透到下层
+                return hostingView.hitTest(local) ?? hostingView
             }
             return nil
         }

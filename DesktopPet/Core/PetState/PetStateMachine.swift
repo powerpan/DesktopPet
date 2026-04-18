@@ -27,14 +27,16 @@ final class PetStateMachine: ObservableObject {
             if state == .sleep {
                 transition(to: .idle)
             }
+            // 正在显示敲击反馈时不要被甩鼠打断，否则几乎看不到「敲」
+            if state == .keyTap {
+                break
+            }
             scheduleTransient(to: .jump, durationNanoseconds: 320_000_000)
-        case let .mouseHoverNear(distance):
+        case .mouseHoverNear:
             if state == .sleep {
                 transition(to: .idle)
             }
-            if distance < 90 {
-                transition(to: .idle)
-            }
+            // 悬停只驱动 PointerTrackingModel 的注视偏移，不再改状态机，避免打断 keyTap/jump
         case .patrolRequested:
             if state == .sleep {
                 transition(to: .idle)
@@ -72,11 +74,11 @@ final class PetStateMachine: ObservableObject {
         }
     }
 
-    /// 连击越快，敲击态略短，形成更跟手的节奏感。
+    /// 连击越快，敲击态略短，但仍保留可见下限，避免 UI 来不及刷新。
     private func keyTapDurationNanoseconds() -> UInt64 {
-        let base: UInt64 = 220_000_000
-        let step: UInt64 = 11_000_000
-        let sub = min(UInt64(keyBurstCount), 14) * step
-        return max(72_000_000, base &- sub)
+        let base: UInt64 = 260_000_000
+        let step: UInt64 = 9_000_000
+        let sub = min(UInt64(keyBurstCount), 12) * step
+        return max(150_000_000, base &- sub)
     }
 }
