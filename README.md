@@ -82,6 +82,7 @@ DesktopPet/
 
 - 详细 PRD：`docs/requirements.md`
 - 待办与后续工作：`docs/TODO.md`
+- **扩展规划**（饲养、智能体 DeepSeek、叠加 UI、菜单栏触发与 API 设置）：`docs/TODO_AGENT_AND_CARE.md`
 
 ## 许可证
 
