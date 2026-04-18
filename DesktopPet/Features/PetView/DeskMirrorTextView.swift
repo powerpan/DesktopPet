@@ -9,22 +9,43 @@ struct DeskMirrorTextView: View {
     @EnvironmentObject private var deskMirror: DeskMirrorModel
     @EnvironmentObject private var settings: SettingsViewModel
     @Environment(\.petCardContentScale) private var u
+    @Environment(\.petCardLayoutInnerWidth) private var layoutW
 
     private let padCols = 7
     private let padRows = 5
 
     var body: some View {
-        HStack(alignment: .top, spacing: 6 * u) {
-            keyboardBlock
-            mousePadBlock
+        let gap = max(2, 4 * u)
+        let split = splitKeyboardAndPad(layoutW: max(1, layoutW), gap: gap)
+        HStack(alignment: .top, spacing: gap) {
+            keyboardBlock(width: split.keyboardW)
+            mousePadBlock(width: split.padW, cell: split.cell)
         }
-        .font(.system(size: max(7, 10 * u), design: .monospaced))
-        .minimumScaleFactor(0.55)
+        .frame(width: max(1, layoutW), alignment: .leading)
+    }
+
+    /// 在总宽内分配键盘与鼠标垫，保证垫不超出右边界；鼠标格宽随 `padW` 均分。
+    private func splitKeyboardAndPad(layoutW: CGFloat, gap: CGFloat) -> (keyboardW: CGFloat, padW: CGFloat, cell: CGFloat) {
+        let w = max(1, layoutW)
+        let idealPad = CGFloat(padCols) * max(4, 5.5 * u) + 8 * u
+        let maxPad = min(idealPad, w * 0.38)
+        let minPad = CGFloat(padCols) * 2.5 + 4 * u
+        var padW = min(maxPad, w - gap - 28)
+        padW = max(minPad, padW)
+        var keyboardW = w - gap - padW
+        if keyboardW < 24 {
+            keyboardW = 24
+            padW = max(minPad, w - gap - keyboardW)
+        }
+        let cell = max(2.5, (padW - 8 * u) / CGFloat(padCols))
+        return (keyboardW, padW, cell)
     }
 
     @ViewBuilder
-    private var keyboardBlock: some View {
-        VStack(alignment: .leading, spacing: 2 * u) {
+    private func keyboardBlock(width keyboardW: CGFloat) -> some View {
+        let rowSpacing = max(3, 5 * u)
+        let keySpacing = max(1, 1.5 * u)
+        VStack(alignment: .leading, spacing: rowSpacing) {
             if !settings.isDeskKeyMirrorEnabled {
                 Text("已在设置中关闭按键镜像")
                     .foregroundStyle(.secondary)
@@ -35,11 +56,13 @@ struct DeskMirrorTextView: View {
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 ForEach(Array(PhysicalKeyLayout.keyboardRows.enumerated()), id: \.offset) { _, row in
-                    HStack(spacing: 2 * u) {
+                    HStack(spacing: keySpacing) {
                         ForEach(Array(row.enumerated()), id: \.offset) { _, code in
                             keyCell(code: code)
+                                .frame(maxWidth: .infinity)
                         }
                     }
+                    .frame(width: keyboardW)
                 }
                 if let code = deskMirror.highlightedKeyCode, PhysicalKeyLayout.cell(forKeyCode: code) == nil {
                     Text("其它 \(deskMirror.lastKeyLabel)")
@@ -54,7 +77,7 @@ struct DeskMirrorTextView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(width: keyboardW, alignment: .leading)
     }
 
     private func keyCell(code: UInt16) -> some View {
@@ -62,14 +85,20 @@ struct DeskMirrorTextView: View {
         let on = deskMirror.highlightedKeyCode == code
             && deskMirror.accessibilityKeyboardMirrorGranted
             && settings.isDeskKeyMirrorEnabled
-        let cellFont = max(6, 9 * u)
-        let padH = max(1, 2 * u)
-        let padV = max(0.5, 1 * u)
+        let cellFont = max(7, 9 * u)
+        let padH = max(1, 1.5 * u)
+        let padV = max(1, 2 * u)
+        let rowMinH = max(12, cellFont + padV * 2 + 4)
         return Text(label)
             .font(.system(size: cellFont, weight: on ? .bold : .regular, design: .monospaced))
+            .multilineTextAlignment(.center)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
             .padding(.horizontal, padH)
             .padding(.vertical, padV)
-            .background(on ? Color.accentColor.opacity(0.35) : Color.clear, in: RoundedRectangle(cornerRadius: 3 * u))
+            .frame(minHeight: rowMinH)
+            .frame(maxWidth: .infinity)
+            .background(on ? Color.accentColor.opacity(0.35) : Color.clear, in: RoundedRectangle(cornerRadius: max(2, 3 * u)))
     }
 
     private func shortLabel(for code: UInt16) -> String {
@@ -106,19 +135,17 @@ struct DeskMirrorTextView: View {
         }
     }
 
-    private var mousePadBlock: some View {
-        let cell = max(5, 7 * u)
-        let padW = CGFloat(padCols) * cell + 8 * u
-        return VStack(alignment: .center, spacing: 2 * u) {
+    private func mousePadBlock(width padW: CGFloat, cell: CGFloat) -> some View {
+        VStack(alignment: .center, spacing: 2 * u) {
             Text("垫")
                 .font(.system(size: max(6, 8 * u), design: .rounded))
                 .foregroundStyle(.tertiary)
-            padGrid(cellSize: cell)
+            padGrid(cellSize: cell, padW: padW)
         }
-        .frame(width: padW)
+        .frame(width: padW, alignment: .center)
     }
 
-    private func padGrid(cellSize: CGFloat) -> some View {
+    private func padGrid(cellSize: CGFloat, padW: CGFloat) -> some View {
         let nx = max(-1, min(1, deskMirror.padCursorNormalized.x))
         let ny = max(-1, min(1, deskMirror.padCursorNormalized.y))
         let cx = (nx + 1) * 0.5 * CGFloat(padCols - 1)
@@ -131,13 +158,13 @@ struct DeskMirrorTextView: View {
                 HStack(spacing: 0) {
                     ForEach(0 ..< padCols, id: \.self) { c in
                         Text(r == iy && c == ix ? "●" : "·")
-                            .frame(width: cellSize, height: cellSize * 1.15)
-                            .font(.system(size: max(6, 8 * u), weight: .medium, design: .monospaced))
+                            .frame(width: cellSize, height: max(cellSize * 1.12, 8))
+                            .font(.system(size: max(6, 7.5 * u), weight: .medium, design: .monospaced))
                     }
                 }
             }
         }
         .padding(4 * u)
-        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 4 * u))
+        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: max(2, 4 * u)))
     }
 }
