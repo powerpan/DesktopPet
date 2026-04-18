@@ -28,7 +28,7 @@
 
 - **菜单栏**：点击爪印图标可显示/隐藏宠物、打开权限说明、进入系统「设置…」面板（`⌘,`）、退出应用。
 - **⌘K**：全局快捷键，切换宠物窗口显示（需已授予辅助功能）。
-- **鼠标穿透**：菜单栏 **设置…** 与窗口右上角按钮共用同一开关（`SettingsViewModel.isClickThroughEnabled`）。开启时精灵区不参与命中；`PetRootContainerView` 在包络外 `hitTest` 为 `nil`，包络内**只**转发 `NSHostingView.hitTest`（**不再**用 `?? hostingView` 吞掉 SwiftUI 返回的 `nil`，否则外圈会一直挡下层）。`PetSpriteView` 使用与圆角一致的 `contentShape`，减少方形容器在圆角外误挡点击。穿透关闭时拖窗请点在**材质卡片**上。
+- **鼠标穿透**：菜单栏 **设置…** 与窗口右上角按钮共用同一开关。开启时精灵区不参与命中；`PetRootContainerView` 包络外 `hitTest` 为 `nil`，包络内只转发 `NSHostingView.hitTest`（**不用** `?? hostingView`）。`PetSpriteView` 使用与圆角一致的 `contentShape`。宠物根视图**不再**整卡 `.padding(8)`，窗口边长由 `PetConfig.exteriorHitSide` 取「视觉边长 + 约 6pt」以尽量消掉隐形外圈。穿透关闭时拖窗请点在**材质卡片**上。
 - **缩放**：滑条 **0.6～1.2**（最大整窗约等于此前仅拉到 1.2× 时的体量，不再支持 1.8）。卡片画布基准 **176pt**（`PetConfig.petCanvasLayoutPoints`，小于原 220）以减小占位。`visualBaselineFactor`（0.6）仍使 **1.0 档** 视觉约等于更早一版「相对 0.6」的体量。连续拖动滑条时窗口以**本轮第一次**屏幕中心为锚缩放并夹紧在可见桌面内。
 - **设置**：菜单栏图标 → **设置…**，可调整穿透、巡逻、缩放；选项写入 `UserDefaults`，重启后保留。
 
