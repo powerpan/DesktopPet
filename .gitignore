@@ -35,6 +35,9 @@ Carthage/Build/
 .LSOverride
 ._*
 
+# 本地外部参考工程（不上传远端）
+outside_resources/
+
 # 备份与临时
 *~
 *.swp
