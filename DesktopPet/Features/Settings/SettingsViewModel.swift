@@ -40,7 +40,7 @@ final class SettingsViewModel: ObservableObject {
         } else {
             petScale = defaults.double(forKey: SettingsKeys.scale)
         }
-        petScale = min(max(petScale, 0.6), 1.8)
+        petScale = min(max(petScale, PetConfig.petScaleMin), PetConfig.petScaleMax)
 
         // 跳过首帧，避免 init 时把默认值再写回磁盘
         $isClickThroughEnabled

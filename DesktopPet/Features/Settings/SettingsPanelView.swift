@@ -14,7 +14,7 @@ struct SettingsPanelView: View {
             Toggle("启用巡逻", isOn: $viewModel.isPatrolEnabled)
             HStack {
                 Text("宠物缩放")
-                Slider(value: $viewModel.petScale, in: 0.6...1.8, step: 0.1)
+                Slider(value: $viewModel.petScale, in: PetConfig.petScaleMin...PetConfig.petScaleMax, step: 0.1)
                 Text(String(format: "%.1fx", viewModel.petScale))
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)

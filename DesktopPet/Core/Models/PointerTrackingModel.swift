@@ -21,13 +21,14 @@ final class PointerTrackingModel: ObservableObject {
         let dx = mouseScreen.x - center.x
         let dy = mouseScreen.y - center.y
         let distance = hypot(dx, dy)
-        if distance > 220 {
+        let gazeRadius = PetConfig.petCanvasLayoutPoints * 1.25
+        if distance > gazeRadius {
             gazeOffsetX = 0
             return
         }
         let maxOffset: CGFloat = 14
-        let t = max(-1, min(1, dx / 130))
-        let verticalDamp = max(0.35, 1 - min(abs(dy), 160) / 220)
+        let t = max(-1, min(1, dx / (PetConfig.petCanvasLayoutPoints * 0.59)))
+        let verticalDamp = max(0.35, 1 - min(abs(dy), PetConfig.petCanvasLayoutPoints * 0.73) / PetConfig.petCanvasLayoutPoints)
         gazeOffsetX = -t * maxOffset * verticalDamp
     }
 }

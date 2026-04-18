@@ -1,7 +1,7 @@
 # DesktopPet 需求文档（PRD）
 
 > **仓库实现备注（2026）**：当前工程已关闭 App Sandbox，采用菜单栏 accessory 形态启动；宠物窗口为 `NSPanel` 浮动层（`PetWindow` / `PetWindowController`），全局键盘与 `⌘K` 通过 `GlobalInputMonitor` 单路监听；设置项已接入 `UserDefaults`。**Bundle ID** 为 `io.github.powerpan.DesktopPet`；生成 Info 时含 `NSAccessibilityUsageDescription`。辅助功能未授权时由 `AccessibilityPermissionManager` 与 `AccessibilityOnboardingView` 引导登记 TCC、`AppCoordinator` 在激活与「重新检测」后延迟轮询信任状态。  
-> **窗口与命中**：`PetConfig.exteriorHitSide` 与 `PetConfig.visualBaselineFactor` 统一窗口边长、`PetRootContainerView.hitClipSidePoints` 与 SwiftUI `scaleEffect`；穿透开启时精灵层不接收点击，包络外 `hitTest` 为 `nil`。拖动缩放滑条时以固定屏幕锚点缩放并夹紧 `visibleFrame`，避免连续 `setFrame` 漂移。细节以 `README.md` 与源码为准。
+> **窗口与命中**：`PetConfig.petCanvasLayoutPoints`（卡片基准边长）、`petScaleMin`/`petScaleMax`（缩放滑条范围，当前最大 1.2）、`exteriorHitSide` 与 `visualBaselineFactor` 统一窗口边长与 `PetRootContainerView.hitClipSidePoints`；穿透开启时精灵层不接收点击，包络外 `hitTest` 为 `nil`。拖动缩放滑条时以固定屏幕锚点缩放并夹紧 `visibleFrame`。细节以 `README.md` 与源码为准。
 
 ## 1. 项目概述
 
