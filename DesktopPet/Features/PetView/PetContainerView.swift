@@ -10,19 +10,20 @@ struct PetContainerView: View {
     @EnvironmentObject private var stateMachine: PetStateMachine
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            PetSpriteView()
-            SettingsFloatingButton(
-                isClickThrough: Binding(
-                    get: { settings.isClickThroughEnabled },
-                    set: { settings.isClickThroughEnabled = $0 }
+        // 不用 ZStack(alignment: .topTrailing) 叠精灵+按钮：在「未铺满」时会把精灵贴右上角，左下出现大块空白（预览里像一圈缝）。
+        // 精灵先铺满固定画布，再用 overlay 叠按钮，布局与命中都与 176×176 对齐。
+        PetSpriteView()
+            .frame(width: PetConfig.petCanvasLayoutPoints, height: PetConfig.petCanvasLayoutPoints)
+            .overlay(alignment: .topTrailing) {
+                SettingsFloatingButton(
+                    isClickThrough: Binding(
+                        get: { settings.isClickThroughEnabled },
+                        set: { settings.isClickThroughEnabled = $0 }
+                    )
                 )
-            )
-        }
-        // 不要在这里再包一层 .padding：会扩大布局/命中基底，窗口只能跟着变大，形成「隐形外圈」。
-        .frame(width: PetConfig.petCanvasLayoutPoints, height: PetConfig.petCanvasLayoutPoints)
-        .scaleEffect(settings.petScale * PetConfig.visualBaselineFactor)
-        .animation(.easeInOut(duration: 0.2), value: settings.petScale)
+            }
+            .scaleEffect(settings.petScale * PetConfig.visualBaselineFactor)
+            .animation(.easeInOut(duration: 0.2), value: settings.petScale)
     }
 }
 
