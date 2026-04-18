@@ -15,13 +15,16 @@ struct DeskMirrorTextView: View {
     private let padRows = 5
 
     var body: some View {
+        let w = max(1, layoutW)
         let gap = max(2, 3 * u)
-        let split = splitKeyboardAndPad(layoutW: max(1, layoutW), gap: gap)
+        let split = splitKeyboardAndPad(layoutW: w, gap: gap)
+        // 用余量定键盘宽，避免浮点舍入在 HStack 右侧留一条空。
+        let keyboardW = max(12, w - gap - split.padW)
         HStack(alignment: .top, spacing: gap) {
-            keyboardBlock(width: split.keyboardW)
+            keyboardBlock(width: keyboardW)
             mousePadBlock(width: split.padW, cell: split.cell)
         }
-        .frame(width: max(1, layoutW), alignment: .leading)
+        .frame(width: w, alignment: .leading)
     }
 
     /// 键盘 + 鼠标垫宽度之和不超过 `layoutW - gap`。
@@ -29,19 +32,22 @@ struct DeskMirrorTextView: View {
         let w = max(1, layoutW)
         let total = max(6, w - gap)
         if total < 22 {
-            let padW = max(8, total * 0.42)
+            let padW = max(8, total * 0.28)
             let keyboardW = total - padW
             let cell = max(2, (padW - 6 * u) / CGFloat(max(1, padCols)))
             return (keyboardW, padW, cell)
         }
-        let idealPad = CGFloat(padCols) * max(3.5, 5 * u) + 8 * u
-        let padTarget = min(idealPad, total * 0.36)
-        var padW = max(CGFloat(padCols) * 2 + 3 * u, min(padTarget, total - 14))
+        // 鼠标垫只占窄条即可，把宽度让给键盘；idealPad 上限约 7 列 + 内边距。
+        let idealPad = CGFloat(padCols) * max(3, 4 * u) + 6 * u
+        let padTarget = min(idealPad, total * 0.24)
+        var padW = max(CGFloat(padCols) * 2 + 2 * u, min(padTarget, total - 18))
         var keyboardW = total - padW
         if keyboardW < 14 {
             keyboardW = 14
             padW = max(CGFloat(padCols) * 2 + 2 * u, total - keyboardW)
         }
+        padW = min(padW, total - 12)
+        keyboardW = total - padW
         let cell = max(2, (padW - 8 * u) / CGFloat(padCols))
         return (keyboardW, padW, cell)
     }

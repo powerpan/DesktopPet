@@ -21,8 +21,9 @@ struct PetSpriteView: View {
             let side = max(1, min(geo.size.width, geo.size.height))
             let u = side / layoutReferenceSide
             let cornerRadius = min(side * 0.12, max(4, side * 0.5 - 1))
+            // 桌镜行用满水平内宽；右上角按钮叠在 overlay 上，不必再整体减 30+ pt 否则右侧会空一大块。
             let innerAfterHPadding = max(1, side - 8 * u)
-            let deskMirrorLayoutWidth = min(innerAfterHPadding - 2, max(32, innerAfterHPadding - (24 + 8 * u)))
+            let deskMirrorLayoutWidth = max(28, innerAfterHPadding - 4)
 
             VStack(alignment: .leading, spacing: max(3, 5 * u)) {
                 Text("猫猫桌前（文字）")
