@@ -1,3 +1,8 @@
+//
+// PetWindow.swift
+// 桌宠浮动面板：无边框、非激活也可显示、透明背景，层级为 floating，可跨 Space 显示。
+//
+
 import AppKit
 
 final class PetWindow: NSPanel {
@@ -19,6 +24,7 @@ final class PetWindow: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         isMovableByWindowBackground = true
         ignoresMouseEvents = false
+        // 避免桌宠出现在「窗口」菜单里干扰用户
         isExcludedFromWindowsMenu = true
     }
 }

@@ -1,3 +1,8 @@
+//
+// ContentView.swift
+// 早期脚手架用的演示窗口视图；当前桌宠主界面由 PetWindow + PetContainerView 承担，本文件可保留给预览或后续主窗口。
+//
+
 import SwiftUI
 
 struct ContentView: View {

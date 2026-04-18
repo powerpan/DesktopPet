@@ -1,3 +1,8 @@
+//
+// PetStateMachine.swift
+// 根据 InteractionEvent 切换宠物状态；短时状态（敲、跳）用 Task 延时后回到 idle。
+//
+
 import Foundation
 import SwiftUI
 
@@ -42,6 +47,7 @@ final class PetStateMachine: ObservableObject {
         state = newState
     }
 
+    /// 先切入短时动画态，再在指定纳秒后回到 idle
     private func scheduleTransient(to newState: PetState, durationNanoseconds: UInt64) {
         transientTask?.cancel()
         transition(to: newState)

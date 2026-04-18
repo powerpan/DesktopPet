@@ -1,3 +1,8 @@
+//
+// PetContainerView.swift
+// 桌宠 SwiftUI 根布局：精灵占位 + 穿透切换浮动按钮，整体可缩放。
+//
+
 import SwiftUI
 
 struct PetContainerView: View {

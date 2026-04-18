@@ -1,8 +1,11 @@
+//
+// PetRootContainerView.swift
+// AppKit 根视图：承载 SwiftUI 内容；开启穿透时除右上角控件区域外 hitTest 返回 nil，让点击落到下层窗口。
+//
+
 import AppKit
 import SwiftUI
 
-/// Hosts SwiftUI content but forwards mouse hits to windows below when ``passthroughEnabled`` is on,
-/// except for a fixed **visual** top-trailing control region (``SettingsFloatingButton`` in a flipped view sits at the bottom-trailing AppKit rect).
 final class PetRootContainerView: NSView {
     private let hostingView: NSHostingView<AnyView>
 
@@ -31,14 +34,15 @@ final class PetRootContainerView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    /// 与 SwiftUI 一致采用向下增长的 Y，便于和 .topTrailing 对齐命中区域
     override var isFlipped: Bool {
         true
     }
 
+    /// 与 SwiftUI `.topTrailing` 的「视觉右上角」对齐：flipped 视图里对应 y 较小的那一侧
     private func controlBounds(in bounds: CGRect) -> CGRect {
         let w = bounds.width
         let side = controlPadding + controlSize
-        // `isFlipped == true`: y grows downward; SwiftUI `.topTrailing` maps to bottom-trailing in this view.
         return CGRect(x: w - side, y: 0, width: side, height: side)
     }
 

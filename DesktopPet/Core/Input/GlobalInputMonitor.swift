@@ -1,7 +1,10 @@
+//
+// GlobalInputMonitor.swift
+// 键盘监听：同时注册全局与本地 keyDown；前者用于其他应用前台（需辅助功能），后者用于本应用前台时仍能收到按键。
+//
+
 import AppKit
 
-/// Registers `keyDown` monitors. Global events fire for other apps (needs Accessibility);
-/// local events fire while this process is key (global monitor does not), so both are used.
 @MainActor
 final class GlobalInputMonitor {
     private var globalMonitor: Any?
@@ -13,12 +16,14 @@ final class GlobalInputMonitor {
     func start() {
         guard globalMonitor == nil, localMonitor == nil else { return }
 
+        // 其他应用为前台时的按键（未授权时返回 nil）
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             Task { @MainActor in
                 self?.dispatch(event)
             }
         }
 
+        // 本进程为前台时的按键（全局监听收不到）
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
             Task { @MainActor in
@@ -62,7 +67,7 @@ final class GlobalInputMonitor {
         onKeyDown?(event)
     }
 
-    /// Prefer character match; fall back to physical key code so non‑US keyboard layouts still get ⌘K.
+    /// 优先用字符判断 ⌘K；部分键盘布局下用物理键码（ANSI K = 40）兜底。
     private func isCommandK(_ event: NSEvent) -> Bool {
         guard event.modifierFlags.contains(.command) else { return false }
         if event.charactersIgnoringModifiers?.lowercased() == "k" { return true }
