@@ -406,7 +406,7 @@ struct AgentSettingsView: View {
                 HStack {
                     Text("随机事件密度")
                     Spacer()
-                    Text("\(petCare.growthConfig.randomEventDensityPercent)%")
+                    Text(growthRandomDensityPercentAndPLine)
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
@@ -425,7 +425,7 @@ struct AgentSettingsView: View {
             } header: {
                 Text("成长参数")
             } footer: {
-                Text("每小时衰减在宠物隐藏时也会累计。若距离上次结算已超过 3 小时（例如久未打开应用），只会按小时补扣心情/能量，不会补抽随机事件；回到 3 小时内后恢复按密度抽样（午间等时段略更容易）。开启 AI 后，部分事件会请求模型生成 JSON（失败则自动用本地事件）；会消耗 API。")
+                Text("每小时衰减在宠物隐藏时也会累计。若距离上次结算已超过 3 小时（例如久未打开应用），只会按小时补扣心情/能量，不会补抽随机事件；回到 3 小时内后恢复按密度抽样（午间等时段略更容易）。密度 100% 且时段加权最高时，「每小时最多一次」随机尝试的成功概率上限约 90%。开启 AI 后，部分事件会请求模型生成 JSON（失败则自动用本地事件）；会消耗 API。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -674,6 +674,13 @@ struct AgentSettingsView: View {
                 petCare.growthConfig = PetGrowthConfig.clamped(c)
             }
         )
+    }
+
+    /// 与 `PetDecayEngine.nominalHourlyRandomEventProbability` 一致：当前本地小时、当前密度下的名义 p（不含「3 小时内才掷」条件）。
+    private var growthRandomDensityPercentAndPLine: String {
+        let pct = petCare.growthConfig.randomEventDensityPercent
+        let p = PetDecayEngine.nominalHourlyRandomEventProbability(randomEventDensityPercent: pct)
+        return "\(pct)%（p≈\(String(format: "%.1f", p * 100))%）"
     }
 
     private var growthDensityBinding: Binding<Double> {

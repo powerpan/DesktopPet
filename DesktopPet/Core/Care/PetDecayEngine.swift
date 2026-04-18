@@ -8,6 +8,24 @@ import Foundation
 enum PetDecayEngine {
     /// 单次唤醒最多补算的小时数，避免极端时间跳变把数值打穿（仍可多次唤醒继续补）
     private static let maxCatchUpHoursPerCall = 168
+    /// `PetLocalGrowthEventPool.periodMultiplier` 峰值约 1.35；density=1 时希望每小时触发概率峰值约 0.9 → k = 0.9/1.35
+    private static let randomEventProbabilityK: Double = 0.9 / 1.35
+    /// 单小时随机尝试成功概率上限（仍「每整点最多一条」）
+    private static let randomEventProbabilityCap: Double = 0.9
+
+    /// 与 `processHourly` 内掷骰公式一致（**不含**「距 `lastDecayAt`≤3 小时才掷」条件）。  
+    /// `date` 用当前时刻时，表示「若此刻所在本地小时被结算」时的名义概率；时段系数随小时变化。
+    static func nominalHourlyRandomEventProbability(
+        randomEventDensityPercent: Int,
+        at date: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Double {
+        let pct = min(100, max(0, randomEventDensityPercent))
+        let density = Double(pct) / 100.0
+        let hour = calendar.component(.hour, from: date)
+        let period = PetLocalGrowthEventPool.periodMultiplier(forHour: hour)
+        return min(randomEventProbabilityCap, density * period * randomEventProbabilityK)
+    }
 
     struct Result: Equatable {
         var newEvents: [PetDecayEventRecord]
@@ -67,7 +85,7 @@ enum PetDecayEngine {
 
             guard allowRandomEvents else { continue }
 
-            let p = min(0.95, density * period * 0.45)
+            let p = min(randomEventProbabilityCap, density * period * randomEventProbabilityK)
             if rng.unitDouble() < p {
                 if cfg.aiGrowthEventsEnabled,
                    rng.unitDouble() < 0.22 {
