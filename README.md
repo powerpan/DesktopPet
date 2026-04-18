@@ -19,14 +19,17 @@
    ```
 
 2. 用 Xcode 打开 `DesktopPet.xcodeproj`，选择 **My Mac**，按 **⌘R** 运行。
-3. 在菜单栏点击 **爪印图标**，使用「辅助功能与权限说明」或首次弹窗完成 **辅助功能** 授权。
-4. 系统设置中也可搜索「辅助功能」，勾选 **DesktopPet**（列表中的名称应与权限窗口底部「可执行名」一致；Xcode 调试若勾选后仍无全局键盘，请**退出应用再 Run**，并在说明窗口点 **重新检测** 查看诊断文案）。
+3. 在菜单栏点击 **爪印图标**，使用「辅助功能与权限说明」或首次弹窗完成 **辅助功能** 授权。（若你直接打开系统设置、列表里还没有 DesktopPet：请先回到本应用，点权限窗口里的 **「打开系统设置」** 或 **「让我在列表中出现」**，系统需要先登记本应用才会出现在该列表。）
+4. 系统设置中也可搜索「辅助功能」，勾选 **DesktopPet**。当前工程的 **Bundle ID** 为 `io.github.powerpan.DesktopPet`（若你曾用过 `com.example.DesktopPet` 的旧构建，请在辅助功能列表里用「−」删掉所有旧项，再退出应用并从 Xcode 重新 Run，只勾选**当前 DerivedData 路径**对应的一条）。
+5. 若勾选后仍显示未信任：菜单栏退出应用 → Xcode 再 Run → 在权限窗口点 **重新检测**；仍不行时在终端执行 `tccutil reset Accessibility io.github.powerpan.DesktopPet`，然后重新勾选。从「系统设置」切回本应用后，应用会在数秒内自动再检测几次以应对系统延迟。
+6. **若列表已勾选但应用内仍显示未信任（`AXIsProcessTrusted` 一直为 false）**：先在 Xcode 的 **Signing & Capabilities** 里为 **DesktopPet** 目标选择 **Team**（免费 **Personal Team** 即可），**不要**留空 Team 只靠「Sign to Run Locally」。然后 **Product → Clean Build Folder**，再 Run；在辅助功能里删掉所有旧 **DesktopPet** 后只勾选当前路径。可用终端自检签名是否带团队：`codesign -dvvv /你的/DesktopPet.app 路径 2>&1 | grep -E 'Authority|TeamIdentifier|adhoc'`（无 `TeamIdentifier` 时优先修签名再谈权限）。
 
 ## 使用说明
 
 - **菜单栏**：点击爪印图标可显示/隐藏宠物、打开权限说明、进入系统「设置…」面板（`⌘,`）、退出应用。
 - **⌘K**：全局快捷键，切换宠物窗口显示（需已授予辅助功能）。
-- **鼠标穿透**：宠物窗口右上角按钮可切换；开启时仅按钮区域接收点击，其余穿透到下层应用（由 `PetRootContainerView` 的 hit-test 实现）。
+- **鼠标穿透**：菜单栏 **设置…** 与窗口右上角按钮共用同一开关（`SettingsViewModel.isClickThroughEnabled`）。开启时精灵区不参与命中（`PetSpriteView` 上 `allowsHitTesting(false)`），`PetRootContainerView` 在居中包络外 `hitTest` 返回 `nil`，点击落到下层应用；包络边长与窗口随 `PetConfig.exteriorHitSide(scale)` 与缩放滑条联动。
+- **缩放**：滑条范围 0.6～1.8；`PetConfig.visualBaselineFactor`（默认 0.6）使 **1.0 档** 的视觉与窗口外框约等于旧版仅缩放到 **0.6** 时的大小（默认滑条仍为 1.0）。连续拖动滑条时，窗口以**本轮第一次**的屏幕中心为锚缩放，并夹紧在可见桌面内，避免往一角漂移飞出屏幕。
 - **设置**：菜单栏图标 → **设置…**，可调整穿透、巡逻、缩放；选项写入 `UserDefaults`，重启后保留。
 
 ## 分发与沙盒
@@ -39,7 +42,7 @@
 DesktopPet/
 ├── App/                 # AppDelegate、AppCoordinator（生命周期与模块编排）
 ├── Core/
-│   ├── Window/          # PetWindow(NSPanel)、PetWindowController、穿透根视图
+│   ├── Window/          # PetWindow(NSPanel)、PetWindowController、PetRootContainerView
 │   ├── Animation/       # AnimationDriver（状态到展示占位，可替换为序列帧/视频）
 │   ├── Permissions/    # 辅助功能检测
 │   ├── Input/           # GlobalInputMonitor（合并全局键与 ⌘K）、MouseTracker
@@ -62,6 +65,7 @@ DesktopPet/
 - 睡眠态下不再重设「进入睡眠」的空闲计时器，避免无意义重复触发。
 - 空闲约 `PetConfig.default.idleToSleepInterval` 秒后进入睡眠状态；键鼠或巡逻可唤醒。
 - 设置项（穿透、巡逻、缩放）持久化。
+- 辅助功能：`AXIsProcessTrusted` 诊断文案、`tccutil` 与签名自检说明；未授权时延迟登记 TCC 列表与多次重检；`PetWindow` 允许必要时成为 key 以避免 `makeKeyWindow` 控制台告警。
 
 ## 需求文档
 

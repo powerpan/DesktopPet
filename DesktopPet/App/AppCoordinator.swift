@@ -24,6 +24,8 @@ final class AppCoordinator: ObservableObject {
     /// 空闲一段时间后触发「进入睡眠」
     private var idleSleepTimer: Timer?
     private var isPetVisible = true
+    /// 辅助功能信任轮询：系统设置勾选后 TCC 可能延迟数秒才对本进程生效，取消旧任务避免重复排队。
+    private var accessibilityTrustPollTask: Task<Void, Never>?
 
     func start() {
         preparePetWindow()
@@ -47,6 +49,7 @@ final class AppCoordinator: ObservableObject {
 
         if !permissionManager.isGranted {
             presentOnboardingWindow()
+            // 登记调度在 `presentOnboardingWindow()` 末尾统一触发，避免重复排队
         }
 
         petWindowController?.setPassthrough(settingsViewModel.isClickThroughEnabled)
@@ -75,7 +78,7 @@ final class AppCoordinator: ObservableObject {
         if onboardingWindow == nil {
             let view = AccessibilityOnboardingView(permissionManager: permissionManager)
             let hosting = NSHostingView(rootView: view)
-            let rect = NSRect(x: 0, y: 0, width: 480, height: 280)
+            let rect = NSRect(x: 0, y: 0, width: 500, height: 360)
             let window = NSWindow(
                 contentRect: rect,
                 styleMask: [.titled, .closable],
@@ -98,6 +101,9 @@ final class AppCoordinator: ObservableObject {
                 .store(in: &cancellables)
         }
         onboardingWindow?.makeKeyAndOrderFront(nil)
+        if !permissionManager.isGranted {
+            permissionManager.scheduleAccessibilityListingRegistrationPromptIfNeeded()
+        }
     }
 
     private func preparePetWindow() {
@@ -135,13 +141,48 @@ final class AppCoordinator: ObservableObject {
 
     /// 用户点击「重新检测」：强制读 AX、刷新诊断文案，并在已信任时重启键盘监听（修复此前 start 早退导致全局监听永远为 nil）。
     private func recheckAccessibilityAndRestartInput() {
+        // 切回前台再读，避免刚在系统设置里勾选时仍读到旧状态
+        NSApp.activate(ignoringOtherApps: true)
         permissionManager.refreshStatus(prompt: false, bumpUI: true)
+        applyTrustToInputMonitors()
+        // 同一轮事件循环末尾再读一次（部分系统上 TCC 与 RunLoop 节拍不同步）
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.permissionManager.refreshStatus(prompt: false, bumpUI: true)
+            self.applyTrustToInputMonitors()
+        }
+        scheduleAccessibilityTrustPollingIfNeeded(manualRecheck: true)
+    }
+
+    /// 根据当前辅助功能信任状态，挂接或停止全局键盘监听。
+    private func applyTrustToInputMonitors() {
         if permissionManager.isGranted {
+            accessibilityTrustPollTask?.cancel()
+            accessibilityTrustPollTask = nil
             configureGlobalInputHandlers()
             globalInput.restart()
             dismissOnboardingIfNeeded()
         } else {
             globalInput.stop()
+        }
+    }
+
+    /// 从系统设置返回或用户点「重新检测」后，TCC 可能延迟数秒才刷新；在未信任时按间隔再检测若干次。
+    private func scheduleAccessibilityTrustPollingIfNeeded(manualRecheck: Bool = false) {
+        guard !permissionManager.isGranted else { return }
+        accessibilityTrustPollTask?.cancel()
+        let delays: [Double] = manualRecheck
+            ? [0.2, 0.55, 1.1, 2.2, 4.0, 7.0, 10.0]
+            : [0.35, 1.0, 2.5, 5.0]
+        accessibilityTrustPollTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            for delay in delays {
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                if Task.isCancelled { return }
+                self.permissionManager.refreshStatus(prompt: false, bumpUI: true)
+                self.applyTrustToInputMonitors()
+                if self.permissionManager.isGranted { return }
+            }
         }
     }
 
@@ -219,12 +260,9 @@ final class AppCoordinator: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self else { return }
-                self.permissionManager.refreshStatus(prompt: false)
-                // 从「系统设置 → 隐私」返回后重新挂监听，避免权限刚开仍无键盘
-                if self.permissionManager.isGranted {
-                    self.configureGlobalInputHandlers()
-                    self.globalInput.restart()
-                }
+                self.permissionManager.refreshStatus(prompt: false, bumpUI: true)
+                self.applyTrustToInputMonitors()
+                self.scheduleAccessibilityTrustPollingIfNeeded()
             }
             .store(in: &cancellables)
     }

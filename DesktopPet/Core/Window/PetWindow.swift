@@ -27,4 +27,9 @@ final class PetWindow: NSPanel {
         // 避免桌宠出现在「窗口」菜单里干扰用户
         isExcludedFromWindowsMenu = true
     }
+
+    /// 非激活面板基类默认不可成为 key 时，点击内嵌 SwiftUI 按钮仍会触发 `makeKeyWindow`，控制台告警。此处允许在必要时成为 key，与 `becomesKeyOnlyIfNeeded = true` 配合。
+    override var canBecomeKey: Bool { true }
+
+    override var canBecomeMain: Bool { false }
 }

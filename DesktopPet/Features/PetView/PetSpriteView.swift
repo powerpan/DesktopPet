@@ -6,6 +6,7 @@
 import SwiftUI
 
 struct PetSpriteView: View {
+    @EnvironmentObject private var settings: SettingsViewModel
     @EnvironmentObject private var stateMachine: PetStateMachine
     @EnvironmentObject private var pointer: PointerTrackingModel
 
@@ -23,6 +24,8 @@ struct PetSpriteView: View {
         .animation(.easeOut(duration: 0.12), value: pointer.gazeOffsetX)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        // 鼠标穿透开启时：精灵区不接收点击，事件交给 AppKit 根视图的 hitTest 落到下层应用；仅右上角按钮仍可点。
+        .allowsHitTesting(!settings.isClickThroughEnabled)
     }
 }
 

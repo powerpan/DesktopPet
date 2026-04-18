@@ -9,12 +9,14 @@ import SwiftUI
 final class PetRootContainerView: NSView {
     private let hostingView: NSHostingView<AnyView>
 
-    var passthroughEnabled = true {
+    /// 与 `PetConfig.exteriorHitSide` 一致；仅在此矩形（相对本视图 bounds 居中）内接收点击，矩形外 `hitTest` 一律返回 nil，事件落到下层应用。
+    var hitClipSidePoints: CGFloat = PetConfig.exteriorHitSide(scale: 1.0) {
         didSet { needsDisplay = true }
     }
 
-    private let controlPadding: CGFloat = 4
-    private let controlSize: CGFloat = 52
+    var passthroughEnabled = true {
+        didSet { needsDisplay = true }
+    }
 
     init<V: View>(rootView: V) {
         hostingView = NSHostingView(rootView: AnyView(rootView))
@@ -39,24 +41,26 @@ final class PetRootContainerView: NSView {
         true
     }
 
-    /// 与 SwiftUI `.topTrailing` 的「视觉右上角」对齐：flipped 视图里对应 y 较小的那一侧
-    private func controlBounds(in bounds: CGRect) -> CGRect {
-        let w = bounds.width
-        let side = controlPadding + controlSize
-        return CGRect(x: w - side, y: 0, width: side, height: side)
-    }
-
     override func hitTest(_ point: NSPoint) -> NSView? {
-        if passthroughEnabled {
-            let rect = controlBounds(in: bounds)
-            if rect.contains(point) {
-                let local = hostingView.convert(point, from: self)
-                // SwiftUI 在透明区域常返回 nil，仍应吃掉事件，否则会穿透到下层
-                return hostingView.hitTest(local) ?? hostingView
-            }
+        let b = bounds
+        let side = min(hitClipSidePoints, min(b.width, b.height))
+        guard side > 1 else {
+            return super.hitTest(point)
+        }
+        let env = CGRect(
+            x: (b.width - side) * 0.5,
+            y: (b.height - side) * 0.5,
+            width: side,
+            height: side
+        )
+        if !env.contains(point) {
             return nil
         }
+
         let local = hostingView.convert(point, from: self)
-        return hostingView.hitTest(local)
+        if passthroughEnabled {
+            return hostingView.hitTest(local)
+        }
+        return hostingView.hitTest(local) ?? hostingView
     }
 }

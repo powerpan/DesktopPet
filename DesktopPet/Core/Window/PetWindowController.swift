@@ -4,21 +4,28 @@
 //
 
 import AppKit
+import Combine
 import SwiftUI
 
 @MainActor
 final class PetWindowController: NSWindowController {
-    private let petConfig = PetConfig.default
+    private let settings: SettingsViewModel
     private weak var passthroughRoot: PetRootContainerView?
+    private var cancellables = Set<AnyCancellable>()
+    /// 拖动缩放滑条期间固定用「第一次变化前」的窗口中心，避免每帧用 setFrame 后的 frame 重算中心导致舍入漂移（宠物往右下跑飞屏）。
+    private var petScaleResizeAnchorScreen: CGPoint?
 
     init(settings: SettingsViewModel, stateMachine: PetStateMachine, pointer: PointerTrackingModel) {
-        let rect = NSRect(x: 120, y: 240, width: petConfig.windowSize.width, height: petConfig.windowSize.height)
+        self.settings = settings
+        let initialSide = PetConfig.exteriorHitSide(scale: settings.petScale)
+        let rect = NSRect(x: 120, y: 240, width: initialSide, height: initialSide)
         let window = PetWindow(contentRect: rect)
         let rootView = PetContainerView()
             .environmentObject(settings)
             .environmentObject(stateMachine)
             .environmentObject(pointer)
         let root = PetRootContainerView(rootView: rootView)
+        root.hitClipSidePoints = initialSide
         window.contentView = root
         super.init(window: window)
         shouldCascadeWindows = false
@@ -31,6 +38,50 @@ final class PetWindowController: NSWindowController {
             f.origin = ScreenGeometry.clampedOrigin(f.size, origin: f.origin, in: vf, margin: 24)
             window.setFrameOrigin(f.origin)
         }
+
+        settings.$petScale
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] scale in
+                self?.applyWindowSize(forScale: scale)
+            }
+            .store(in: &cancellables)
+
+        settings.$petScale
+            .debounce(for: .milliseconds(160), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.petScaleResizeAnchorScreen = nil
+            }
+            .store(in: &cancellables)
+    }
+
+    private func applyWindowSize(forScale scale: Double) {
+        guard let window else { return }
+        let side = CGFloat(round(PetConfig.exteriorHitSide(scale: scale)))
+        passthroughRoot?.hitClipSidePoints = side
+        let newSize = NSSize(width: side, height: side)
+
+        let anchor: CGPoint
+        if let a = petScaleResizeAnchorScreen {
+            anchor = a
+        } else {
+            let old = window.frame
+            let a = CGPoint(x: old.midX, y: old.midY)
+            petScaleResizeAnchorScreen = a
+            anchor = a
+        }
+
+        var origin = CGPoint(
+            x: anchor.x - newSize.width / 2,
+            y: anchor.y - newSize.height / 2
+        )
+        origin.x = round(origin.x * 2) / 2
+        origin.y = round(origin.y * 2) / 2
+
+        let vf = window.screen?.visibleFrame ?? ScreenGeometry.visibleFrameContainingMouse()
+        origin = ScreenGeometry.clampedOrigin(newSize, origin: origin, in: vf, margin: 12)
+
+        let newFrame = NSRect(origin: origin, size: newSize)
+        window.setFrame(newFrame, display: true, animate: false)
     }
 
     required init?(coder: NSCoder) {
@@ -38,7 +89,7 @@ final class PetWindowController: NSWindowController {
     }
 
     override func showWindow(_ sender: Any?) {
-        super.showWindow(sender)
+        // 不使用 super：默认实现会对窗口调 makeKeyAndOrderFront，而 .nonactivatingPanel 曾令 canBecomeKeyWindow 为 false 时产生控制台警告。
         window?.orderFrontRegardless()
     }
 

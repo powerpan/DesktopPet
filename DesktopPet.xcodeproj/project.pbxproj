@@ -3,18 +3,15 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		A1B2C3D4E5F6789012345689 /* DesktopPetApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F60718293A4B5C6D /* DesktopPetApp.swift */; };
-		C3D4E5F60718293A4B5C6D7E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8F /* ContentView.swift */; };
 		C10000000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000001 /* AppDelegate.swift */; };
 		C10000000000000000000002 /* AppCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000002 /* AppCoordinator.swift */; };
-		C10000000000000000000016 /* GlobalInputMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000016 /* GlobalInputMonitor.swift */; };
 		C10000000000000000000005 /* MouseTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000005 /* MouseTracker.swift */; };
 		C10000000000000000000006 /* InteractionEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000006 /* InteractionEvent.swift */; };
-		C10000000000000000000020 /* PointerTrackingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000020 /* PointerTrackingModel.swift */; };
 		C10000000000000000000007 /* PetConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000007 /* PetConfig.swift */; };
 		C10000000000000000000008 /* AccessibilityPermissionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000008 /* AccessibilityPermissionManager.swift */; };
 		C10000000000000000000009 /* PatrolScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000009 /* PatrolScheduler.swift */; };
@@ -30,9 +27,12 @@
 		C10000000000000000000013 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000013 /* SettingsViewModel.swift */; };
 		C10000000000000000000014 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000014 /* Logger.swift */; };
 		C10000000000000000000015 /* ScreenGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000015 /* ScreenGeometry.swift */; };
+		C10000000000000000000016 /* GlobalInputMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000016 /* GlobalInputMonitor.swift */; };
 		C10000000000000000000017 /* PetRootContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000017 /* PetRootContainerView.swift */; };
 		C10000000000000000000018 /* AnimationDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000018 /* AnimationDriver.swift */; };
 		C10000000000000000000019 /* AccessibilityOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000019 /* AccessibilityOnboardingView.swift */; };
+		C10000000000000000000020 /* PointerTrackingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000020 /* PointerTrackingModel.swift */; };
+		C3D4E5F60718293A4B5C6D7E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8F /* ContentView.swift */; };
 		E5F60718293A4B5C6D7E8F90 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F60718293A4B5C6D7E8F90AB /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -41,10 +41,8 @@
 		B100000000000000000000001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		B100000000000000000000002 /* AppCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCoordinator.swift; sourceTree = "<group>"; };
 		B100000000000000000000005 /* MouseTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseTracker.swift; sourceTree = "<group>"; };
-		B100000000000000000000016 /* GlobalInputMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalInputMonitor.swift; sourceTree = "<group>"; };
 		B100000000000000000000006 /* InteractionEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractionEvent.swift; sourceTree = "<group>"; };
 		B100000000000000000000007 /* PetConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetConfig.swift; sourceTree = "<group>"; };
-		B100000000000000000000020 /* PointerTrackingModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointerTrackingModel.swift; sourceTree = "<group>"; };
 		B100000000000000000000008 /* AccessibilityPermissionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPermissionManager.swift; sourceTree = "<group>"; };
 		B100000000000000000000009 /* PatrolScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatrolScheduler.swift; sourceTree = "<group>"; };
 		B10000000000000000000000A /* PetState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetState.swift; sourceTree = "<group>"; };
@@ -59,9 +57,11 @@
 		B100000000000000000000013 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
 		B100000000000000000000014 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		B100000000000000000000015 /* ScreenGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenGeometry.swift; sourceTree = "<group>"; };
+		B100000000000000000000016 /* GlobalInputMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalInputMonitor.swift; sourceTree = "<group>"; };
 		B100000000000000000000017 /* PetRootContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRootContainerView.swift; sourceTree = "<group>"; };
 		B100000000000000000000018 /* AnimationDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationDriver.swift; sourceTree = "<group>"; };
 		B100000000000000000000019 /* AccessibilityOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityOnboardingView.swift; sourceTree = "<group>"; };
+		B100000000000000000000020 /* PointerTrackingModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointerTrackingModel.swift; sourceTree = "<group>"; };
 		B2C3D4E5F60718293A4B5C6D /* DesktopPetApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPetApp.swift; sourceTree = "<group>"; };
 		D4E5F60718293A4B5C6D7E8F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		F60718293A4B5C6D7E8F90AB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -98,6 +98,14 @@
 				F60718293A4B5C6D7E8F90AB /* Assets.xcassets */,
 			);
 			path = DesktopPet;
+			sourceTree = "<group>";
+		};
+		4B5C6D7E8F90AB12C3D4E5F60 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				0718293A4B5C6D7E8F90AB12 /* DesktopPet.app */,
+			);
+			name = Products;
 			sourceTree = "<group>";
 		};
 		A10000000000000000000001 /* App */ = {
@@ -160,14 +168,6 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
-		A1000000000000000000000C /* Animation */ = {
-			isa = PBXGroup;
-			children = (
-				B100000000000000000000018 /* AnimationDriver.swift */,
-			);
-			path = Animation;
-			sourceTree = "<group>";
-		};
 		A10000000000000000000007 /* Permissions */ = {
 			isa = PBXGroup;
 			children = (
@@ -207,14 +207,6 @@
 			path = PetView;
 			sourceTree = "<group>";
 		};
-		A1000000000000000000000D /* Onboarding */ = {
-			isa = PBXGroup;
-			children = (
-				B100000000000000000000019 /* AccessibilityOnboardingView.swift */,
-			);
-			path = Onboarding;
-			sourceTree = "<group>";
-		};
 		A1000000000000000000000B /* Settings */ = {
 			isa = PBXGroup;
 			children = (
@@ -224,12 +216,20 @@
 			path = Settings;
 			sourceTree = "<group>";
 		};
-		4B5C6D7E8F90AB12C3D4E5F60 /* Products */ = {
+		A1000000000000000000000C /* Animation */ = {
 			isa = PBXGroup;
 			children = (
-				0718293A4B5C6D7E8F90AB12 /* DesktopPet.app */,
+				B100000000000000000000018 /* AnimationDriver.swift */,
 			);
-			name = Products;
+			path = Animation;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000000D /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				B100000000000000000000019 /* AccessibilityOnboardingView.swift */,
+			);
+			path = Onboarding;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -268,6 +268,7 @@
 				};
 			};
 			buildConfigurationList = AB12C3D4E5F60718293A4B5C6 /* Build configuration list for PBXProject "DesktopPet" */;
+			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -276,7 +277,6 @@
 			);
 			mainGroup = 293A4B5C6D7E8F90AB12C3D4;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 56;
 			productRefGroup = 4B5C6D7E8F90AB12C3D4E5F60 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -461,7 +461,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = BFYDGS756S;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -469,13 +469,14 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = DesktopPet;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSAccessibilityUsageDescription = "DesktopPet 需要辅助功能以便在您使用其他应用时接收键盘事件，用于桌宠动画反馈；不会上传或记录键入内容。";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.DesktopPet;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.powerpan.DesktopPet;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -492,7 +493,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = BFYDGS756S;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -500,13 +501,14 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = DesktopPet;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSAccessibilityUsageDescription = "DesktopPet 需要辅助功能以便在您使用其他应用时接收键盘事件，用于桌宠动画反馈；不会上传或记录键入内容。";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.DesktopPet;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.powerpan.DesktopPet;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
@@ -517,20 +519,20 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		AB12C3D4E5F60718293A4B5C6 /* Build configuration list for PBXProject "DesktopPet" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				B12C3D4E5F60718293A4B5C6D /* Debug */,
-				C3D4E5F60718293A4B5C6D7E8 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		6D7E8F90AB12C3D4E5F60718 /* Build configuration list for PBXNativeTarget "DesktopPet" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				D4E5F60718293A4B5C6D7E8F9 /* Debug */,
 				F60718293A4B5C6D7E8F90AC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AB12C3D4E5F60718293A4B5C6 /* Build configuration list for PBXProject "DesktopPet" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B12C3D4E5F60718293A4B5C6D /* Debug */,
+				C3D4E5F60718293A4B5C6D7E8 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

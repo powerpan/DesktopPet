@@ -21,11 +21,22 @@ struct AccessibilityOnboardingView: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
 
+            Text(
+                "若你直接打开系统设置、列表里还没有 DesktopPet：需要先由本应用向系统「登记」。请优先点下面的「打开系统设置」；若仍没有，再点「让我在列表中出现」后稍等几秒，再回到设置里查看。"
+            )
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
             HStack(spacing: 12) {
                 Button("打开系统设置") {
                     openAccessibilityPrivacyPane()
                 }
                 .keyboardShortcut(.defaultAction)
+
+                Button("让我在列表中出现") {
+                    permissionManager.triggerAccessibilityTrustPromptForSystemListing()
+                }
 
                 Button("重新检测") {
                     NotificationCenter.default.post(name: .desktopPetAccessibilityRecheck, object: nil)
@@ -50,8 +61,15 @@ struct AccessibilityOnboardingView: View {
 
     private func openAccessibilityPrivacyPane() {
         permissionManager.requestIfNeeded()
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-            NSWorkspace.shared.open(url)
+        // 优先深链到「隐私与安全性 → 辅助功能」应用列表；新系统若解析失败再打开「隐私与安全性」总页，需手动点「辅助功能」。
+        let specs = [
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+            "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension",
+        ]
+        for spec in specs {
+            if let url = URL(string: spec), NSWorkspace.shared.open(url) {
+                return
+            }
         }
     }
 }

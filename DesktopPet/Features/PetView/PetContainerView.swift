@@ -21,7 +21,7 @@ struct PetContainerView: View {
         }
         .padding(8)
         .frame(width: 220, height: 220)
-        .scaleEffect(settings.petScale)
+        .scaleEffect(settings.petScale * PetConfig.visualBaselineFactor)
         .animation(.easeInOut(duration: 0.2), value: settings.petScale)
     }
 }
