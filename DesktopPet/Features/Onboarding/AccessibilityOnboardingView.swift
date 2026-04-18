@@ -28,7 +28,7 @@ struct AccessibilityOnboardingView: View {
                 .keyboardShortcut(.defaultAction)
 
                 Button("重新检测") {
-                    permissionManager.refreshStatus(prompt: false)
+                    NotificationCenter.default.post(name: .desktopPetAccessibilityRecheck, object: nil)
                 }
             }
 
@@ -36,9 +36,16 @@ struct AccessibilityOnboardingView: View {
                 Label("已通过检测", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
             }
+
+            Text(permissionManager.lastRecheckSummary)
+                .id(permissionManager.recheckToken)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
         }
         .padding(24)
-        .frame(minWidth: 420, maxWidth: 480)
+        .frame(minWidth: 420, maxWidth: 520)
     }
 
     private func openAccessibilityPrivacyPane() {

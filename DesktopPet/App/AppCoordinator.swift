@@ -32,6 +32,7 @@ final class AppCoordinator: ObservableObject {
         wirePatrol()
         wireMouse()
         wireActivationRefresh()
+        wireAccessibilityRecheck()
 
         permissionManager.refreshStatus(prompt: false)
         // 隐藏宠物时不应因屏外鼠标产生悬停/唤醒
@@ -41,7 +42,7 @@ final class AppCoordinator: ObservableObject {
         // 若用户已预先勾选辅助功能，Combine 可能不会发「从 false→true」，需主动启动监听
         if permissionManager.isGranted {
             configureGlobalInputHandlers()
-            globalInput.start()
+            globalInput.restart()
         }
 
         if !permissionManager.isGranted {
@@ -114,13 +115,34 @@ final class AppCoordinator: ObservableObject {
                 guard let self else { return }
                 if granted {
                     self.configureGlobalInputHandlers()
-                    self.globalInput.start()
+                    self.globalInput.restart()
                     self.dismissOnboardingIfNeeded()
                 } else {
                     self.globalInput.stop()
                 }
             }
             .store(in: &cancellables)
+    }
+
+    private func wireAccessibilityRecheck() {
+        NotificationCenter.default.publisher(for: .desktopPetAccessibilityRecheck)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.recheckAccessibilityAndRestartInput()
+            }
+            .store(in: &cancellables)
+    }
+
+    /// 用户点击「重新检测」：强制读 AX、刷新诊断文案，并在已信任时重启键盘监听（修复此前 start 早退导致全局监听永远为 nil）。
+    private func recheckAccessibilityAndRestartInput() {
+        permissionManager.refreshStatus(prompt: false, bumpUI: true)
+        if permissionManager.isGranted {
+            configureGlobalInputHandlers()
+            globalInput.restart()
+            dismissOnboardingIfNeeded()
+        } else {
+            globalInput.stop()
+        }
     }
 
     private func configureGlobalInputHandlers() {
@@ -201,7 +223,7 @@ final class AppCoordinator: ObservableObject {
                 // 从「系统设置 → 隐私」返回后重新挂监听，避免权限刚开仍无键盘
                 if self.permissionManager.isGranted {
                     self.configureGlobalInputHandlers()
-                    self.globalInput.start()
+                    self.globalInput.restart()
                 }
             }
             .store(in: &cancellables)

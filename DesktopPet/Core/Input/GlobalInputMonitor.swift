@@ -59,6 +59,12 @@ final class GlobalInputMonitor {
         }
     }
 
+    /// 先卸再装，用于用户刚在系统设置中打开权限后，补注册此前为 nil 的全局监听。
+    func restart() {
+        stop()
+        start()
+    }
+
     private func dispatch(_ event: NSEvent) {
         if isCommandK(event) {
             onCommandK?()
