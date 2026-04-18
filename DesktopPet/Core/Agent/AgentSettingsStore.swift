@@ -17,6 +17,8 @@ private enum AgentSettingsKeys {
     static let keyboardTriggerEnabled = "DesktopPet.agent.keyboardTriggerEnabled"
     static let screenSnapTriggerEnabled = "DesktopPet.agent.screenSnapTriggerEnabled"
     static let triggers = "DesktopPet.agent.triggers"
+    /// 2 = 含旁白路由 `routes` / `defaultPromptTemplate` 的结构；用于首次升级后回写 UserDefaults。
+    static let triggersFormatVersion = "DesktopPet.agent.triggersFormatVersion"
 }
 
 @MainActor
@@ -54,6 +56,12 @@ final class AgentSettingsStore: ObservableObject {
                 .new(kind: .timer),
                 .new(kind: .randomIdle),
             ]
+        }
+
+        let triggersVer = defaults.integer(forKey: AgentSettingsKeys.triggersFormatVersion)
+        if triggersVer < 2, let migrated = try? JSONEncoder().encode(triggers) {
+            defaults.set(migrated, forKey: AgentSettingsKeys.triggers)
+            defaults.set(2, forKey: AgentSettingsKeys.triggersFormatVersion)
         }
 
         $baseURL.dropFirst().debounce(for: .milliseconds(200), scheduler: DispatchQueue.main).sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.baseURL) }.store(in: &cancellables)

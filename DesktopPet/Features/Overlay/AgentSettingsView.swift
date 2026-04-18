@@ -183,7 +183,7 @@ struct AgentSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
-            Section("列表") {
+            Section {
                 ForEach(settings.triggers) { rule in
                     TriggerRuleRow(rule: rule)
                 }
@@ -203,6 +203,13 @@ struct AgentSettingsView: View {
                         settings.triggers.append(.new(kind: .screenSnap))
                     }
                 }
+            } header: {
+                Text("列表")
+            } footer: {
+                Text("macOS 上分组表单里通常没有「左滑删除」；请点每行右侧废纸篓图标，或在打开「编辑」后使用工具栏里的「删除」。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .formStyle(.grouped)
@@ -281,6 +288,15 @@ private struct TriggerRuleRow: View {
             Spacer()
             Toggle("", isOn: enabledBinding)
                 .labelsHidden()
+            Button {
+                settings.removeTrigger(id: rule.id)
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.red)
+            .help("删除此触发器")
+            .accessibilityLabel("删除此触发器")
             Button("编辑") {
                 editing = rule
                 showEditor = true
@@ -307,12 +323,22 @@ private struct TriggerRuleRow: View {
     }
 
     private func subtitle(for r: AgentTriggerRule) -> String {
+        let routeHint: String = {
+            let n = r.routes.count
+            guard n > 0 else { return "" }
+            let mx = r.routes.map(\.priority).max() ?? 0
+            return " · \(n)条路由·最高优先级\(mx)"
+        }()
         switch r.kind {
-        case .timer: return "每 \(r.timerIntervalMinutes) 分钟"
-        case .randomIdle: return "空闲 ≥\(r.randomIdleSeconds)s，概率 \(Int(r.randomIdleProbability * 100))%"
-        case .keyboardPattern: return "模式「\(r.keyboardPattern)」"
-        case .frontApp: return "前台包含「\(r.frontAppNameContains)」"
-        case .screenSnap: return "占位，不触发"
+        case .timer: return "每 \(r.timerIntervalMinutes) 分钟\(routeHint)"
+        case .randomIdle: return "空闲 ≥\(r.randomIdleSeconds)s，概率 \(Int(r.randomIdleProbability * 100))%\(routeHint)"
+        case .keyboardPattern:
+            if r.routes.isEmpty, !r.keyboardPattern.isEmpty { return "模式「\(r.keyboardPattern)」" }
+            return "键盘路由\(routeHint)"
+        case .frontApp:
+            if r.routes.isEmpty, !r.frontAppNameContains.isEmpty { return "前台包含「\(r.frontAppNameContains)」" }
+            return "前台路由\(routeHint)"
+        case .screenSnap: return "占位，不触发\(routeHint)"
         case .bubbleTest: return "编辑内选手动触发短/长气泡"
         }
     }
@@ -322,6 +348,7 @@ private struct TriggerRuleEditorSheet: View {
     @State var rule: AgentTriggerRule
     @EnvironmentObject private var settings: AgentSettingsStore
     @Binding var isPresented: Bool
+    @State private var editingRouteIndex: Int?
 
     var body: some View {
         NavigationStack {
@@ -345,6 +372,88 @@ private struct TriggerRuleEditorSheet: View {
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
+
+                if rule.kind != .bubbleTest {
+                    Section {
+                        TextEditor(text: $rule.defaultPromptTemplate)
+                            .font(.body)
+                            .frame(minHeight: 72)
+                    } header: {
+                        Text("默认旁白请求（无路由命中）")
+                    } footer: {
+                        Text("发给模型的一条 user 消息模板。占位符：`{extra}`（系统触发说明等）、`{triggerKind}`、`{matchedCondition}`、`{keySummary}`（需打开键入摘要）。留空则使用内置默认。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    Section {
+                        if rule.routes.isEmpty {
+                            Text("尚未配置路由：将使用上方默认模板；键盘类还可回退到下方「旧版单一模式串」。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        ForEach(Array(rule.routes.enumerated()), id: \.element.id) { index, route in
+                            HStack(alignment: .firstTextBaseline) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("优先级 \(route.priority)")
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(routeSummary(route))
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                }
+                                Spacer()
+                                Text(route.enabled ? "开" : "关")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                Button("编辑") {
+                                    editingRouteIndex = index
+                                }
+                            }
+                        }
+                        .onDelete { idx in
+                            rule.routes.remove(atOffsets: idx)
+                        }
+
+                        Button("添加旁白路由") {
+                            let nextP = (rule.routes.map(\.priority).max() ?? 0) + 1
+                            let tmpl = AgentTriggerRule.standardPrologueTemplate
+                            let conds: [TriggerRouteCondition] = {
+                                switch rule.kind {
+                                case .keyboardPattern: return [.keyboardContains("")]
+                                case .frontApp: return [.frontAppContains("")]
+                                case .timer, .randomIdle, .screenSnap: return [.always]
+                                case .bubbleTest: return []
+                                }
+                            }()
+                            rule.routes.append(
+                                TriggerPromptRoute(enabled: true, priority: nextP, conditions: conds, promptTemplate: tmpl)
+                            )
+                            editingRouteIndex = rule.routes.count - 1
+                        }
+
+                        if rule.kind == .keyboardPattern {
+                            HStack(spacing: 10) {
+                                Button("插入示例：密码安全") {
+                                    insertPasswordRouteExample()
+                                }
+                                Button("插入示例：表白关键词") {
+                                    insertLoveRouteExamples()
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    } header: {
+                        Text("旁白路由（优先级高先匹配）")
+                    } footer: {
+                        Text("每条路由内多个条件为 AND。键盘类路由至少包含一个「按键包含」条件，否则不会匹配。同一次触发只选用一条路由的提示语。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+
                 switch rule.kind {
                 case .timer:
                     Section {
@@ -382,22 +491,22 @@ private struct TriggerRuleEditorSheet: View {
                         Text("仅匹配模式串（最近按键缓冲），不保存全文日志。需打开「隐私」中的总开关。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        TextField("要匹配的子串", text: $rule.keyboardPattern)
+                        TextField("旧版单一模式串（仅当上方「路由表」为空时生效）", text: $rule.keyboardPattern)
                     } header: {
-                        Text("键盘模式")
+                        Text("键盘模式（兼容）")
                     } footer: {
-                        Text("在「最近按键」字符缓冲里查找是否包含该子串；大小写敏感。需已授予辅助功能。")
+                        Text("推荐在「旁白路由」里为不同子串配置不同提示语；优先级数字越大越先匹配。此处旧字段仅在路由表为空时作为单条子串回退；大小写敏感。需已授予辅助功能。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 case .frontApp:
                     Section {
-                        TextField("应用名包含（本地化名称子串）", text: $rule.frontAppNameContains)
+                        TextField("旧版应用名子串（仅当路由表为空时生效）", text: $rule.frontAppNameContains)
                     } header: {
-                        Text("前台应用")
+                        Text("前台应用（兼容）")
                     } footer: {
-                        Text("当前台应用切换到名称包含该子串的应用时触发一次（例如 Xcode、Safari）。")
+                        Text("推荐在「旁白路由」里用「前台包含」条件写多条。此处旧字段仅在路由表为空时回退；切换应用时大小写不敏感匹配本地化名称。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -441,10 +550,25 @@ private struct TriggerRuleEditorSheet: View {
                 }
             }
             .formStyle(.grouped)
+            .sheet(isPresented: Binding(
+                get: { editingRouteIndex != nil },
+                set: { if !$0 { editingRouteIndex = nil } }
+            )) {
+                if let i = editingRouteIndex, rule.routes.indices.contains(i) {
+                    TriggerPromptRouteEditorSheet(rule: $rule, routeIndex: i)
+                        .frame(minWidth: 440, minHeight: 520)
+                }
+            }
             .navigationTitle("编辑触发器")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { isPresented = false }
+                }
+                ToolbarItem(placement: .destructiveAction) {
+                    Button("删除", role: .destructive) {
+                        settings.removeTrigger(id: rule.id)
+                        isPresented = false
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") {
@@ -455,5 +579,172 @@ private struct TriggerRuleEditorSheet: View {
             }
         }
         .frame(minWidth: 400, minHeight: 360)
+    }
+
+    private func routeSummary(_ route: TriggerPromptRoute) -> String {
+        let cond = route.conditions.isEmpty
+            ? "（无条件）"
+            : route.conditions.map(conditionLabel).joined(separator: " 且 ")
+        let promptPreview = route.promptTemplate
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .prefix(36)
+        return "\(cond) → 「\(promptPreview)\(promptPreview.count >= 36 ? "…" : "")」"
+    }
+
+    private func conditionLabel(_ c: TriggerRouteCondition) -> String {
+        switch c {
+        case .always: return "始终"
+        case let .keyboardContains(s): return "按键含「\(s)」"
+        case let .frontAppContains(s): return "前台含「\(s)」"
+        case let .idleAtLeastSeconds(n): return "空闲≥\(n)s"
+        case let .timerElapsedAtLeastMinutes(m): return "距上次≥\(m)分"
+        }
+    }
+
+    private func insertPasswordRouteExample() {
+        rule.routes.append(
+            TriggerPromptRoute(
+                enabled: true,
+                priority: 10,
+                conditions: [.keyboardContains("ABC123456")],
+                promptTemplate: "检测到用户近期键入里出现了示例密码串 ABC123456。请用一两句简体中文温柔提醒用户保管好密码、避免泄露与截图外泄，不要用教训口吻。{extra}"
+            )
+        )
+    }
+
+    private func insertLoveRouteExamples() {
+        rule.routes.append(
+            TriggerPromptRoute(
+                enabled: true,
+                priority: 9,
+                conditions: [.keyboardContains("我爱你")],
+                promptTemplate: "用户键入了「我爱你」相关字串。请用一两句简体中文温柔、轻松地鼓励用户：想念对方就合适地表达出来或去见一面，语气要暖。{extra}"
+            )
+        )
+        rule.routes.append(
+            TriggerPromptRoute(
+                enabled: true,
+                priority: 8,
+                conditions: [.keyboardContains("woaini")],
+                promptTemplate: "用户键入了「woaini」拼音式表白。请用一两句简体中文轻松鼓励用户把心意传达给对方或约见面，语气俏皮可爱。{extra}"
+            )
+        )
+    }
+}
+
+// MARK: - 旁白路由编辑
+
+private struct TriggerPromptRouteEditorSheet: View {
+    @Binding var rule: AgentTriggerRule
+    let routeIndex: Int
+    @Environment(\.dismiss) private var dismiss
+    @State private var draft: TriggerPromptRoute
+
+    init(rule: Binding<AgentTriggerRule>, routeIndex: Int) {
+        _rule = rule
+        self.routeIndex = routeIndex
+        _draft = State(initialValue: rule.wrappedValue.routes[routeIndex])
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Stepper("优先级（越大越先匹配）: \(draft.priority)", value: $draft.priority, in: 0 ... 999, step: 1)
+                    Toggle("启用该路由", isOn: $draft.enabled)
+                } header: {
+                    Text("路由")
+                }
+
+                Section {
+                    TextEditor(text: $draft.promptTemplate)
+                        .font(.body)
+                        .frame(minHeight: 120)
+                } header: {
+                    Text("本路由发给模型的 user 模板")
+                } footer: {
+                    Text("占位符：`{extra}`、`{triggerKind}`、`{matchedCondition}`、`{keySummary}`。空内容将回退到规则级默认模板。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                Section {
+                    if draft.conditions.isEmpty {
+                        Text("无条件：等价于「始终」匹配（键盘类规则请勿留空条件，请添加「按键包含」）。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(Array(draft.conditions.enumerated()), id: \.offset) { index, _ in
+                        conditionRow(index: index)
+                    }
+                    .onDelete { idx in
+                        draft.conditions.remove(atOffsets: idx)
+                    }
+
+                    Menu("添加条件") {
+                        Button("始终") { draft.conditions.append(.always) }
+                        Button("按键包含子串") { draft.conditions.append(.keyboardContains("")) }
+                        Button("前台名称包含子串") { draft.conditions.append(.frontAppContains("")) }
+                        Button("空闲至少…秒") { draft.conditions.append(.idleAtLeastSeconds(120)) }
+                        Button("距上次触发至少…分钟") { draft.conditions.append(.timerElapsedAtLeastMinutes(1)) }
+                    }
+                } header: {
+                    Text("条件（同一路由内为 AND）")
+                } footer: {
+                    Text("键盘类触发器：至少保留一个「按键包含」且子串非空，否则该路由不会参与匹配。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .formStyle(.grouped)
+            .navigationTitle("编辑旁白路由")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") {
+                        if rule.routes.indices.contains(routeIndex) {
+                            rule.routes[routeIndex] = draft
+                        }
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func conditionRow(index: Int) -> some View {
+        let c = draft.conditions[index]
+        switch c {
+        case .always:
+            HStack {
+                Text("始终")
+                Spacer()
+            }
+        case .keyboardContains(let s):
+            TextField("按键缓冲需包含（大小写敏感）", text: Binding(
+                get: { s },
+                set: { draft.conditions[index] = .keyboardContains($0) }
+            ))
+        case .frontAppContains(let s):
+            TextField("前台名称需包含（不区分大小写）", text: Binding(
+                get: { s },
+                set: { draft.conditions[index] = .frontAppContains($0) }
+            ))
+        case .idleAtLeastSeconds(let sec):
+            Stepper("空闲至少 \(sec) 秒", value: Binding(
+                get: { sec },
+                set: { draft.conditions[index] = .idleAtLeastSeconds($0) }
+            ), in: 0 ... 24 * 3600, step: 10)
+        case .timerElapsedAtLeastMinutes(let m):
+            Stepper("距上次触发至少 \(m) 分钟", value: Binding(
+                get: { m },
+                set: { draft.conditions[index] = .timerElapsedAtLeastMinutes($0) }
+            ), in: 0 ... 24 * 60, step: 1)
+        }
     }
 }
