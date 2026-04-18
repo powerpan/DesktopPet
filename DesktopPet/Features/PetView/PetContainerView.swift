@@ -11,10 +11,6 @@ struct PetContainerView: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            // 铺在底层且不参与命中，避免 ZStack 中心空白区仍被 SwiftUI 当成可点容器挡住下层（穿透开启时尤甚）
-            Color.clear
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .allowsHitTesting(false)
             PetSpriteView()
             SettingsFloatingButton(
                 isClickThrough: Binding(

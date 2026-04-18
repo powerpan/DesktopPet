@@ -24,7 +24,9 @@ struct PetSpriteView: View {
         .animation(.easeOut(duration: 0.12), value: pointer.gazeOffsetX)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
-        // 鼠标穿透开启时：精灵区不接收点击，事件交给 AppKit 根视图的 hitTest 落到下层应用；仅右上角按钮仍可点。
+        // 命中与圆角卡片一致，避免方形 maxFrame 在圆角外仍挡住下层（穿透关时外圈更易点到背后）。
+        .contentShape(RoundedRectangle(cornerRadius: 18))
+        // 鼠标穿透开启时：精灵区不接收点击，事件落到 AppKit 根视图再返回 nil，仅右上角按钮仍可点。
         .allowsHitTesting(!settings.isClickThroughEnabled)
     }
 }
