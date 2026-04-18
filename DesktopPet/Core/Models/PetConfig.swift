@@ -28,10 +28,15 @@ struct PetConfig {
     /// 相对早期 220pt 卡片，整体再乘此系数；**滑条在 1.0 时**视觉与窗口约等于「以前滑条 0.6」的外框（不是把默认滑条改成 0.6）。
     static let visualBaselineFactor: CGFloat = 0.6
 
-    /// 与 `PetContainerView` 一致：`frame(petCanvasLayoutPoints)` × `scaleEffect(scale × visualBaselineFactor)` 后的约等于边长；**slack** 仅留几 pt 给舍入与右上角按钮，避免再撑出一大圈隐形窗。
-    static func exteriorHitSide(scale: Double) -> CGFloat {
+    /// SwiftUI 卡片实际布局边长（已含滑条与 `visualBaselineFactor`）。应用层请用此值做 `frame`，**勿**再对整块内容 `scaleEffect`：后者不改变布局尺寸，会在 Preview/命中基底周围留下一圈与缩放成比例的空白。
+    static func petLayoutSide(scale: Double) -> CGFloat {
         let s = CGFloat(min(max(scale, petScaleMin), petScaleMax))
-        let visualSide = petCanvasLayoutPoints * s * visualBaselineFactor
+        return petCanvasLayoutPoints * s * visualBaselineFactor
+    }
+
+    /// 窗口与 `PetRootContainerView.hitClipSidePoints`：`petLayoutSide` + **slack**（舍入与右上角按钮），并设最小边长。
+    static func exteriorHitSide(scale: Double) -> CGFloat {
+        let visualSide = petLayoutSide(scale: scale)
         let slack: CGFloat = 6
         return max(72, ceil(visualSide + slack))
     }
