@@ -1,37 +1,92 @@
 //
 // AgentSessionStore.swift
-// 当前会话消息（内存）；清空策略由 UI 触发。
+// 多频道会话代理：委托 `AgentConversationStore` 持久化；触发旁白历史见 `TriggerSpeechHistoryStore`。
 //
 
+import Combine
 import Foundation
 import SwiftUI
 
 @MainActor
 final class AgentSessionStore: ObservableObject {
-    @Published private(set) var messages: [ChatMessage] = []
+    let conversation: AgentConversationStore
+    let triggerHistory: TriggerSpeechHistoryStore
+
     @Published private(set) var isSending = false
     @Published var lastError: String?
 
+    private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        conversation = AgentConversationStore()
+        triggerHistory = TriggerSpeechHistoryStore()
+        conversation.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+        triggerHistory.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+    }
+
+    // MARK: - 当前频道投影
+
+    var messages: [ChatMessage] { conversation.activeMessages }
+
+    var channels: [ChatChannel] { conversation.channels }
+
+    var activeChannelId: UUID { conversation.activeChannelId }
+
+    var activeChannel: ChatChannel? { conversation.channel(id: conversation.activeChannelId) }
+
+    func selectChannel(id: UUID) {
+        conversation.switchChannel(id: id)
+    }
+
+    @discardableResult
+    func createNewEmptyChannel(title: String? = nil) -> UUID {
+        conversation.createEmptyChannel(title: title)
+    }
+
+    /// 点击触发气泡后续聊：新建频道，首条为猫猫旁白作为上文。
+    @discardableResult
+    func startSessionFromTrigger(text: String) -> UUID {
+        conversation.createChannelFromTriggerPrologue(text)
+    }
+
+    func renameChannel(id: UUID, title: String) {
+        conversation.renameChannel(id: id, title: title)
+    }
+
+    func deleteChannel(id: UUID) {
+        conversation.deleteChannel(id: id)
+    }
+
     func clearSession() {
-        messages = []
+        conversation.clearActiveChannelMessages()
         lastError = nil
     }
 
     func appendUser(_ text: String) {
-        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return }
-        messages.append(ChatMessage(role: "user", content: t))
+        conversation.appendUser(text)
     }
 
     func appendAssistant(_ text: String) {
-        messages.append(ChatMessage(role: "assistant", content: text))
+        conversation.appendAssistant(text)
     }
 
     func appendSystemNotice(_ text: String) {
-        messages.append(ChatMessage(role: "system", content: text))
+        conversation.appendSystemNotice(text)
     }
 
     func setSending(_ v: Bool) {
         isSending = v
+    }
+
+    /// 重置所有手动会话为单一空频道（不清理触发旁白历史）。
+    func resetAllConversationChannelsToDefault() {
+        conversation.resetToSingleDefaultChannel()
+        lastError = nil
     }
 }

@@ -14,6 +14,8 @@ struct AgentSettingsView: View {
     @State private var showKeyboardRiskAlert = false
     @State private var showScreenSnapInfo = false
     @AppStorage("DesktopPet.agent.keyboardMasterRiskAcknowledged") private var keyboardRiskAcknowledged = false
+    @State private var showConversationChannelsSheet = false
+    @State private var showTriggerSpeechHistorySheet = false
 
     var body: some View {
         TabView {
@@ -116,19 +118,39 @@ struct AgentSettingsView: View {
             }
 
             Section {
-                Button("清空当前对话") {
+                Button("查看正式会话频道…") {
+                    showConversationChannelsSheet = true
+                }
+                Button("查看条件触发旁白历史…") {
+                    showTriggerSpeechHistorySheet = true
+                }
+                Button("清空当前频道消息") {
                     session.clearSession()
                 }
+                Button("清空条件触发旁白历史", role: .destructive) {
+                    session.triggerHistory.clearAll()
+                }
+                Button("重置所有手动会话频道", role: .destructive) {
+                    session.resetAllConversationChannelsToDefault()
+                }
             } header: {
-                Text("会话")
+                Text("会话与历史")
             } footer: {
-                Text("仅清空本应用内存中的当前会话，不影响钥匙串与触发器配置。")
+                Text("多会话频道与消息保存在 UserDefaults；「清空当前频道」只影响当前选中会话。「旁白历史」记录条件触发文案（最多约 200 条）。重置会话会删除所有频道并恢复为单一空会话。在频道表中进入某频道可浏览全部消息，并可一键切回该频道并打开对话面板。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .formStyle(.grouped)
+        .sheet(isPresented: $showConversationChannelsSheet) {
+            ConversationChannelsManagerSheet(isPresented: $showConversationChannelsSheet)
+                .environmentObject(session)
+        }
+        .sheet(isPresented: $showTriggerSpeechHistorySheet) {
+            TriggerSpeechHistoryListSheet(isPresented: $showTriggerSpeechHistorySheet)
+                .environmentObject(session)
+        }
     }
 
     private var personalityTab: some View {
@@ -153,7 +175,8 @@ struct AgentSettingsView: View {
         Form {
             Section {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("触发器在满足条件时会自动请求模型写一句短旁白，并出现在对话列表里。")
+                    Text("触发器在满足条件时会自动请求模型写一句短旁白：写入旁白历史，并以宠窗旁云气泡展示。")
+                    Text("轻点气泡会关闭气泡、以该旁白为上下文新建一个手动会话频道，并打开对话面板续聊。")
                     Text("每条规则有独立冷却，避免刷屏。定时与随机空闲适合日常使用；键盘与前台应用属于进阶能力，请谨慎开启。")
                 }
                 .font(.caption)

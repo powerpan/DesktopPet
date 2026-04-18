@@ -50,6 +50,9 @@
 		C10000000000000000000030 /* ChatOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000030 /* ChatOverlayView.swift */; };
 		C10000000000000000000031 /* AgentSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000031 /* AgentSettingsView.swift */; };
 		C10000000000000000000032 /* TriggerSpeechBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000032 /* TriggerSpeechBubbleView.swift */; };
+		C10000000000000000000033 /* AgentConversationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000033 /* AgentConversationStore.swift */; };
+		C10000000000000000000034 /* TriggerSpeechHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000034 /* TriggerSpeechHistoryStore.swift */; };
+		C10000000000000000000035 /* AgentSessionHistoryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000035 /* AgentSessionHistoryViews.swift */; };
 		C3D4E5F60718293A4B5C6D7E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8F /* ContentView.swift */; };
 		E5F60718293A4B5C6D7E8F90 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F60718293A4B5C6D7E8F90AB /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -97,6 +100,9 @@
 		B100000000000000000000030 /* ChatOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatOverlayView.swift; sourceTree = "<group>"; };
 		B100000000000000000000031 /* AgentSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSettingsView.swift; sourceTree = "<group>"; };
 		B100000000000000000000032 /* TriggerSpeechBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriggerSpeechBubbleView.swift; sourceTree = "<group>"; };
+		B100000000000000000000033 /* AgentConversationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentConversationStore.swift; sourceTree = "<group>"; };
+		B100000000000000000000034 /* TriggerSpeechHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriggerSpeechHistoryStore.swift; sourceTree = "<group>"; };
+		B100000000000000000000035 /* AgentSessionHistoryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSessionHistoryViews.swift; sourceTree = "<group>"; };
 		B200000000000000000000040 /* DeskMirror */ = {isa = PBXFileReference; lastKnownFileType = folder; path = DeskMirror; sourceTree = "<group>"; };
 		B2C3D4E5F60718293A4B5C6D /* DesktopPetApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPetApp.swift; sourceTree = "<group>"; };
 		D4E5F60718293A4B5C6D7E8F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -292,6 +298,8 @@
 				B100000000000000000000029 /* AgentSettingsStore.swift */,
 				B10000000000000000000002A /* AgentClient.swift */,
 				B10000000000000000000002B /* AgentSessionStore.swift */,
+				B100000000000000000000033 /* AgentConversationStore.swift */,
+				B100000000000000000000034 /* TriggerSpeechHistoryStore.swift */,
 				B10000000000000000000002C /* FrontmostAppWatcher.swift */,
 				B10000000000000000000002D /* AgentTriggerEngine.swift */,
 			);
@@ -313,6 +321,7 @@
 				B10000000000000000000002F /* CareOverlayView.swift */,
 				B100000000000000000000030 /* ChatOverlayView.swift */,
 				B100000000000000000000031 /* AgentSettingsView.swift */,
+				B100000000000000000000035 /* AgentSessionHistoryViews.swift */,
 				B100000000000000000000032 /* TriggerSpeechBubbleView.swift */,
 			);
 			path = Overlay;
@@ -432,6 +441,9 @@
 				C10000000000000000000030 /* ChatOverlayView.swift in Sources */,
 				C10000000000000000000031 /* AgentSettingsView.swift in Sources */,
 				C10000000000000000000032 /* TriggerSpeechBubbleView.swift in Sources */,
+				C10000000000000000000033 /* AgentConversationStore.swift in Sources */,
+				C10000000000000000000034 /* TriggerSpeechHistoryStore.swift in Sources */,
+				C10000000000000000000035 /* AgentSessionHistoryViews.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

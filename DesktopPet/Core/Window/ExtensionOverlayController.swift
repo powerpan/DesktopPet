@@ -43,10 +43,14 @@ final class ExtensionOverlayController {
             p.orderOut(nil)
             return
         }
+        presentChatPanel(root: root)
+    }
+
+    /// 始终打开/前置聊天面板（用于从触发气泡续聊，避免 `toggle` 误关已打开的面板）。
+    func presentChatPanel(root: AnyView) {
         ensureChatPanel()
         chatPanel?.contentView = NSHostingView(rootView: root)
         layoutChatPanel()
-        // 菜单栏 accessory 应用 + 可输入面板：需激活应用并让面板成为 key，TextField 才能接收键盘。
         NSApp.activate(ignoringOtherApps: true)
         chatPanel?.makeKeyAndOrderFront(nil)
     }
@@ -136,7 +140,8 @@ final class ExtensionOverlayController {
     }
 
     /// 条件触发旁白：云朵气泡挂在宠窗附近；靠近屏幕右下时改挂到猫猫左上侧。
-    func showTriggerBubble(text: String) {
+    /// - Parameter onContinueChat: 用户轻点气泡后：先收起气泡，再执行（例如新建会话并打开聊天窗）。
+    func showTriggerBubble(text: String, onContinueChat: (() -> Void)? = nil) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         ensureBubblePanel()
@@ -147,9 +152,11 @@ final class ExtensionOverlayController {
 
         let view = TriggerSpeechBubbleView(text: trimmed) { [weak self] in
             self?.dismissTriggerBubble()
+            onContinueChat?()
         }
         let hosting = NSHostingView(rootView: view)
-        hosting.setFrameSize(NSSize(width: 280, height: 200))
+        // 先给足够大的临时尺寸以便 SwiftUI 算出紧凑的 fittingSize；最终框由 layoutTriggerBubble 决定。
+        hosting.setFrameSize(NSSize(width: 360, height: 400))
         panel.contentView = hosting
         panel.alphaValue = 1
         panel.orderFrontRegardless()
@@ -202,10 +209,11 @@ final class ExtensionOverlayController {
         content.layoutSubtreeIfNeeded()
         var w = content.fittingSize.width
         var h = content.fittingSize.height
-        if !w.isFinite || w < 80 { w = 280 }
-        if !h.isFinite || h < 48 { h = 160 }
-        w = min(288, max(200, w + 16))
-        h = min(200, max(88, h + 12))
+        if !w.isFinite || w < 1 { w = 160 }
+        if !h.isFinite || h < 1 { h = 72 }
+        // 紧凑：随内容变窄变矮；过长时由气泡内 ScrollView 限制高度，此处放宽面板高度上限。
+        w = min(320, max(96, w + 8))
+        h = min(380, max(52, h + 8))
 
         let pf = pet.frame
         let nearRight = (vf.maxX - pf.maxX) < 130

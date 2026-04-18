@@ -31,8 +31,14 @@ final class AppCoordinator: ObservableObject {
         deskMirror: deskMirrorModel,
         frontWatcher: frontmostAppWatcher,
         isPetVisible: { [weak self] in self?.isPetVisible ?? false },
-        onTriggerSpeech: { [weak self] line in
-            self?.extensionOverlay.showTriggerBubble(text: line)
+        onTriggerSpeech: { [weak self] payload in
+            guard let self else { return }
+            self.agentSessionStore.triggerHistory.append(text: payload.text, kind: payload.triggerKind)
+            self.extensionOverlay.showTriggerBubble(text: payload.text) { [weak self] in
+                guard let self else { return }
+                self.agentSessionStore.startSessionFromTrigger(text: payload.text)
+                self.presentChatOverlay()
+            }
         }
     )
 
@@ -54,6 +60,7 @@ final class AppCoordinator: ObservableObject {
         wireActivationRefresh()
         wireAccessibilityRecheck()
         wirePetWindowOverlayNotifications()
+        wirePresentChatContinuingChannelFromSettings()
 
         petCareModel.startCompanionTicking { [weak self] in self?.isPetVisible ?? false }
         triggerEngine.start()
@@ -110,16 +117,26 @@ final class AppCoordinator: ObservableObject {
 
     func toggleChatOverlay() {
         let wasVisible = extensionOverlay.isChatVisible()
-        extensionOverlay.toggleChatPanel(root: AnyView(
-            ChatOverlayView()
-                .environmentObject(agentSessionStore)
-                .environmentObject(agentSettingsStore)
-                .environmentObject(deskMirrorModel)
-        ))
+        extensionOverlay.toggleChatPanel(root: chatOverlayRoot())
         // 从隐藏变为显示时清掉旧错误，避免「已保存 Key 却仍显示未配置」的误导（lastError 来自上次发送失败）。
         if extensionOverlay.isChatVisible(), !wasVisible {
             agentSessionStore.lastError = nil
         }
+    }
+
+    /// 打开或前置对话面板（不切换关闭）；用于触发气泡点击后续聊。
+    func presentChatOverlay() {
+        extensionOverlay.presentChatPanel(root: chatOverlayRoot())
+        agentSessionStore.lastError = nil
+    }
+
+    private func chatOverlayRoot() -> AnyView {
+        AnyView(
+            ChatOverlayView()
+                .environmentObject(agentSessionStore)
+                .environmentObject(agentSettingsStore)
+                .environmentObject(deskMirrorModel)
+        )
     }
 
     func presentAgentSettingsWindow() {
@@ -186,6 +203,19 @@ final class AppCoordinator: ObservableObject {
             self?.extensionOverlay.repositionIfNeeded()
         }
         .store(in: &cancellables)
+    }
+
+    private func wirePresentChatContinuingChannelFromSettings() {
+        NotificationCenter.default.publisher(for: .desktopPetPresentChatContinuingChannel)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] note in
+                guard let self else { return }
+                guard let idString = note.userInfo?[DesktopPetNotificationUserInfoKey.channelId] as? String,
+                      let id = UUID(uuidString: idString) else { return }
+                self.agentSessionStore.selectChannel(id: id)
+                self.presentChatOverlay()
+            }
+            .store(in: &cancellables)
     }
 
     private func wirePermissionAndInput() {

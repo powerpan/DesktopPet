@@ -5,7 +5,7 @@
 
 import Foundation
 
-struct ChatMessage: Identifiable, Equatable {
+struct ChatMessage: Identifiable, Equatable, Codable {
     let id: UUID
     let role: String
     let content: String
@@ -17,6 +17,29 @@ struct ChatMessage: Identifiable, Equatable {
         self.content = content
         self.createdAt = createdAt
     }
+}
+
+/// 用户与猫猫的一个对话频道（持久化）。
+struct ChatChannel: Identifiable, Equatable, Codable {
+    var id: UUID
+    var title: String
+    var createdAt: Date
+    var updatedAt: Date
+    var messages: [ChatMessage]
+}
+
+/// 条件触发旁白历史条目（持久化）。
+struct TriggerSpeechRecord: Identifiable, Equatable, Codable {
+    var id: UUID
+    var text: String
+    var triggerKind: AgentTriggerKind
+    var createdAt: Date
+}
+
+/// 触发成功后交给 UI / 历史记录的一包数据。
+struct TriggerSpeechPayload: Equatable {
+    var text: String
+    var triggerKind: AgentTriggerKind
 }
 
 enum AgentTriggerKind: String, Codable, CaseIterable, Identifiable {

@@ -21,8 +21,8 @@ final class AgentTriggerEngine: ObservableObject {
     private var tickIndex: Int = 0
 
     private var isPetVisible: () -> Bool
-    /// 触发旁白成功后的展示（如云气泡）；与手动对话列表分离。
-    private let onTriggerSpeech: ((String) -> Void)?
+    /// 触发旁白成功后的展示（如云气泡 + 历史记录）；与手动对话频道分离。
+    private let onTriggerSpeech: ((TriggerSpeechPayload) -> Void)?
 
     init(
         settings: AgentSettingsStore,
@@ -31,7 +31,7 @@ final class AgentTriggerEngine: ObservableObject {
         deskMirror: DeskMirrorModel,
         frontWatcher: FrontmostAppWatcher,
         isPetVisible: @escaping () -> Bool,
-        onTriggerSpeech: ((String) -> Void)? = nil
+        onTriggerSpeech: ((TriggerSpeechPayload) -> Void)? = nil
     ) {
         self.settings = settings
         self.session = session
@@ -178,7 +178,7 @@ final class AgentTriggerEngine: ObservableObject {
                 maxTokens: min(settings.maxTokens, 256)
             )
             if let onTriggerSpeech {
-                onTriggerSpeech(text)
+                onTriggerSpeech(TriggerSpeechPayload(text: text, triggerKind: trigger.kind))
             } else {
                 session.appendAssistant(text)
             }

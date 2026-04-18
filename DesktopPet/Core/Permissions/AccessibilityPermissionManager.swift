@@ -13,6 +13,8 @@ extension Notification.Name {
     static let desktopPetAccessibilityRecheck = Notification.Name("desktopPetAccessibilityRecheck")
     /// 钥匙串中的 DeepSeek API Key 已写入或清除，供对话面板等刷新「已配置」提示。
     static let desktopPetAPIKeyDidChange = Notification.Name("desktopPetAPIKeyDidChange")
+    /// 从设置「历史会话」选择某频道继续聊天：`userInfo["channelId"]` 为频道 UUID 字符串。
+    static let desktopPetPresentChatContinuingChannel = Notification.Name("desktopPetPresentChatContinuingChannel")
 }
 
 @MainActor
