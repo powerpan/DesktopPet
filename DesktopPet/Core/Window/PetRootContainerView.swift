@@ -59,7 +59,10 @@ final class PetRootContainerView: NSView {
 
         let local = hostingView.convert(point, from: self)
         if passthroughEnabled {
-            return hostingView.hitTest(local)
+            let hit = hostingView.hitTest(local)
+            // SwiftUI 在空白区有时仍命中 NSHostingView 自身，等价于无控件 → 让事件落到下层
+            if hit === hostingView { return nil }
+            return hit
         }
         return hostingView.hitTest(local) ?? hostingView
     }

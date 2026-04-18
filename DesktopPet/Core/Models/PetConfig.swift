@@ -28,11 +28,11 @@ struct PetConfig {
     /// 相对早期 220pt 卡片，整体再乘此系数；**滑条在 1.0 时**视觉与窗口约等于「以前滑条 0.6」的外框（不是把默认滑条改成 0.6）。
     static let visualBaselineFactor: CGFloat = 0.6
 
-    /// 与 `PetContainerView` 的 `frame(petCanvasLayoutPoints) + scaleEffect(scale * visualBaselineFactor)` 一致；用作窗口边长与 `PetRootContainerView` 命中裁剪。
+    /// 与 SwiftUI 视觉一致：`petCanvasLayoutPoints × scale × visualBaselineFactor`（与 `scaleEffect` 合成系数一致），仅加少量 slack；**不再**叠加大块 `chrome`，否则 1.2 满档时窗外仍有一圈「空窗」挡点击。
     static func exteriorHitSide(scale: Double) -> CGFloat {
         let s = CGFloat(min(max(scale, petScaleMin), petScaleMax))
-        let base: CGFloat = petCanvasLayoutPoints * visualBaselineFactor
-        let chrome: CGFloat = 48
-        return max(100, base * s + chrome)
+        let visualSide = petCanvasLayoutPoints * s * visualBaselineFactor
+        let slack: CGFloat = 14
+        return max(80, ceil(visualSide + slack))
     }
 }
