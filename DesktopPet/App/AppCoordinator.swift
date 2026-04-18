@@ -27,6 +27,7 @@ final class AppCoordinator: ObservableObject {
         wireActivationRefresh()
 
         permissionManager.refreshStatus(prompt: false)
+        mouseTracker.interactionSamplingEnabled = isPetVisible
         mouseTracker.start()
 
         if permissionManager.isGranted {
@@ -54,6 +55,7 @@ final class AppCoordinator: ObservableObject {
     func togglePetVisibility() {
         isPetVisible.toggle()
         petWindowController?.setPetVisible(isPetVisible)
+        mouseTracker.interactionSamplingEnabled = isPetVisible
     }
 
     func presentOnboardingWindow() {
@@ -134,6 +136,7 @@ final class AppCoordinator: ObservableObject {
         patrolScheduler.onPatrolTick = { [weak self] in
             guard let self else { return }
             guard self.settingsViewModel.isPatrolEnabled else { return }
+            guard self.isPetVisible else { return }
             self.stateMachine.handle(.patrolRequested)
             self.petWindowController?.nudgePatrolStep(in: ScreenGeometry.visibleFrameContainingMouse())
             self.bumpActivity()
@@ -184,22 +187,8 @@ final class AppCoordinator: ObservableObject {
 
     private func bumpActivity() {
         idleSleepTimer?.invalidate()
-        if stateMachine.state == .sleep {
-            idleSleepTimer = Timer.scheduledTimer(
-                withTimeInterval: PetConfig.default.idleToSleepInterval,
-                repeats: false
-            ) { [weak self] _ in
-                self?.stateMachine.handle(.idleTimeout)
-            }
-            if let idleSleepTimer {
-                RunLoop.main.add(idleSleepTimer, forMode: .common)
-            }
-            return
-        }
-        idleSleepTimer = Timer.scheduledTimer(
-            withTimeInterval: PetConfig.default.idleToSleepInterval,
-            repeats: false
-        ) { [weak self] _ in
+        let interval = PetConfig.default.idleToSleepInterval
+        idleSleepTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
             self?.stateMachine.handle(.idleTimeout)
         }
         if let idleSleepTimer {
