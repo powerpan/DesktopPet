@@ -70,6 +70,7 @@ DesktopPet/
 ## 需求文档
 
 - 详细 PRD：`docs/requirements.md`
+- 待办与后续工作：`docs/TODO.md`
 
 ## 许可证
 
