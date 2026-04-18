@@ -58,7 +58,9 @@ final class AppCoordinator: ObservableObject {
         wireCloseChatOverlayFromPanel()
         wireForceFireTriggerFromSettings()
         wireCareInteractionFromPetPanel()
+        wirePresentAgentSettingsTabFromNotification()
 
+        petCareModel.configureGrowthEngine(client: agentClient, settings: agentSettingsStore)
         petCareModel.startCompanionTicking { [weak self] in self?.isPetVisible ?? false }
         triggerEngine.start()
 
@@ -250,6 +252,19 @@ final class AppCoordinator: ObservableObject {
                 Task { @MainActor in
                     await self.triggerEngine.fireCareInteractionNarrative(contextLine: line)
                 }
+            }
+            .store(in: &cancellables)
+    }
+
+    private func wirePresentAgentSettingsTabFromNotification() {
+        NotificationCenter.default.publisher(for: .desktopPetPresentAgentSettingsTab)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] note in
+                guard let self else { return }
+                let tab = note.userInfo?[DesktopPetNotificationUserInfoKey.agentSettingsTabIndex] as? Int ?? 0
+                let clamped = min(4, max(0, tab))
+                UserDefaults.standard.set(clamped, forKey: "DesktopPet.ui.pendingAgentSettingsTab")
+                self.presentAgentSettingsWindow()
             }
             .store(in: &cancellables)
     }

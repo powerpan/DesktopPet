@@ -1,6 +1,6 @@
 //
 // PetCareModel.swift
-// 轻量饲养：心情/能量、每日重置、喂食与戳戳冷却、陪伴时长累计。
+// 轻量饲养：心情/能量、每日重置、喂食与戳戳冷却、陪伴时长累计、成长衰减与统计。
 //
 
 import Combine
@@ -11,6 +11,7 @@ private enum PetCareKeys {
     static let state = "DesktopPet.care.state"
     static let feedCooldownSeconds = "DesktopPet.care.feedCooldownSeconds"
     static let petCooldownSeconds = "DesktopPet.care.petCooldownSeconds"
+    static let growthConfig = "DesktopPet.care.growthConfig.v1"
 }
 
 @MainActor
@@ -20,10 +21,17 @@ final class PetCareModel: ObservableObject {
     @Published var feedCooldownSeconds: Int
     /// 戳戳冷却（秒），默认 30 秒。
     @Published var petCooldownSeconds: Int
+    /// 成长系统参数（独立持久化）
+    @Published var growthConfig: PetGrowthConfig
 
     private let defaults = UserDefaults.standard
     private var companionTick: Timer?
     private var cancellables = Set<AnyCancellable>()
+    private var persistDebounceTask: Task<Void, Never>?
+    private var growthRng = SplitMix64(seed: UInt64.random(in: 1 ... UInt64.max))
+    private var growthClient: AgentClient?
+    private weak var growthSettings: AgentSettingsStore?
+    private var aiGrowthTask: Task<Void, Never>?
 
     private var feedCooldown: TimeInterval { TimeInterval(feedCooldownSeconds) }
     private var petCooldown: TimeInterval { TimeInterval(petCooldownSeconds) }
@@ -42,6 +50,14 @@ final class PetCareModel: ObservableObject {
         let petDef = 30
         feedCooldownSeconds = Self.clampFeedCooldown(defaults.object(forKey: PetCareKeys.feedCooldownSeconds) as? Int ?? feedDef)
         petCooldownSeconds = Self.clampPetCooldown(defaults.object(forKey: PetCareKeys.petCooldownSeconds) as? Int ?? petDef)
+
+        if let gData = defaults.data(forKey: PetCareKeys.growthConfig),
+           let g = try? JSONDecoder().decode(PetGrowthConfig.self, from: gData) {
+            growthConfig = PetGrowthConfig.clamped(g)
+        } else {
+            growthConfig = PetGrowthConfig.default
+        }
+
         ensureDayResetIfNeeded()
 
         $feedCooldownSeconds
@@ -70,6 +86,26 @@ final class PetCareModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        $growthConfig
+            .dropFirst()
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .sink { [weak self] v in
+                guard let self else { return }
+                let c = PetGrowthConfig.clamped(v)
+                if c != v {
+                    self.growthConfig = c
+                } else if let data = try? JSONEncoder().encode(c) {
+                    self.defaults.set(data, forKey: PetCareKeys.growthConfig)
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    /// 由 `AppCoordinator` 注入，用于可选 AI 成长事件。
+    func configureGrowthEngine(client: AgentClient, settings: AgentSettingsStore) {
+        growthClient = client
+        growthSettings = settings
     }
 
     func startCompanionTicking(isPetVisible: @escaping () -> Bool) {
@@ -78,11 +114,8 @@ final class PetCareModel: ObservableObject {
             Task { @MainActor in
                 guard let self else { return }
                 self.ensureDayResetIfNeeded()
-                guard isPetVisible() else { return }
-                var s = self.state
-                s.todayCompanionSeconds += 1
-                self.state = s
-                self.persist()
+                let visible = isPetVisible()
+                self.runGrowthCompanionSecond(isPetVisible: visible)
             }
         }
         if let companionTick {
@@ -93,7 +126,27 @@ final class PetCareModel: ObservableObject {
     func stopCompanionTicking() {
         companionTick?.invalidate()
         companionTick = nil
+        aiGrowthTask?.cancel()
+        aiGrowthTask = nil
     }
+
+    // MARK: - 统计查询（供 UI）
+
+    func companionMinutes(on dayKey: String) -> Int {
+        PetGrowthStats.companionMinutes(on: dayKey, journal: state.companionDailyJournal)
+    }
+
+    func lastNDaysCompanionMinutes(_ n: Int) -> [(dayKey: String, minutes: Int)] {
+        let keys = PetGrowthStats.lastNDayKeys(n)
+        return keys.map { k in (k, companionMinutes(on: k)) }
+    }
+
+    func currentMonthSummary(calendar: Calendar = .current) -> PetGrowthMonthSummary {
+        let key = PetGrowthStats.monthKey(for: Date(), calendar: calendar)
+        return PetGrowthStats.summaryForMonth(yearMonthKey: key, journal: state.companionDailyJournal, calendar: calendar)
+    }
+
+    // MARK: - 内部
 
     private func dayKey(for date: Date = Date()) -> String {
         let f = DateFormatter()
@@ -112,8 +165,124 @@ final class PetCareModel: ObservableObject {
             s.mood = min(1, s.mood + 0.05)
             s.energy = min(1, s.energy + 0.05)
             state = s
-            persist()
+            persistDebounced()
         }
+    }
+
+    private func runGrowthCompanionSecond(isPetVisible: Bool) {
+        var s = state
+        let cfg = PetGrowthConfig.clamped(growthConfig)
+        let decayResult = PetDecayEngine.processHourly(state: &s, config: cfg, now: Date(), rng: &growthRng)
+        for ev in decayResult.newEvents {
+            applyDecayEvent(ev, to: &s)
+        }
+        state = s
+
+        if let aiHour = decayResult.requestAIGrowthForHourStart {
+            scheduleAIGrowthIfNeeded(contextHour: aiHour)
+        }
+
+        if isPetVisible {
+            var s2 = state
+            s2.todayCompanionSeconds += 1
+            upsertJournal(dayKey: dayKey(), on: &s2) { row in
+                row.companionSeconds += 1
+            }
+            state = s2
+        }
+
+        persistDebounced()
+    }
+
+    private func upsertJournal(dayKey: String, on stateRef: inout PetCareState, mutate: (inout PetCompanionDayStats) -> Void) {
+        if let i = stateRef.companionDailyJournal.firstIndex(where: { $0.dayKey == dayKey }) {
+            var row = stateRef.companionDailyJournal[i]
+            mutate(&row)
+            stateRef.companionDailyJournal[i] = row
+        } else {
+            var row = PetCompanionDayStats.empty(dayKey: dayKey)
+            mutate(&row)
+            stateRef.companionDailyJournal.append(row)
+        }
+        trimJournalIfNeeded(&stateRef.companionDailyJournal)
+    }
+
+    private func trimJournalIfNeeded(_ journal: inout [PetCompanionDayStats]) {
+        let maxRows = 420
+        guard journal.count > maxRows else { return }
+        let sorted = journal.sorted { $0.dayKey < $1.dayKey }
+        journal = Array(sorted.suffix(maxRows))
+    }
+
+    private func applyDecayEvent(_ ev: PetDecayEventRecord, to stateRef: inout PetCareState) {
+        stateRef.mood = min(1, max(0, stateRef.mood + ev.moodDelta))
+        stateRef.energy = min(1, max(0, stateRef.energy + ev.energyDelta))
+        stateRef.recentDecayEvents.insert(ev, at: 0)
+        if stateRef.recentDecayEvents.count > 80 {
+            stateRef.recentDecayEvents = Array(stateRef.recentDecayEvents.prefix(80))
+        }
+        let dk = dayKey(for: ev.occurredAt)
+        upsertJournal(dayKey: dk, on: &stateRef) { row in
+            row.decayEventCount += 1
+        }
+    }
+
+    private func scheduleAIGrowthIfNeeded(contextHour: Date) {
+        let cfg = PetGrowthConfig.clamped(growthConfig)
+        guard cfg.aiGrowthEventsEnabled else { return }
+        if let last = state.lastAIGrowthEventAt,
+           Date().timeIntervalSince(last) < cfg.aiGrowthEventsMinIntervalHours * 3600 {
+            return
+        }
+        guard let client = growthClient, let settings = growthSettings else { return }
+        guard aiGrowthTask == nil else { return }
+
+        aiGrowthTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.aiGrowthTask = nil }
+            let recentCodes = self.state.recentDecayEvents.prefix(20).map(\.reasonCode)
+            let user = PetGrowthAI.buildUserPrompt(
+                hourStart: contextHour,
+                mood: self.state.mood,
+                energy: self.state.energy,
+                recentEventCodes: recentCodes,
+                localTemplateSummary: PetGrowthAI.localTemplateSummaryForPrompt()
+            )
+            let key = KeychainStore.readAPIKey()
+            let messages: [[String: String]] = [["role": "user", "content": user]]
+            do {
+                let text = try await client.completeChat(
+                    baseURL: settings.baseURL,
+                    model: settings.model,
+                    apiKey: key,
+                    systemPrompt: "你只输出 JSON。不要输出任何其它字符。",
+                    messages: messages,
+                    temperature: 0.85,
+                    maxTokens: 512
+                )
+                guard let parsed = PetGrowthAI.parseEvents(from: text),
+                      let first = parsed.first
+                else {
+                    self.fallbackLocalEvent(for: contextHour)
+                    return
+                }
+                var s = self.state
+                self.applyDecayEvent(first, to: &s)
+                s.lastAIGrowthEventAt = Date()
+                self.state = s
+                self.persistDebounced()
+            } catch {
+                self.fallbackLocalEvent(for: contextHour)
+            }
+        }
+    }
+
+    private func fallbackLocalEvent(for date: Date) {
+        guard let ev = PetLocalGrowthEventPool.sampleEvent(at: date, calendar: .current, rng: &growthRng) else { return }
+        var s = state
+        applyDecayEvent(ev, to: &s)
+        state = s
+        persistDebounced()
     }
 
     func feedIfAllowed() -> Bool {
@@ -124,8 +293,11 @@ final class PetCareModel: ObservableObject {
         s.lastFeedAt = Date()
         s.mood = min(1, s.mood + 0.12)
         s.energy = min(1, s.energy + 0.15)
+        upsertJournal(dayKey: dayKey(), on: &s) { row in
+            row.feedCount += 1
+        }
         state = s
-        persist()
+        persistDebounced()
         return true
     }
 
@@ -136,12 +308,24 @@ final class PetCareModel: ObservableObject {
         var s = state
         s.lastPetAt = Date()
         s.mood = min(1, s.mood + 0.06)
+        upsertJournal(dayKey: dayKey(), on: &s) { row in
+            row.petCount += 1
+        }
         state = s
-        persist()
+        persistDebounced()
         return true
     }
 
-    private func persist() {
+    private func persistDebounced() {
+        persistDebounceTask?.cancel()
+        persistDebounceTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            guard let self, !Task.isCancelled else { return }
+            self.persistImmediate()
+        }
+    }
+
+    private func persistImmediate() {
         if let data = try? JSONEncoder().encode(state) {
             defaults.set(data, forKey: PetCareKeys.state)
         }

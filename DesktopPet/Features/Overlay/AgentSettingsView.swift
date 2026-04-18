@@ -19,24 +19,42 @@ struct AgentSettingsView: View {
     @State private var showTriggerSpeechHistorySheet = false
     @State private var showTriggerUserPromptHistorySheet = false
     @State private var showNewKeyboardTriggerPrivacyHint = false
+    @State private var selectedSettingsTab = 0
+
+    private static let pendingAgentSettingsTabKey = "DesktopPet.ui.pendingAgentSettingsTab"
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedSettingsTab) {
             connectionTab
                 .tabItem { Label("连接", systemImage: "link") }
+                .tag(0)
             personalityTab
                 .tabItem { Label("人格", systemImage: "theatermasks") }
+                .tag(1)
             triggersTab
                 .tabItem { Label("触发器", systemImage: "bolt.horizontal") }
+                .tag(2)
             privacyTab
                 .tabItem { Label("隐私", systemImage: "hand.raised") }
+                .tag(3)
             growthTab
                 .tabItem { Label("成长", systemImage: "leaf.fill") }
+                .tag(4)
         }
         .frame(minWidth: 480, minHeight: 520)
         .padding(12)
         .onAppear {
             apiKeyDraft = KeychainStore.readAPIKey() ?? ""
+            if let v = UserDefaults.standard.object(forKey: Self.pendingAgentSettingsTabKey) as? Int {
+                UserDefaults.standard.removeObject(forKey: Self.pendingAgentSettingsTabKey)
+                if (0 ... 4).contains(v) {
+                    selectedSettingsTab = v
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .desktopPetPresentAgentSettingsTab)) { note in
+            let tab = note.userInfo?[DesktopPetNotificationUserInfoKey.agentSettingsTabIndex] as? Int ?? 0
+            selectedSettingsTab = min(4, max(0, tab))
         }
         .alert("键盘模式触发", isPresented: $showKeyboardRiskAlert) {
             Button("取消", role: .cancel) {}
@@ -355,8 +373,196 @@ struct AgentSettingsView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+
+            Section {
+                HStack {
+                    Text("每小时能量衰减")
+                    Spacer()
+                    Text(String(format: "%.1f%%", petCare.growthConfig.energyDrainPerHour * 100))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                Slider(
+                    value: growthEnergyDrainBinding,
+                    in: 0 ... 0.15,
+                    step: 0.002
+                )
+                HStack {
+                    Text("每小时心情衰减")
+                    Spacer()
+                    Text(String(format: "%.1f%%", petCare.growthConfig.moodDrainPerHour * 100))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                Slider(
+                    value: growthMoodDrainBinding,
+                    in: 0 ... 0.12,
+                    step: 0.002
+                )
+                HStack {
+                    Text("随机事件密度")
+                    Spacer()
+                    Text("\(petCare.growthConfig.randomEventDensityPercent)%")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                Slider(
+                    value: growthDensityBinding,
+                    in: 0 ... 100,
+                    step: 1
+                )
+                Toggle("允许 AI 生成成长事件", isOn: growthAIEnabledBinding)
+                Stepper(
+                    "AI 事件最小间隔：\(String(format: "%.0f", petCare.growthConfig.aiGrowthEventsMinIntervalHours)) 小时",
+                    value: growthAIMinHoursBinding,
+                    in: 1 ... 48,
+                    step: 1
+                )
+            } header: {
+                Text("成长参数")
+            } footer: {
+                Text("每小时衰减在宠物隐藏时也会累计；随机事件按密度抽样，午间等时段略更容易发生。开启 AI 后，部分事件会请求模型生成 JSON（失败则自动用本地事件）；会消耗 API。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Section {
+                let month = petCare.currentMonthSummary()
+                Text("本月（\(month.yearMonthKey)）有陪伴的天数：\(month.daysWithCompanion) 天")
+                Text("本月累计陪伴：\(month.totalCompanionSeconds / 60) 分钟 · 喂食 \(month.totalFeedCount) 次 · 戳戳 \(month.totalPetCount) 次 · 成长事件 \(month.totalDecayEvents) 次")
+                Text("本月有陪伴日的平均陪伴：\(month.averageCompanionMinutesPerActiveDay) 分钟/天 · 最佳连续有陪伴：\(month.bestStreakDaysWithCompanion) 天")
+                Divider().padding(.vertical, 4)
+                Text("近 7 天陪伴（分钟）")
+                    .font(.subheadline.weight(.semibold))
+                ForEach(petCare.lastNDaysCompanionMinutes(7), id: \.dayKey) { row in
+                    HStack {
+                        Text(row.dayKey)
+                            .font(.caption.monospacedDigit())
+                        Spacer()
+                        Text("\(row.minutes) 分")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("统计预览")
+            } footer: {
+                Text("陪伴时长仅在宠物窗口可见时累计；统计按本机日历日写入。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Section {
+                if petCare.state.recentDecayEvents.isEmpty {
+                    Text("暂无记录")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(petCare.state.recentDecayEvents.prefix(15)) { ev in
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text(ev.source == .ai ? "AI" : "本地")
+                                    .font(.caption2.weight(.semibold))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(ev.source == .ai ? Color.blue.opacity(0.15) : Color.gray.opacity(0.15), in: Capsule())
+                                Text(ev.reasonCode)
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                                Spacer()
+                                Text(shortDate(ev.occurredAt))
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            Text(ev.reasonText)
+                                .font(.caption)
+                            Text("心情 \(signedPct(ev.moodDelta)) · 能量 \(signedPct(ev.energyDelta))")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+            } header: {
+                Text("最近成长事件")
+            } footer: {
+                Text("事件会轻微调整心情/能量并记入当日统计；列表最多保留 80 条。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .formStyle(.grouped)
+    }
+
+    private func shortDate(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateStyle = .short
+        f.timeStyle = .short
+        return f.string(from: d)
+    }
+
+    private func signedPct(_ d: Double) -> String {
+        let p = d * 100
+        if p >= 0 { return String(format: "+%.0f%%", p) }
+        return String(format: "%.0f%%", p)
+    }
+
+    private var growthEnergyDrainBinding: Binding<Double> {
+        Binding(
+            get: { petCare.growthConfig.energyDrainPerHour },
+            set: { v in
+                var c = petCare.growthConfig
+                c.energyDrainPerHour = v
+                petCare.growthConfig = PetGrowthConfig.clamped(c)
+            }
+        )
+    }
+
+    private var growthMoodDrainBinding: Binding<Double> {
+        Binding(
+            get: { petCare.growthConfig.moodDrainPerHour },
+            set: { v in
+                var c = petCare.growthConfig
+                c.moodDrainPerHour = v
+                petCare.growthConfig = PetGrowthConfig.clamped(c)
+            }
+        )
+    }
+
+    private var growthDensityBinding: Binding<Double> {
+        Binding(
+            get: { Double(petCare.growthConfig.randomEventDensityPercent) },
+            set: { v in
+                var c = petCare.growthConfig
+                c.randomEventDensityPercent = Int(v.rounded())
+                petCare.growthConfig = PetGrowthConfig.clamped(c)
+            }
+        )
+    }
+
+    private var growthAIEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { petCare.growthConfig.aiGrowthEventsEnabled },
+            set: { v in
+                var c = petCare.growthConfig
+                c.aiGrowthEventsEnabled = v
+                petCare.growthConfig = PetGrowthConfig.clamped(c)
+            }
+        )
+    }
+
+    private var growthAIMinHoursBinding: Binding<Double> {
+        Binding(
+            get: { petCare.growthConfig.aiGrowthEventsMinIntervalHours },
+            set: { v in
+                var c = petCare.growthConfig
+                c.aiGrowthEventsMinIntervalHours = v
+                petCare.growthConfig = PetGrowthConfig.clamped(c)
+            }
+        )
     }
 
     private var growthFeedCooldownLabel: String {

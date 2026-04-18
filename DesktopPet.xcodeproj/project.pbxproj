@@ -53,6 +53,10 @@
 		C10000000000000000000033 /* AgentConversationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000033 /* AgentConversationStore.swift */; };
 		C10000000000000000000034 /* TriggerSpeechHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000034 /* TriggerSpeechHistoryStore.swift */; };
 		C10000000000000000000035 /* AgentSessionHistoryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000035 /* AgentSessionHistoryViews.swift */; };
+		C10000000000000000000036 /* PetGrowthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000036 /* PetGrowthModels.swift */; };
+		C10000000000000000000037 /* PetLocalGrowthEventPool.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000037 /* PetLocalGrowthEventPool.swift */; };
+		C10000000000000000000038 /* PetDecayEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000038 /* PetDecayEngine.swift */; };
+		C10000000000000000000039 /* PetGrowthAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000039 /* PetGrowthAI.swift */; };
 		C3D4E5F60718293A4B5C6D7E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8F /* ContentView.swift */; };
 		E5F60718293A4B5C6D7E8F90 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F60718293A4B5C6D7E8F90AB /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -103,6 +107,10 @@
 		B100000000000000000000033 /* AgentConversationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentConversationStore.swift; sourceTree = "<group>"; };
 		B100000000000000000000034 /* TriggerSpeechHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriggerSpeechHistoryStore.swift; sourceTree = "<group>"; };
 		B100000000000000000000035 /* AgentSessionHistoryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSessionHistoryViews.swift; sourceTree = "<group>"; };
+		B100000000000000000000036 /* PetGrowthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetGrowthModels.swift; sourceTree = "<group>"; };
+		B100000000000000000000037 /* PetLocalGrowthEventPool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetLocalGrowthEventPool.swift; sourceTree = "<group>"; };
+		B100000000000000000000038 /* PetDecayEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetDecayEngine.swift; sourceTree = "<group>"; };
+		B100000000000000000000039 /* PetGrowthAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetGrowthAI.swift; sourceTree = "<group>"; };
 		B200000000000000000000040 /* DeskMirror */ = {isa = PBXFileReference; lastKnownFileType = folder; path = DeskMirror; sourceTree = "<group>"; };
 		B2C3D4E5F60718293A4B5C6D /* DesktopPetApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPetApp.swift; sourceTree = "<group>"; };
 		D4E5F60718293A4B5C6D7E8F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -311,6 +319,10 @@
 			children = (
 				B100000000000000000000025 /* PetCareState.swift */,
 				B100000000000000000000026 /* PetCareModel.swift */,
+				B100000000000000000000036 /* PetGrowthModels.swift */,
+				B100000000000000000000037 /* PetLocalGrowthEventPool.swift */,
+				B100000000000000000000038 /* PetDecayEngine.swift */,
+				B100000000000000000000039 /* PetGrowthAI.swift */,
 			);
 			path = Care;
 			sourceTree = "<group>";
@@ -444,6 +456,10 @@
 				C10000000000000000000033 /* AgentConversationStore.swift in Sources */,
 				C10000000000000000000034 /* TriggerSpeechHistoryStore.swift in Sources */,
 				C10000000000000000000035 /* AgentSessionHistoryViews.swift in Sources */,
+				C10000000000000000000036 /* PetGrowthModels.swift in Sources */,
+				C10000000000000000000037 /* PetLocalGrowthEventPool.swift in Sources */,
+				C10000000000000000000038 /* PetDecayEngine.swift in Sources */,
+				C10000000000000000000039 /* PetGrowthAI.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

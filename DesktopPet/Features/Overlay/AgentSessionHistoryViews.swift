@@ -252,4 +252,6 @@ enum DesktopPetNotificationUserInfoKey {
     static let triggerRuleJSON = "triggerRuleJSON"
     /// 饲养互动旁白：由应用拼好的多行说明，替换模板中的 `{careContext}`。
     static let careContext = "careContext"
+    /// 打开智能体设置时要选中的 Tab 索引（Int）。
+    static let agentSettingsTabIndex = "agentSettingsTabIndex"
 }

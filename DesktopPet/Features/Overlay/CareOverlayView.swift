@@ -18,6 +18,15 @@ struct CareOverlayView: View {
             Text("今日陪伴 \(care.state.todayCompanionSeconds / 60) 分钟")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            Button("成长详情…") {
+                NotificationCenter.default.post(
+                    name: .desktopPetPresentAgentSettingsTab,
+                    object: nil,
+                    userInfo: [DesktopPetNotificationUserInfoKey.agentSettingsTabIndex: 4]
+                )
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
             Text("互动成功时的猫猫反应由「智能体设置 → 触发器 → 饲养互动」旁白请求模型生成（若已启用该规则）；此处仅在操作失败时提示。")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)

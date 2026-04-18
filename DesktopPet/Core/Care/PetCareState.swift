@@ -19,12 +19,92 @@ struct PetCareState: Codable, Equatable {
     /// 今日累计陪伴秒（宠物窗口可见时由模型累加）
     var todayCompanionSeconds: Int
 
+    // MARK: - 成长 / 衰减（旧存档缺省）
+
+    /// 上次完成「按小时」衰减计算的时间锚点；用于跨小时补算
+    var lastDecayAt: Date?
+    /// 按日聚合：陪伴秒、喂食次数、戳戳次数、成长事件次数
+    var companionDailyJournal: [PetCompanionDayStats]
+    /// 最近成长衰减事件（本地 + AI）
+    var recentDecayEvents: [PetDecayEventRecord]
+    /// 上次成功应用 AI 成长事件的时间（用于节流）
+    var lastAIGrowthEventAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case mood
+        case energy
+        case lastFeedAt
+        case lastPetAt
+        case lastResetDayKey
+        case todayCompanionSeconds
+        case lastDecayAt
+        case companionDailyJournal
+        case recentDecayEvents
+        case lastAIGrowthEventAt
+    }
+
+    init(
+        mood: Double,
+        energy: Double,
+        lastFeedAt: Date?,
+        lastPetAt: Date?,
+        lastResetDayKey: String,
+        todayCompanionSeconds: Int,
+        lastDecayAt: Date?,
+        companionDailyJournal: [PetCompanionDayStats],
+        recentDecayEvents: [PetDecayEventRecord],
+        lastAIGrowthEventAt: Date?
+    ) {
+        self.mood = mood
+        self.energy = energy
+        self.lastFeedAt = lastFeedAt
+        self.lastPetAt = lastPetAt
+        self.lastResetDayKey = lastResetDayKey
+        self.todayCompanionSeconds = todayCompanionSeconds
+        self.lastDecayAt = lastDecayAt
+        self.companionDailyJournal = companionDailyJournal
+        self.recentDecayEvents = recentDecayEvents
+        self.lastAIGrowthEventAt = lastAIGrowthEventAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        mood = try c.decode(Double.self, forKey: .mood)
+        energy = try c.decode(Double.self, forKey: .energy)
+        lastFeedAt = try c.decodeIfPresent(Date.self, forKey: .lastFeedAt)
+        lastPetAt = try c.decodeIfPresent(Date.self, forKey: .lastPetAt)
+        lastResetDayKey = try c.decodeIfPresent(String.self, forKey: .lastResetDayKey) ?? ""
+        todayCompanionSeconds = try c.decodeIfPresent(Int.self, forKey: .todayCompanionSeconds) ?? 0
+        lastDecayAt = try c.decodeIfPresent(Date.self, forKey: .lastDecayAt)
+        companionDailyJournal = try c.decodeIfPresent([PetCompanionDayStats].self, forKey: .companionDailyJournal) ?? []
+        recentDecayEvents = try c.decodeIfPresent([PetDecayEventRecord].self, forKey: .recentDecayEvents) ?? []
+        lastAIGrowthEventAt = try c.decodeIfPresent(Date.self, forKey: .lastAIGrowthEventAt)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(mood, forKey: .mood)
+        try c.encode(energy, forKey: .energy)
+        try c.encodeIfPresent(lastFeedAt, forKey: .lastFeedAt)
+        try c.encodeIfPresent(lastPetAt, forKey: .lastPetAt)
+        try c.encode(lastResetDayKey, forKey: .lastResetDayKey)
+        try c.encode(todayCompanionSeconds, forKey: .todayCompanionSeconds)
+        try c.encodeIfPresent(lastDecayAt, forKey: .lastDecayAt)
+        try c.encode(companionDailyJournal, forKey: .companionDailyJournal)
+        try c.encode(recentDecayEvents, forKey: .recentDecayEvents)
+        try c.encodeIfPresent(lastAIGrowthEventAt, forKey: .lastAIGrowthEventAt)
+    }
+
     static let neutral = PetCareState(
         mood: 0.65,
         energy: 0.7,
         lastFeedAt: nil,
         lastPetAt: nil,
         lastResetDayKey: "",
-        todayCompanionSeconds: 0
+        todayCompanionSeconds: 0,
+        lastDecayAt: nil,
+        companionDailyJournal: [],
+        recentDecayEvents: [],
+        lastAIGrowthEventAt: nil
     )
 }
