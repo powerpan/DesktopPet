@@ -56,7 +56,7 @@ final class AppCoordinator: ObservableObject {
         wirePetWindowOverlayNotifications()
         wirePresentChatContinuingChannelFromSettings()
         wireCloseChatOverlayFromPanel()
-        wireTestBubbleFromSettings()
+        wireForceFireTriggerFromSettings()
 
         petCareModel.startCompanionTicking { [weak self] in self?.isPetVisible ?? false }
         triggerEngine.start()
@@ -223,15 +223,18 @@ final class AppCoordinator: ObservableObject {
             .store(in: &cancellables)
     }
 
-    private func wireTestBubbleFromSettings() {
-        NotificationCenter.default.publisher(for: .desktopPetFireTestBubble)
+    private func wireForceFireTriggerFromSettings() {
+        NotificationCenter.default.publisher(for: .desktopPetForceFireTriggerRule)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] note in
                 guard let self else { return }
-                let raw = note.userInfo?[DesktopPetNotificationUserInfoKey.testBubbleSample] as? String
-                let sample = TestBubbleSample(rawValue: raw ?? "") ?? .short
-                let text = sample.cannedText
-                self.deliverTriggerSpeech(TriggerSpeechPayload(text: text, triggerKind: .bubbleTest, userPrompt: nil))
+                guard let json = note.userInfo?[DesktopPetNotificationUserInfoKey.triggerRuleJSON] as? String,
+                      let data = json.data(using: .utf8),
+                      let rule = try? JSONDecoder().decode(AgentTriggerRule.self, from: data)
+                else { return }
+                Task { @MainActor in
+                    await self.triggerEngine.forceFireTrigger(ruleSnapshot: rule)
+                }
             }
             .store(in: &cancellables)
     }

@@ -17,8 +17,8 @@ extension Notification.Name {
     static let desktopPetPresentChatContinuingChannel = Notification.Name("desktopPetPresentChatContinuingChannel")
     /// 对话面板内「关闭」或等价操作：收起聊天浮动窗。
     static let desktopPetCloseChatOverlay = Notification.Name("desktopPetCloseChatOverlay")
-    /// 智能体设置里「气泡测试」规则点击立即触发：`userInfo["sample"]` 为 `TestBubbleSample.rawValue`。
-    static let desktopPetFireTestBubble = Notification.Name("desktopPetFireTestBubble")
+    /// 触发器编辑页「立即触发当前触发器」：`userInfo["triggerRuleJSON"]` 为 `AgentTriggerRule` 的 JSON 字符串（UTF-8）。
+    static let desktopPetForceFireTriggerRule = Notification.Name("desktopPetForceFireTriggerRule")
 }
 
 @MainActor

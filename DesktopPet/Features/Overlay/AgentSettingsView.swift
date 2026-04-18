@@ -185,7 +185,7 @@ struct AgentSettingsView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("触发器在满足条件时会自动请求模型写一句短旁白：写入旁白历史，并以宠窗旁云气泡展示。")
                     Text("轻点气泡会关闭气泡、以该旁白为上下文新建一个手动会话频道，并打开对话面板续聊。")
-                    Text("「气泡测试」不调用模型：在规则编辑页选择短/长固定文案后点「立即触发」，用于检查气泡布局与续聊流程。")
+                    Text("在规则编辑页底部可点「立即触发当前触发器」，用当前表单内容向模型请求一次旁白（与自动触发相同链路），便于试跑提示语与路由。")
                     Text("每条规则有独立冷却，避免刷屏。定时与随机空闲适合日常使用；键盘与前台应用属于进阶能力，请谨慎开启。")
                 }
                 .font(.caption)
@@ -347,7 +347,6 @@ private struct TriggerRuleRow: View {
             if r.routes.isEmpty, !r.frontAppNameContains.isEmpty { return "前台包含「\(r.frontAppNameContains)」" }
             return "前台路由\(routeHint)"
         case .screenSnap: return "占位，不触发\(routeHint)"
-        case .bubbleTest: return "编辑内选手动触发短/长气泡"
         }
     }
 }
@@ -378,6 +377,7 @@ private struct PromptPlaceholderHelp: View {
 private struct TriggerRuleEditorSheet: View {
     @State var rule: AgentTriggerRule
     @EnvironmentObject private var settings: AgentSettingsStore
+    @EnvironmentObject private var session: AgentSessionStore
     @Binding var isPresented: Bool
     @State private var editingRouteIndex: Int?
 
@@ -392,112 +392,106 @@ private struct TriggerRuleEditorSheet: View {
                     }
                     .disabled(true)
                     Stepper("冷却（秒）: \(Int(rule.cooldownSeconds))", value: $rule.cooldownSeconds, in: 30 ... 3600, step: 30)
-                        .disabled(rule.kind == .bubbleTest)
                 } header: {
                     Text("基本")
                 } footer: {
-                    Text(rule.kind == .bubbleTest
-                         ? "气泡测试仅用手动按钮触发，不走模型；冷却对自动轮询无影响（本条不参与定时评估）。"
-                         : "冷却：两次触发之间的最短间隔（秒）。触发一次后会进入冷却，期间即使条件仍满足也不会再请求。")
+                    Text("冷却：两次触发之间的最短间隔（秒）。触发一次后会进入冷却，期间即使条件仍满足也不会再请求。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                if rule.kind != .bubbleTest {
-                    Section {
-                        TextEditor(text: $rule.defaultPromptTemplate)
-                            .font(.body)
-                            .frame(minHeight: 72)
-                        PromptPlaceholderHelp()
-                    } header: {
-                        Text("默认旁白请求（无路由命中）")
-                    } footer: {
-                        Text("发给模型的一条 user 消息（user role）。当没有任何旁白路由的条件被满足时，使用本模板。整段留空则使用应用内置默认句式。")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
-                    Section {
-                        if rule.routes.isEmpty {
-                            Text("尚未配置路由：将使用上方默认模板；键盘类还可回退到下方「旧版单一模式串」。")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        ForEach(Array(rule.routes.enumerated()), id: \.element.id) { index, route in
-                            HStack(alignment: .firstTextBaseline) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("优先级 \(route.priority)")
-                                        .font(.subheadline.weight(.semibold))
-                                    Text(routeSummary(route))
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(2)
-                                }
-                                Spacer()
-                                Text(route.enabled ? "开" : "关")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                Button("编辑") {
-                                    editingRouteIndex = index
-                                }
-                                Button {
-                                    removeRoute(at: index)
-                                } label: {
-                                    Image(systemName: "trash")
-                                }
-                                .buttonStyle(.borderless)
-                                .foregroundStyle(.red)
-                                .help("删除此旁白路由")
-                                .accessibilityLabel("删除此旁白路由")
-                            }
-                        }
-                        .onDelete { idx in
-                            for i in idx.sorted(by: >) {
-                                removeRoute(at: i)
-                            }
-                        }
-
-                        Button("添加旁白路由") {
-                            let nextP = (rule.routes.map(\.priority).max() ?? 0) + 1
-                            let tmpl = AgentTriggerRule.newRoutePromptTemplate(for: rule.kind)
-                            let conds: [TriggerRouteCondition] = {
-                                switch rule.kind {
-                                case .keyboardPattern: return [.keyboardContains("")]
-                                case .frontApp: return [.frontAppContains("")]
-                                case .timer, .randomIdle, .screenSnap: return [.always]
-                                case .bubbleTest: return []
-                                }
-                            }()
-                            rule.routes.append(
-                                TriggerPromptRoute(enabled: true, priority: nextP, conditions: conds, promptTemplate: tmpl)
-                            )
-                            editingRouteIndex = rule.routes.count - 1
-                        }
-
-                        if rule.kind == .keyboardPattern {
-                            HStack(spacing: 10) {
-                                Button("插入示例：密码安全") {
-                                    insertPasswordRouteExample()
-                                }
-                                Button("插入示例：表白关键词") {
-                                    insertLoveRouteExamples()
-                                }
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                    } header: {
-                        Text("旁白路由（优先级高先匹配）")
-                    } footer: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("每条路由内多个条件为 AND。键盘类路由至少包含一个「按键包含」且子串非空，否则不会匹配。同一次触发只选用一条路由的提示语。")
-                            Text("删除：点每行右侧废纸篓；macOS 分组表单里左滑删除往往不可用。")
-                        }
+                Section {
+                    TextEditor(text: $rule.defaultPromptTemplate)
+                        .font(.body)
+                        .frame(minHeight: 72)
+                    PromptPlaceholderHelp()
+                } header: {
+                    Text("默认旁白请求（无路由命中）")
+                } footer: {
+                    Text("发给模型的一条 user 消息（user role）。当没有任何旁白路由的条件被满足时，使用本模板。整段留空则使用应用内置默认句式。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                Section {
+                    if rule.routes.isEmpty {
+                        Text("尚未配置路由：将使用上方默认模板；键盘类还可回退到下方「旧版单一模式串」。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
+                    ForEach(Array(rule.routes.enumerated()), id: \.element.id) { index, route in
+                        HStack(alignment: .firstTextBaseline) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("优先级 \(route.priority)")
+                                    .font(.subheadline.weight(.semibold))
+                                Text(routeSummary(route))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
+                            Spacer()
+                            Text(route.enabled ? "开" : "关")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Button("编辑") {
+                                editingRouteIndex = index
+                            }
+                            Button {
+                                removeRoute(at: index)
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .buttonStyle(.borderless)
+                            .foregroundStyle(.red)
+                            .help("删除此旁白路由")
+                            .accessibilityLabel("删除此旁白路由")
+                        }
+                    }
+                    .onDelete { idx in
+                        for i in idx.sorted(by: >) {
+                            removeRoute(at: i)
+                        }
+                    }
+
+                    Button("添加旁白路由") {
+                        let nextP = (rule.routes.map(\.priority).max() ?? 0) + 1
+                        let tmpl = AgentTriggerRule.newRoutePromptTemplate(for: rule.kind)
+                        let conds: [TriggerRouteCondition] = {
+                            switch rule.kind {
+                            case .keyboardPattern: return [.keyboardContains("")]
+                            case .frontApp: return [.frontAppContains("")]
+                            case .timer, .randomIdle, .screenSnap: return [.always]
+                            }
+                        }()
+                        rule.routes.append(
+                            TriggerPromptRoute(enabled: true, priority: nextP, conditions: conds, promptTemplate: tmpl)
+                        )
+                        editingRouteIndex = rule.routes.count - 1
+                    }
+
+                    if rule.kind == .keyboardPattern {
+                        HStack(spacing: 10) {
+                            Button("插入示例：密码安全") {
+                                insertPasswordRouteExample()
+                            }
+                            Button("插入示例：表白关键词") {
+                                insertLoveRouteExamples()
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                } header: {
+                    Text("旁白路由（优先级高先匹配）")
+                } footer: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("每条路由内多个条件为 AND。键盘类路由至少包含一个「按键包含」且子串非空，否则不会匹配。同一次触发只选用一条路由的提示语。")
+                        Text("删除：点每行右侧废纸篓；macOS 分组表单里左滑删除往往不可用。")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 switch rule.kind {
@@ -570,29 +564,20 @@ private struct TriggerRuleEditorSheet: View {
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                case .bubbleTest:
-                    Section {
-                        Picker("测试文案", selection: $rule.testBubbleSample) {
-                            ForEach(TestBubbleSample.allCases) { s in
-                                Text(s.displayName).tag(s)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        Button("立即触发测试气泡") {
-                            NotificationCenter.default.post(
-                                name: .desktopPetFireTestBubble,
-                                object: nil,
-                                userInfo: [DesktopPetNotificationUserInfoKey.testBubbleSample: rule.testBubbleSample.rawValue]
-                            )
-                        }
-                    } header: {
-                        Text("气泡测试")
-                    } footer: {
-                        Text("不请求大模型，仅弹出与真实触发相同的旁白气泡与历史记录，便于自测布局。可在上方切换「短 / 长」后再点按钮对比效果。")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                Section {
+                    Button("立即触发当前触发器") {
+                        postForceFireTriggerNotification()
                     }
+                    .disabled(session.isSending || rule.kind == .screenSnap)
+                } header: {
+                    Text("试跑")
+                } footer: {
+                    Text("使用当前编辑页中的表单内容（含未点「完成」的修改）向模型请求一次旁白；成功后会出现旁白气泡并写入「旁白历史」与「发给模型的请求」。与自动触发相同会更新该规则在列表中的「上次触发」时间。路由选择会先按当前真实环境（前台名、按键缓冲、空闲等）匹配；若无一命中（例如在设置窗试跑「前台含 Xcode」），会按优先级回退到第一条启用的旁白路由模板，便于预览文案。截屏类规则仍为占位，不会请求模型；正在发送时按钮不可用。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .formStyle(.grouped)
@@ -625,6 +610,16 @@ private struct TriggerRuleEditorSheet: View {
             }
         }
         .frame(minWidth: 400, minHeight: 360)
+    }
+
+    private func postForceFireTriggerNotification() {
+        guard let data = try? JSONEncoder().encode(rule),
+              let json = String(data: data, encoding: .utf8) else { return }
+        NotificationCenter.default.post(
+            name: .desktopPetForceFireTriggerRule,
+            object: nil,
+            userInfo: [DesktopPetNotificationUserInfoKey.triggerRuleJSON: json]
+        )
     }
 
     /// 删除旁白路由并修正正在编辑的 sheet 下标，避免索引错乱。

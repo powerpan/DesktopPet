@@ -248,6 +248,6 @@ struct TriggerUserPromptHistorySheet: View {
 
 enum DesktopPetNotificationUserInfoKey {
     static let channelId = "channelId"
-    /// `TestBubbleSample.rawValue`（`short` / `long`）
-    static let testBubbleSample = "sample"
+    /// `AgentTriggerRule` 的 JSON 字符串（与 `JSONEncoder` 默认输出一致）。
+    static let triggerRuleJSON = "triggerRuleJSON"
 }

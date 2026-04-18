@@ -53,7 +53,9 @@ final class AgentTriggerEngine: ObservableObject {
     }
 
     func start() {
-        lastKnownFrontApp = frontWatcher.frontmostLocalizedName
+        // 先启动 watcher，再用与 tick 相同的数据源对齐，避免读到尚未 `refresh` 的空串。
+        frontWatcher.start()
+        lastKnownFrontApp = Self.readFrontmostLocalizedName()
         // 定时器：从未触发过时先写入当前时间，避免启动瞬间连发
         for i in settings.triggers.indices where settings.triggers[i].kind == .timer && settings.triggers[i].lastFiredAt == nil {
             var r = settings.triggers[i]
@@ -70,7 +72,11 @@ final class AgentTriggerEngine: ObservableObject {
         if let tickTimer {
             RunLoop.main.add(tickTimer, forMode: .common)
         }
-        frontWatcher.start()
+    }
+
+    /// 与 `NSWorkspace` 同步读取当前激活应用名；勿仅用 `FrontmostAppWatcher` 缓存，部分切前台路径不会发 `didActivateApplication`。
+    private static func readFrontmostLocalizedName() -> String {
+        NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
     }
 
     func stop() {
@@ -94,19 +100,12 @@ final class AgentTriggerEngine: ObservableObject {
         noteUserActivity()
     }
 
-    private func tick() async {
-        tickIndex += 1
-        let now = Date()
+    private func buildTriggerEvalContext(now: Date) -> TriggerEvalContext {
         let uptime = ProcessInfo.processInfo.systemUptime
         let idle = uptime - lastUserActivityUptime
-
-        let currentFront = frontWatcher.frontmostLocalizedName
+        let currentFront = Self.readFrontmostLocalizedName()
         let frontChanged = currentFront != lastKnownFrontApp
-        if frontChanged {
-            lastKnownFrontApp = currentFront
-        }
-
-        let ctx = TriggerEvalContext(
+        return TriggerEvalContext(
             now: now,
             idle: idle,
             currentFront: currentFront,
@@ -114,6 +113,30 @@ final class AgentTriggerEngine: ObservableObject {
             tickIndex: tickIndex,
             keyBuffer: recentKeyBuffer
         )
+    }
+
+    /// 设置页「立即触发」：用当前表单快照走与自动触发相同的模型请求与旁白链路；不经过各 kind 的自动门槛判断。
+    func forceFireTrigger(ruleSnapshot: AgentTriggerRule) async {
+        guard ruleSnapshot.kind != .screenSnap else { return }
+        guard let i = settings.triggers.firstIndex(where: { $0.id == ruleSnapshot.id }) else { return }
+        var ruleForEval = ruleSnapshot
+        ruleForEval.lastFiredAt = settings.triggers[i].lastFiredAt
+        let ctx = buildTriggerEvalContext(now: Date())
+        let matchedRoute = selectMatchedRouteForForceFire(rule: ruleForEval, ctx: ctx)
+        let now = Date()
+        var stored = settings.triggers[i]
+        stored.lastFiredAt = now
+        settings.triggers[i] = stored
+        await firePrologue(trigger: ruleForEval, matchedRoute: matchedRoute)
+    }
+
+    private func tick() async {
+        tickIndex += 1
+        let now = Date()
+        let ctx = buildTriggerEvalContext(now: now)
+        if ctx.frontChanged {
+            lastKnownFrontApp = ctx.currentFront
+        }
 
         for i in settings.triggers.indices {
             var rule = settings.triggers[i]
@@ -131,7 +154,7 @@ final class AgentTriggerEngine: ObservableObject {
                 fired = evaluateKeyboard(rule: rule, ctx: ctx)
             case .frontApp:
                 fired = evaluateFrontApp(rule: rule, ctx: ctx)
-            case .screenSnap, .bubbleTest:
+            case .screenSnap:
                 fired = false
             }
             if fired {
@@ -227,6 +250,19 @@ final class AgentTriggerEngine: ObservableObject {
             if conditionsSatisfied(route.conditions, rule: rule, ctx: ctx) {
                 return route
             }
+        }
+        return nil
+    }
+
+    /// 设置页「立即触发」：先按真实快照做与自动触发相同的路由选择；若无一命中（例如前台规则在设置窗试跑、当前前台并不是 Xcode），则按优先级回退到第一条可用的启用路由，便于试跑已编辑的模板。
+    private func selectMatchedRouteForForceFire(rule: AgentTriggerRule, ctx: TriggerEvalContext) -> TriggerPromptRoute? {
+        if let matched = selectMatchedRoute(rule: rule, ctx: ctx) {
+            return matched
+        }
+        let sorted = rule.routes.filter(\.enabled).sorted { $0.priority > $1.priority }
+        for route in sorted {
+            if rule.kind == .keyboardPattern, !Self.routeIsValidForKeyboardKind(route) { continue }
+            return route
         }
         return nil
     }

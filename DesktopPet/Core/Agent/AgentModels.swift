@@ -35,7 +35,7 @@ struct TriggerSpeechRecord: Identifiable, Equatable, Codable {
     var text: String
     var triggerKind: AgentTriggerKind
     var createdAt: Date
-    /// 本次请求中发给模型的 user 消息全文（占位符已替换）；无模型调用（如气泡测试）为 nil。
+    /// 本次请求中发给模型的 user 消息全文（占位符已替换）；无 user 上下文时为 nil。
     var userPromptSent: String?
 
     init(id: UUID = UUID(), text: String, triggerKind: AgentTriggerKind, createdAt: Date = Date(), userPromptSent: String? = nil) {
@@ -55,14 +55,12 @@ struct TriggerSpeechPayload: Equatable {
     var userPrompt: String?
 }
 
-enum AgentTriggerKind: String, Codable, CaseIterable, Identifiable {
+enum AgentTriggerKind: String, CaseIterable, Identifiable, Codable {
     case timer
     case randomIdle
     case keyboardPattern
     case frontApp
     case screenSnap
-    /// 不经过模型；在编辑页选短/长固定文案并点「立即触发」弹出旁白气泡（用于自测布局与流程）。
-    case bubbleTest
 
     var id: String { rawValue }
 
@@ -73,8 +71,26 @@ enum AgentTriggerKind: String, Codable, CaseIterable, Identifiable {
         case .keyboardPattern: return "键盘模式"
         case .frontApp: return "前台应用"
         case .screenSnap: return "截屏（规划中）"
-        case .bubbleTest: return "气泡测试"
         }
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        let s = try c.decode(String.self)
+        if s == "bubbleTest" {
+            self = .randomIdle
+            return
+        }
+        guard let v = AgentTriggerKind(rawValue: s) else {
+            self = .timer
+            return
+        }
+        self = v
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(rawValue)
     }
 }
 
@@ -117,34 +133,6 @@ struct TriggerPromptRoute: Identifiable, Equatable, Codable, Sendable {
     }
 }
 
-/// 「气泡测试」触发器可选的固定旁白长度。
-enum TestBubbleSample: String, Codable, CaseIterable, Identifiable, Sendable {
-    case short
-    case long
-
-    /// 短测试基准文案（长测试为其字符数的两倍，便于对比布局）。
-    private static let shortTestLine = "【测试·短】喵～这是短猫猫气泡，用来检查云朵是否紧凑。点气泡可以继续聊天哦。"
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .short: return "短气泡（一小段）"
-        case .long: return "长气泡（短文本两倍长）"
-        }
-    }
-
-    /// 固定测试文案，不请求大模型。
-    var cannedText: String {
-        switch self {
-        case .short:
-            return Self.shortTestLine
-        case .long:
-            return Self.shortTestLine + Self.shortTestLine
-        }
-    }
-}
-
 struct AgentTriggerRule: Identifiable, Equatable, Codable {
     /// 与 `firePrologue` 历史行为一致的通用回退 user 模板（含 `{extra}` 占位）。
     static let standardPrologueTemplate = "请用一两句简体中文，像桌宠一样对用户说点什么。{extra}"
@@ -177,8 +165,6 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             （截屏类触发仍为规划能力，当前不会真的截屏或读画面。）{extra}
             请用一两句简体中文像桌宠一样打个招呼即可，勿假定已看到用户屏幕。触发类型：{triggerKind}
             """
-        case .bubbleTest:
-            return standardPrologueTemplate
         }
     }
 
@@ -210,8 +196,6 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             （截屏能力占位。）本路由条件：{matchedCondition}。{extra}
             请用一两句简体中文像桌宠一样简短回应，勿假设已取得屏幕或图像内容。
             """
-        case .bubbleTest:
-            return standardPrologueTemplate
         }
     }
 
@@ -227,8 +211,6 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
     /// 旧版单条件：当 `routes` 为空时由引擎回退使用；新配置应写入 `routes`。
     var keyboardPattern: String
     var frontAppNameContains: String
-    /// 仅 `bubbleTest` 使用：决定「立即触发」时的固定文案长度。
-    var testBubbleSample: TestBubbleSample
     /// 旁白请求分支：同 tick 内按 `priority` 选第一条全部条件满足的；空则回退旧字段逻辑。
     var routes: [TriggerPromptRoute]
     /// 无路由命中时使用的 user 模板（可为空，引擎再回退到 `standardPrologueTemplate`）。
@@ -245,7 +227,6 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         randomIdleProbability: Double,
         keyboardPattern: String,
         frontAppNameContains: String,
-        testBubbleSample: TestBubbleSample,
         routes: [TriggerPromptRoute],
         defaultPromptTemplate: String
     ) {
@@ -259,7 +240,6 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         self.randomIdleProbability = randomIdleProbability
         self.keyboardPattern = keyboardPattern
         self.frontAppNameContains = frontAppNameContains
-        self.testBubbleSample = testBubbleSample
         self.routes = routes
         self.defaultPromptTemplate = defaultPromptTemplate
     }
@@ -276,7 +256,6 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         randomIdleProbability = try c.decode(Double.self, forKey: .randomIdleProbability)
         keyboardPattern = try c.decode(String.self, forKey: .keyboardPattern)
         frontAppNameContains = try c.decode(String.self, forKey: .frontAppNameContains)
-        testBubbleSample = try c.decodeIfPresent(TestBubbleSample.self, forKey: .testBubbleSample) ?? .short
         var decodedRoutes = try c.decodeIfPresent([TriggerPromptRoute].self, forKey: .routes) ?? []
         var decodedDefault = try c.decodeIfPresent(String.self, forKey: .defaultPromptTemplate) ?? ""
         let migrated = Self.migrateLegacyRoutesIfNeeded(
@@ -302,7 +281,6 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         try c.encode(randomIdleProbability, forKey: .randomIdleProbability)
         try c.encode(keyboardPattern, forKey: .keyboardPattern)
         try c.encode(frontAppNameContains, forKey: .frontAppNameContains)
-        try c.encode(testBubbleSample, forKey: .testBubbleSample)
         try c.encode(routes, forKey: .routes)
         try c.encode(defaultPromptTemplate, forKey: .defaultPromptTemplate)
     }
@@ -311,7 +289,6 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         case id, enabled, kind, cooldownSeconds, lastFiredAt
         case timerIntervalMinutes, randomIdleSeconds, randomIdleProbability
         case keyboardPattern, frontAppNameContains
-        case testBubbleSample
         case routes, defaultPromptTemplate
     }
 
@@ -359,8 +336,6 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         case .timer, .randomIdle, .screenSnap:
             let route = TriggerPromptRoute(enabled: true, priority: 0, conditions: [.always], promptTemplate: def)
             return ([route], def)
-        case .bubbleTest:
-            return ([], def)
         }
     }
 
@@ -385,14 +360,10 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             defaultRoutes = [
                 TriggerPromptRoute(enabled: true, priority: 0, conditions: [.frontAppContains("Xcode")], promptTemplate: routeTmpl),
             ]
-        case .bubbleTest:
-            defaultRoutes = []
-            kbd = ""
-            front = ""
         }
         return AgentTriggerRule(
             id: UUID(),
-            enabled: kind == .timer || kind == .randomIdle || kind == .bubbleTest,
+            enabled: kind == .timer || kind == .randomIdle,
             kind: kind,
             cooldownSeconds: 120,
             lastFiredAt: nil,
@@ -401,7 +372,6 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             randomIdleProbability: 0.08,
             keyboardPattern: kbd,
             frontAppNameContains: front,
-            testBubbleSample: .short,
             routes: defaultRoutes,
             defaultPromptTemplate: def
         )
