@@ -23,6 +23,9 @@ struct ChatOverlayView: View {
                 Text(keychainConfigured ? "钥匙串：已检测到 API Key" : "钥匙串：未检测到 API Key（请在智能体设置中保存）")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                Text("本列表仅手动对话；条件触发的旁白以宠窗旁云气泡展示。会话在内存中，退出应用或清空后即消失。")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)

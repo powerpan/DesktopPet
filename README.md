@@ -92,14 +92,17 @@ DesktopPet/
 | 能力 | 说明 |
 |------|------|
 | 饲养面板 | `PetCareModel` / `PetCareState`：`UserDefaults` 持久化；心情与能量条、喂食（长冷却）与戳戳（短冷却）、宠物**可见**时累计今日陪伴秒数；跨日自动重置当日陪伴并小幅回补数值。 |
-| 对话面板 | `ChatOverlayView` + `AgentSessionStore`：非流式 `POST …/v1/chat/completions`（`AgentClient`）；仅向 API 发送 `user`/`assistant` 角色消息；系统提示词可在设置中编辑。 |
+| 对话面板 | `ChatOverlayView` + `AgentSessionStore`：非流式 `POST …/v1/chat/completions`（`AgentClient`）；仅向 API 发送 `user`/`assistant` 角色消息；系统提示词可在设置中编辑。**会话只在内存中**，关闭对话面板或退出应用即清空（无多轮历史持久化）。 |
+| 触发旁白气泡 | 条件触发得到的回复以**云朵气泡**挂在宠窗附近；默认在猫猫**上方**居中；当宠窗靠近屏幕**右侧且下侧**（约 130pt 内）时改挂到猫猫**左上侧**，并夹在安全区内。轻点气泡或约 14 秒后消失；**不写入**对话列表。 |
 | 智能体设置 | 独立窗口（多 Tab）：连接（Base URL、模型、温度、max_tokens）、人格（系统提示词）、触发器列表（增删改、冷却与各类型参数）、隐私（键入摘要、键盘总闸、截屏占位开关）。 |
 | API Key | `KeychainStore` 读写，**不写入** `UserDefaults`。 |
-| 触发器 | `AgentTriggerEngine`：定时、随机空闲、键盘子串匹配（仅内存环形缓冲，不落盘原文）、前台应用名子串（`FrontmostAppWatcher`）；每条规则 `cooldown`；截屏类型为占位，当前**不会**请求截屏权限或上传图像。 |
+| 触发器 | `AgentTriggerEngine`：定时、随机空闲、键盘子串匹配（仅内存环形缓冲，不落盘原文）、前台应用名子串（`FrontmostAppWatcher`）；每条规则 `cooldown`；截屏类型为占位，当前**不会**请求截屏权限或上传图像。成功时由 `ExtensionOverlayController.showTriggerBubble` 展示旁白。 |
 
 **首次使用建议**：菜单栏 → **智能体设置…** → 填写 Base URL（默认 `https://api.deepseek.com`）与模型名 → **保存到钥匙串** → 打开 **对话面板** 试发一条。无网络或 Key 无效时，错误文案显示在输入区上方。
 
-**隐私提示**：「附带键入摘要」会把桌镜生成的键位标签摘要拼进系统提示（对话与部分触发旁白）；「键盘模式触发」需在隐私 Tab 开启总闸并经二次确认；二者默认关闭。详见 [`docs/TODO_AGENT_AND_CARE.md`](docs/TODO_AGENT_AND_CARE.md) 与设置内文案。
+**隐私提示**：「附带键入摘要」会把桌镜生成的键位标签摘要拼进系统提示（**手动对话**与**触发旁白**请求 API 时均可能带上）；「键盘模式触发」需在隐私 Tab 开启总闸并经二次确认；二者默认关闭。详见 [`docs/TODO_AGENT_AND_CARE.md`](docs/TODO_AGENT_AND_CARE.md) 与设置内文案。
+
+**对话与触发是不是一条通道？** 手动在对话面板发的消息在同一条 `AgentSessionStore.messages` 列表里，仅内存、无按日期分会话的存档。条件触发的模型回复**只走云气泡**，不再追加到该列表，避免和聊天混成一串。
 
 **命令行编译示例**（可选，DerivedData 放在仓库内便于清理）：
 

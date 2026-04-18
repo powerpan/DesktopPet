@@ -30,7 +30,10 @@ final class AppCoordinator: ObservableObject {
         client: agentClient,
         deskMirror: deskMirrorModel,
         frontWatcher: frontmostAppWatcher,
-        isPetVisible: { [weak self] in self?.isPetVisible ?? false }
+        isPetVisible: { [weak self] in self?.isPetVisible ?? false },
+        onTriggerSpeech: { [weak self] line in
+            self?.extensionOverlay.showTriggerBubble(text: line)
+        }
     )
 
     private var petWindowController: PetWindowController?
@@ -78,6 +81,7 @@ final class AppCoordinator: ObservableObject {
     }
 
     func stop() {
+        extensionOverlay.dismissTriggerBubble()
         patrolScheduler.stop()
         mouseTracker.stop()
         globalInput.stop()
@@ -93,6 +97,7 @@ final class AppCoordinator: ObservableObject {
         mouseTracker.interactionSamplingEnabled = isPetVisible
         if !isPetVisible {
             deskMirrorModel.resetMouseMirror()
+            extensionOverlay.dismissTriggerBubble()
         }
     }
 
