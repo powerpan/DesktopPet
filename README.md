@@ -27,6 +27,7 @@
 ## 使用说明
 
 - **菜单栏**：点击爪印图标可显示/隐藏宠物、打开权限说明、进入系统「设置…」面板（`⌘,`）、退出应用。
+- **桌镜卡片**：标题为 **「七七猫1.0」**；底部保留 **英文** 状态枚举名（如 `idle`、`keyTap`）；键入历史为单行摘要，与桌镜图叠层分离布局。
 - **⌘K**：全局快捷键，切换宠物窗口显示（需已授予辅助功能）。
 - **鼠标穿透**：菜单栏 **设置…** 与窗口右上角按钮共用同一开关。开启时精灵区不参与命中；`PetRootContainerView` 包络外 `hitTest` 为 `nil`，包络内只转发 `NSHostingView.hitTest`（**不用** `?? hostingView`）。`PetSpriteView` 使用与圆角一致的 `contentShape`。宠物根视图**不再**整卡 `.padding(8)`，窗口边长由 `PetConfig.exteriorHitSide` 取「视觉边长 + 约 6pt」以尽量消掉隐形外圈。穿透关闭时拖窗请点在**材质卡片**上。
 - **缩放**：滑条 **0.6～1.2**（最大整窗约等于此前仅拉到 1.2× 时的体量，不再支持 1.8）。卡片画布基准 **176pt**（`PetConfig.petCanvasLayoutPoints`，小于原 220）以减小占位。`visualBaselineFactor`（0.6）仍使 **1.0 档** 视觉约等于更早一版「相对 0.6」的体量。连续拖动滑条时窗口以**本轮第一次**屏幕中心为锚缩放并夹紧在可见桌面内。
@@ -44,16 +45,25 @@ DesktopPet/
 ├── Core/
 │   ├── Window/          # PetWindow(NSPanel)、PetWindowController、PetRootContainerView
 │   ├── Animation/       # AnimationDriver（状态到展示占位，可替换为序列帧/视频）
-│   ├── Permissions/    # 辅助功能检测
-│   ├── Input/           # GlobalInputMonitor（合并全局键与 ⌘K）、MouseTracker
+│   ├── Permissions/     # 辅助功能检测
+│   ├── Input/           # GlobalInputMonitor（keyDown/keyUp、⌘K）、MouseTracker
 │   ├── PetState/        # 状态机、巡逻调度
-│   └── Models/          # 配置与交互事件
+│   └── Models/          # PetConfig、DeskMirrorModel、PhysicalKeyLayout、InteractionEvent 等
 ├── Features/
-│   ├── PetView/         # 宠物 SwiftUI 层
+│   ├── PetView/         # PetSpriteView、DeskMirrorTextView、DeskMirrorKeyImage、…
 │   ├── Onboarding/      # 权限说明 SwiftUI 视图
 │   └── Settings/        # 设置表单与持久化 ViewModel
+├── Resources/
+│   └── DeskMirror/      # 桌镜 Bundle 文件夹引用：cover / nohand_cover、left-keys、right-keys（PNG）
 └── Utils/
 ```
+
+## 桌前镜像（桌镜）
+
+- 宠物卡片内默认展示 **整幅叠层**：底图（空闲 `cover.png` / 有输入 `nohand_cover.png`）+ 与底图同尺寸的 **爪印 PNG**（`left-keys`，按 `NSEvent.keyCode` 映射）+ **鼠标四向**（`right-keys` 的 `UpArrow` 等）；资源位于 **`DesktopPet/Resources/DeskMirror/`**，由 Xcode **文件夹引用** 打进 Bundle。
+- **键鼠逻辑**：需辅助功能；`GlobalInputMonitor` 同时监听 **keyDown / keyUp**（本应用前台用 local monitor，其它应用前台用 global）。鼠标由 `MouseTracker` 差分得到主方向（上/下/左/右）；展示层在输入停止后 **约 0.3 秒** 再回落，且静止采样不会反复重置鼠标计时器。
+- **设置**：「关闭按键镜像」等见 `SettingsViewModel` / 设置面板；无权限时桌镜区有降级文案。
+- **素材来源与许可**：当前 PNG 命名对齐参考工程 BongoCat 的 `keyboard/resources`；**分发前请自行确认** Live2D / 第三方素材是否允许随应用使用。
 
 ## 已实现行为（相对上一版骨架）
 
@@ -66,6 +76,7 @@ DesktopPet/
 - 空闲约 `PetConfig.default.idleToSleepInterval` 秒后进入睡眠状态；键鼠或巡逻可唤醒。
 - 设置项（穿透、巡逻、缩放）持久化。
 - 辅助功能：`AXIsProcessTrusted` 诊断文案、`tccutil` 与签名自检说明；未授权时延迟登记 TCC 列表与多次重检；`PetWindow` 允许必要时成为 key 以避免 `makeKeyWindow` 控制台告警。
+- **桌前镜像**：`DeskMirrorTextView` 整幅 `cover` / `nohand_cover` 与爪印、鼠标方向 PNG 同比例叠放；`DeskMirrorKeyImage` 负责 Bundle 路径与宽高比；`DeskMirrorModel` 维护物理高亮、展示层延迟与鼠标方向防抖。
 
 ## 需求文档
 

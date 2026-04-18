@@ -44,3 +44,5 @@
 - [x] 菜单栏 accessory、`NSPanel` 桌宠窗口、穿透与命中包络、`petScale` 与窗口锚定缩放。
 - [x] 辅助功能引导、Bundle ID、`NSAccessibilityUsageDescription`、TCC 诊断与延迟重检、全局键与 ⌘K。
 - [x] 状态机骨架、巡逻调度、设置持久化（穿透/巡逻/缩放）、`visualBaselineFactor` 默认体量。
+- [x] **桌前镜像 v1**：`Resources/DeskMirror`（`cover` / `nohand_cover`、`left-keys`、`right-keys`）+ `DeskMirrorKeyImage` / `DeskMirrorTextView` / `DeskMirrorModel`；整幅叠层同比例；空闲与有输入切换底图；**keyUp** 清除物理键高亮；展示层 **~0.3s** 保持最后一键/最后一向；鼠标静止采样不反复重置清除计时器；设置项「关闭按键镜像」与无 AX 降级文案。
+- [x] 桌镜卡片 UI：标题「七七猫1.0」、底部英文 `PetState.rawValue`、键入历史行样式与边距；卡片内左右边距不对称以尽量占满桌镜宽度。

@@ -1,6 +1,6 @@
 //
 // PetSpriteView.swift
-// 宠物画面占位：根据状态机显示大字状态标题（后续可换成精灵图或动画视图）。
+// 宠物卡片：桌镜叠层为主（状态动画占位可后续接 GIF/序列帧）。
 //
 
 import SwiftUI
@@ -21,12 +21,13 @@ struct PetSpriteView: View {
             let side = max(1, min(geo.size.width, geo.size.height))
             let u = side / layoutReferenceSide
             let cornerRadius = min(side * 0.12, max(4, side * 0.5 - 1))
-            // 桌镜行用满水平内宽；右上角按钮叠在 overlay 上，不必再整体减 30+ pt 否则右侧会空一大块。
-            let innerAfterHPadding = max(1, side - 8 * u)
-            let deskMirrorLayoutWidth = max(28, innerAfterHPadding - 4)
+            // 左侧略留边、右侧更贴边（右上角设置叠在 overlay 上）；桌镜宽度与内边距一致避免右侧空带。
+            let padLeading = max(2, 1.25 * u)
+            let padTrailing = max(1, 0.35 * u)
+            let deskMirrorLayoutWidth = max(28, side - padLeading - padTrailing)
 
             VStack(alignment: .leading, spacing: max(3, 5 * u)) {
-                Text("猫猫桌前（文字）")
+                Text("七七猫1.0")
                     .font(.system(size: max(8, 11 * u), weight: .medium, design: .rounded))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
@@ -36,21 +37,16 @@ struct PetSpriteView: View {
                 DeskMirrorTextView()
                     .layoutPriority(1)
 
-                Text(PetAnimationDriver.title(for: stateMachine.state))
-                    .font(.system(size: min(side * 0.2, max(11, 20 * u)), weight: .bold, design: .rounded))
-                    .accessibilityLabel(PetAnimationDriver.accessibilityLabel(for: stateMachine.state))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.45)
-                    .frame(maxWidth: .infinity, alignment: .center)
-
                 Text(stateMachine.state.rawValue)
-                    .font(.system(size: max(7, 10 * u), design: .monospaced))
+                    .font(.system(size: max(5, 6.5 * u), design: .monospaced))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.65)
+                    .minimumScaleFactor(0.55)
                     .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, max(2, 2.5 * u))
             }
-            .padding(.horizontal, 4 * u)
+            .padding(.leading, padLeading)
+            .padding(.trailing, padTrailing)
             .padding(.vertical, 3 * u)
             .environment(\.petCardContentScale, u)
             .environment(\.petCardLayoutInnerWidth, deskMirrorLayoutWidth)
@@ -83,7 +79,7 @@ extension EnvironmentValues {
         set { self[PetCardContentScaleKey.self] = newValue }
     }
 
-    /// `DeskMirrorTextView` 内 HStack 可用总宽（已扣水平 padding 与右上角按钮占位）。
+    /// `DeskMirrorTextView` 内整幅叠层可用宽度（已扣较窄水平 padding 与圆角/按钮余量）。
     var petCardLayoutInnerWidth: CGFloat {
         get { self[PetCardLayoutInnerWidthKey.self] }
         set { self[PetCardLayoutInnerWidthKey.self] = newValue }

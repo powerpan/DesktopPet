@@ -1,6 +1,6 @@
 //
 // GlobalInputMonitor.swift
-// 键盘监听：同时注册全局与本地 keyDown；前者用于其他应用前台（需辅助功能），后者用于本应用前台时仍能收到按键。
+// 键盘监听：全局与本地 keyDown / keyUp；全局用于其他应用前台（需辅助功能），本地用于本进程前台时仍能收到按键。
 //
 
 import AppKit
@@ -9,12 +9,15 @@ import AppKit
 final class GlobalInputMonitor {
     private var globalMonitor: Any?
     private var localMonitor: Any?
+    private var globalKeyUpMonitor: Any?
+    private var localKeyUpMonitor: Any?
 
     var onKeyDown: ((NSEvent) -> Void)?
+    var onKeyUp: ((NSEvent) -> Void)?
     var onCommandK: (() -> Void)?
 
     func start() {
-        guard globalMonitor == nil, localMonitor == nil else { return }
+        guard globalMonitor == nil, localMonitor == nil, globalKeyUpMonitor == nil, localKeyUpMonitor == nil else { return }
 
         // 其他应用为前台时的按键（未授权时返回 nil）
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -40,6 +43,20 @@ final class GlobalInputMonitor {
         if localMonitor != nil {
             Logger.shared.info("Local keyDown monitor registered.")
         }
+
+        globalKeyUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyUp) { [weak self] event in
+            Task { @MainActor in
+                self?.dispatchKeyUp(event)
+            }
+        }
+
+        localKeyUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { [weak self] event in
+            guard let self else { return event }
+            Task { @MainActor in
+                self.dispatchKeyUp(event)
+            }
+            return event
+        }
     }
 
     func stop() {
@@ -52,6 +69,16 @@ final class GlobalInputMonitor {
         if let monitor = localMonitor {
             NSEvent.removeMonitor(monitor)
             localMonitor = nil
+            removed = true
+        }
+        if let monitor = globalKeyUpMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalKeyUpMonitor = nil
+            removed = true
+        }
+        if let monitor = localKeyUpMonitor {
+            NSEvent.removeMonitor(monitor)
+            localKeyUpMonitor = nil
             removed = true
         }
         if removed {
@@ -71,6 +98,10 @@ final class GlobalInputMonitor {
             return
         }
         onKeyDown?(event)
+    }
+
+    private func dispatchKeyUp(_ event: NSEvent) {
+        onKeyUp?(event)
     }
 
     /// 优先用字符判断 ⌘K；部分键盘布局下用物理键码（ANSI K = 40）兜底。

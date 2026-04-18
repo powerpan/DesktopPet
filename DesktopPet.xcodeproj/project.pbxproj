@@ -34,6 +34,8 @@
 		C10000000000000000000021 /* PhysicalKeyLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000021 /* PhysicalKeyLayout.swift */; };
 		C10000000000000000000022 /* DeskMirrorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000022 /* DeskMirrorModel.swift */; };
 		C10000000000000000000023 /* DeskMirrorTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000023 /* DeskMirrorTextView.swift */; };
+		C10000000000000000000024 /* DeskMirrorKeyImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000024 /* DeskMirrorKeyImage.swift */; };
+		C20000000000000000000040 /* DeskMirror in Resources */ = {isa = PBXBuildFile; fileRef = B200000000000000000000040 /* DeskMirror */; };
 		C3D4E5F60718293A4B5C6D7E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8F /* ContentView.swift */; };
 		E5F60718293A4B5C6D7E8F90 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F60718293A4B5C6D7E8F90AB /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -66,6 +68,8 @@
 		B100000000000000000000021 /* PhysicalKeyLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhysicalKeyLayout.swift; sourceTree = "<group>"; };
 		B100000000000000000000022 /* DeskMirrorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskMirrorModel.swift; sourceTree = "<group>"; };
 		B100000000000000000000023 /* DeskMirrorTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskMirrorTextView.swift; sourceTree = "<group>"; };
+		B100000000000000000000024 /* DeskMirrorKeyImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskMirrorKeyImage.swift; sourceTree = "<group>"; };
+		B200000000000000000000040 /* DeskMirror */ = {isa = PBXFileReference; lastKnownFileType = folder; path = DeskMirror; sourceTree = "<group>"; };
 		B2C3D4E5F60718293A4B5C6D /* DesktopPetApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPetApp.swift; sourceTree = "<group>"; };
 		D4E5F60718293A4B5C6D7E8F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		F60718293A4B5C6D7E8F90AB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -97,6 +101,7 @@
 				A10000000000000000000002 /* Core */,
 				A10000000000000000000003 /* Features */,
 				A10000000000000000000004 /* Utils */,
+				A100000000000000000000040 /* Resources */,
 				B2C3D4E5F60718293A4B5C6D /* DesktopPetApp.swift */,
 				D4E5F60718293A4B5C6D7E8F /* ContentView.swift */,
 				F60718293A4B5C6D7E8F90AB /* Assets.xcassets */,
@@ -153,6 +158,14 @@
 			path = Utils;
 			sourceTree = "<group>";
 		};
+		A100000000000000000000040 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				B200000000000000000000040 /* DeskMirror */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		A10000000000000000000005 /* Input */ = {
 			isa = PBXGroup;
 			children = (
@@ -205,6 +218,7 @@
 		A1000000000000000000000A /* PetView */ = {
 			isa = PBXGroup;
 			children = (
+				B100000000000000000000024 /* DeskMirrorKeyImage.swift */,
 				B100000000000000000000023 /* DeskMirrorTextView.swift */,
 				B10000000000000000000000F /* PetContainerView.swift */,
 				B100000000000000000000010 /* PetSpriteView.swift */,
@@ -297,6 +311,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C20000000000000000000040 /* DeskMirror in Resources */,
 				E5F60718293A4B5C6D7E8F90 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -328,6 +343,7 @@
 				C1000000000000000000000F /* PetContainerView.swift in Sources */,
 				C10000000000000000000010 /* PetSpriteView.swift in Sources */,
 				C10000000000000000000023 /* DeskMirrorTextView.swift in Sources */,
+				C10000000000000000000024 /* DeskMirrorKeyImage.swift in Sources */,
 				C10000000000000000000011 /* SettingsFloatingButton.swift in Sources */,
 				C10000000000000000000012 /* SettingsPanelView.swift in Sources */,
 				C10000000000000000000013 /* SettingsViewModel.swift in Sources */,

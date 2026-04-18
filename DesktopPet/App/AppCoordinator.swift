@@ -71,7 +71,7 @@ final class AppCoordinator: ObservableObject {
         petWindowController?.setPetVisible(isPetVisible)
         mouseTracker.interactionSamplingEnabled = isPetVisible
         if !isPetVisible {
-            deskMirrorModel.resetPadCursor()
+            deskMirrorModel.resetMouseMirror()
         }
     }
 
@@ -201,6 +201,12 @@ final class AppCoordinator: ObservableObject {
             )
             self.stateMachine.handle(.keyboardInput)
             self.bumpActivity()
+        }
+        globalInput.onKeyUp = { [weak self] event in
+            self?.deskMirrorModel.consumeKeyUpEvent(
+                event,
+                mirrorKeysEnabled: self?.settingsViewModel.isDeskKeyMirrorEnabled ?? false
+            )
         }
         globalInput.onCommandK = { [weak self] in
             guard let self else { return }
