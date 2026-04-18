@@ -14,6 +14,9 @@ final class ExtensionOverlayController {
     private var bubblePanel: NSPanel?
     private var bubbleDismissTimer: Timer?
     private var agentSettingsWindow: NSWindow?
+    /// 供 `layoutTriggerBubble` 重建 SwiftUI 内容与尾巴参数。
+    private var bubbleSpeechText: String = ""
+    private var bubbleContinueChat: (() -> Void)?
 
     func attachPetWindow(_ window: NSWindow?) {
         petWindow = window
@@ -154,12 +157,18 @@ final class ExtensionOverlayController {
         bubbleDismissTimer?.invalidate()
         bubbleDismissTimer = nil
 
-        let view = TriggerSpeechBubbleView(text: trimmed) { [weak self] in
-            self?.dismissTriggerBubble()
-            onContinueChat?()
+        bubbleSpeechText = trimmed
+        bubbleContinueChat = onContinueChat
+
+        let tap: () -> Void = { [weak self] in
+            guard let self else { return }
+            let cont = self.bubbleContinueChat
+            self.dismissTriggerBubble()
+            cont?()
         }
-        let hosting = NSHostingView(rootView: view)
-        // 先给足够大的临时尺寸以便 SwiftUI 算出紧凑的 fittingSize；最终框由 layoutTriggerBubble 决定。
+        // 先用默认尾巴测量 intrinsic，再由 layoutTriggerBubble 选象限并替换为最终视图。
+        let provisional = TriggerSpeechBubbleView(text: trimmed, tailEdge: .bottom, tailAlongOffset: 0, onTap: tap)
+        let hosting = NSHostingView(rootView: provisional)
         hosting.setFrameSize(NSSize(width: 360, height: 400))
         hosting.wantsLayer = true
         hosting.layer?.isOpaque = false
@@ -183,6 +192,8 @@ final class ExtensionOverlayController {
     func dismissTriggerBubble() {
         bubbleDismissTimer?.invalidate()
         bubbleDismissTimer = nil
+        bubbleContinueChat = nil
+        bubbleSpeechText = ""
         bubblePanel?.orderOut(nil)
     }
 
@@ -210,43 +221,221 @@ final class ExtensionOverlayController {
     private func layoutTriggerBubble() {
         guard let panel = bubblePanel,
               let pet = petWindow,
-              let content = panel.contentView else { return }
+              let content = panel.contentView,
+              !bubbleSpeechText.isEmpty else { return }
 
         let margin: CGFloat = 10
-        let gap: CGFloat = 8
-        let vf = pet.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
+        /// 气泡面板矩形与宠窗边沿的间距（AppKit 坐标）；取 0 让尾巴尽量贴住宠窗顶边。
+        let gap: CGFloat = 0
+        let vf = pet.screen?.visibleFrame ?? ScreenGeometry.visibleFrameContainingMouse()
+        let pf = pet.frame
 
         content.layoutSubtreeIfNeeded()
         var w = content.fittingSize.width
         var h = content.fittingSize.height
         if !w.isFinite || w < 1 { w = 160 }
         if !h.isFinite || h < 1 { h = 72 }
-        // 紧凑：随内容变窄变矮；为下行笔画与阴影留垂直余量，避免第二行被裁切。
-        w = min(320, max(96, w + 8))
-        h = min(380, max(52, h + 18))
-        // 与面板可视区域一致，避免 NSHostingView 大于窗体时出现直角底板或底部裁切。
+        // 勿再加大 `fittingSize`：多余宽高会让 NSHostingView 内 SwiftUI 左上对齐，右侧与底部出现「假空白」，文字右缘发空、尾巴离宠窗变远。
+        w = min(320, max(96, ceil(w)))
+        h = min(380, max(52, ceil(h)))
         content.frame = NSRect(x: 0, y: 0, width: w, height: h)
         content.autoresizingMask = [.width, .height]
         content.layoutSubtreeIfNeeded()
 
-        let pf = pet.frame
-        let nearRight = (vf.maxX - pf.maxX) < 130
-        let nearBottom = (pf.minY - vf.minY) < 130
-        let preferUpperLeft = nearRight && nearBottom
+        let (originRaw, tailEdge) = BubblePlacementEngine.pickBestOrigin(
+            petFrame: pf,
+            visibleFrame: vf,
+            bubbleSize: CGSize(width: w, height: h),
+            margin: margin,
+            gap: gap
+        )
+        let origin = ScreenGeometry.clampedOrigin(CGSize(width: w, height: h), origin: originRaw, in: vf, margin: margin)
+        let bubbleFrame = CGRect(origin: origin, size: CGSize(width: w, height: h))
+        let tailAlong0 = BubblePlacementEngine.tailAlongOffset(
+            petFrame: pf,
+            bubbleFrame: bubbleFrame,
+            edge: tailEdge,
+            bubbleWidth: w,
+            bubbleHeight: h
+        )
 
-        let rawX: CGFloat
-        if preferUpperLeft {
-            rawX = pf.minX - w + 40
-        } else {
-            rawX = pf.midX - w / 2
+        let tap: () -> Void = { [weak self] in
+            guard let self else { return }
+            let cont = self.bubbleContinueChat
+            self.dismissTriggerBubble()
+            cont?()
         }
-        let x = min(max(rawX, vf.minX + margin), vf.maxX - w - margin)
-        var y = pf.maxY + gap
-        if y + h > vf.maxY - margin {
-            y = vf.maxY - margin - h
+        let measureView = TriggerSpeechBubbleView(
+            text: bubbleSpeechText,
+            tailEdge: tailEdge,
+            tailAlongOffset: tailAlong0,
+            onTap: tap
+        )
+        let hosting = NSHostingView(rootView: measureView)
+        hosting.setFrameSize(NSSize(width: 400, height: 400))
+        hosting.layoutSubtreeIfNeeded()
+        var w2 = hosting.fittingSize.width
+        var h2 = hosting.fittingSize.height
+        if !w2.isFinite || w2 < 1 { w2 = w }
+        if !h2.isFinite || h2 < 1 { h2 = h }
+        w2 = min(320, max(96, ceil(w2)))
+        h2 = min(380, max(52, ceil(h2)))
+        hosting.frame = NSRect(x: 0, y: 0, width: w2, height: h2)
+        hosting.autoresizingMask = [.width, .height]
+        hosting.wantsLayer = true
+        hosting.layer?.isOpaque = false
+        hosting.layer?.backgroundColor = NSColor.clear.cgColor
+        hosting.layer?.masksToBounds = false
+        hosting.layoutSubtreeIfNeeded()
+
+        let origin2 = ScreenGeometry.clampedOrigin(CGSize(width: w2, height: h2), origin: originRaw, in: vf, margin: margin)
+        let bubbleFrame2 = CGRect(origin: origin2, size: CGSize(width: w2, height: h2))
+        let tailAlong2 = BubblePlacementEngine.tailAlongOffset(
+            petFrame: pf,
+            bubbleFrame: bubbleFrame2,
+            edge: tailEdge,
+            bubbleWidth: w2,
+            bubbleHeight: h2
+        )
+        let refined = TriggerSpeechBubbleView(
+            text: bubbleSpeechText,
+            tailEdge: tailEdge,
+            tailAlongOffset: tailAlong2,
+            onTap: tap
+        )
+        let hostFinal = NSHostingView(rootView: refined)
+        hostFinal.frame = NSRect(x: 0, y: 0, width: w2, height: h2)
+        hostFinal.autoresizingMask = [.width, .height]
+        hostFinal.wantsLayer = true
+        hostFinal.layer?.isOpaque = false
+        hostFinal.layer?.backgroundColor = NSColor.clear.cgColor
+        hostFinal.layer?.masksToBounds = false
+        panel.contentView = hostFinal
+        panel.setFrame(NSRect(origin: origin2, size: NSSize(width: w2, height: h2)), display: true)
+    }
+}
+
+// MARK: - 气泡候选布局（不挡猫猫、靠边象限、尾巴指向）
+
+private enum BubblePlacementEngine {
+    private static let nearThreshold: CGFloat = 130
+
+    /// 返回未夹紧的 origin（左下角）与尾巴附着边。
+    static func pickBestOrigin(
+        petFrame pf: CGRect,
+        visibleFrame vf: CGRect,
+        bubbleSize: CGSize,
+        margin: CGFloat,
+        gap: CGFloat
+    ) -> (CGPoint, TriggerBubbleTailEdge) {
+        let w = bubbleSize.width
+        let h = bubbleSize.height
+        let candidates = orderedCandidates(petFrame: pf, vf: vf, w: w, h: h, gap: gap)
+        var seen = Set<String>()
+        var best: (score: CGFloat, origin: CGPoint, edge: TriggerBubbleTailEdge)?
+
+        let catCenter = CGPoint(x: pf.midX, y: pf.midY)
+
+        for (o, e) in candidates {
+            let key = "\(Int(o.x * 2))_\(Int(o.y * 2))_\(e.rawValue)"
+            if seen.contains(key) { continue }
+            seen.insert(key)
+
+            let oc = ScreenGeometry.clampedOrigin(CGSize(width: w, height: h), origin: o, in: vf, margin: margin)
+            let B = CGRect(origin: oc, size: CGSize(width: w, height: h))
+            let inter = intersectionArea(B, pf)
+            let outside = outsideVisibleArea(B, vf)
+            let dist = hypot((oc.x + w / 2) - catCenter.x, (oc.y + h / 2) - catCenter.y)
+            let distDefault = abs(oc.x - (pf.midX - w / 2)) + abs(oc.y - (pf.maxY + gap))
+            // 优先不重叠；其次少越界；再次更贴近默认「上方居中」；最后离猫中心略近
+            let score = inter * 1_000_000 + outside * 1_000 + distDefault * 0.02 + dist * 0.001
+
+            if best == nil || score < best!.score {
+                best = (score: score, origin: o, edge: e)
+            }
         }
-        y = max(y, vf.minY + margin)
-        panel.setFrame(NSRect(x: x, y: y, width: w, height: h), display: true)
+
+        guard let b = best else {
+            return (CGPoint(x: pf.midX - w / 2, y: pf.maxY + gap), .bottom)
+        }
+        return (b.origin, b.edge)
+    }
+
+    static func tailAlongOffset(
+        petFrame pf: CGRect,
+        bubbleFrame B: CGRect,
+        edge: TriggerBubbleTailEdge,
+        bubbleWidth w: CGFloat,
+        bubbleHeight h: CGFloat
+    ) -> CGFloat {
+        let m: CGFloat = 12
+        switch edge {
+        case .bottom, .top:
+            let local = pf.midX - B.minX
+            let hi = max(m, w - m)
+            let c = min(max(local, m), hi)
+            return c - w / 2
+        case .left, .right:
+            let local = pf.midY - B.minY
+            let hi = max(m, h - m)
+            let c = min(max(local, m), hi)
+            return c - h / 2
+        }
+    }
+
+    private static func intersectionArea(_ a: CGRect, _ b: CGRect) -> CGFloat {
+        let r = a.intersection(b)
+        guard !r.isNull, !r.isEmpty else { return 0 }
+        return r.width * r.height
+    }
+
+    private static func outsideVisibleArea(_ r: CGRect, _ vf: CGRect) -> CGFloat {
+        let i = r.intersection(vf)
+        guard !i.isNull, !i.isEmpty else { return r.width * r.height }
+        return max(0, r.width * r.height - i.width * i.height)
+    }
+
+    private static func orderedCandidates(
+        petFrame pf: CGRect,
+        vf: CGRect,
+        w: CGFloat,
+        h: CGFloat,
+        gap: CGFloat
+    ) -> [(CGPoint, TriggerBubbleTailEdge)] {
+        let midX = pf.midX
+        let midY = pf.midY
+        let nearRight = vf.maxX - pf.maxX < nearThreshold
+        let nearTop = vf.maxY - pf.maxY < nearThreshold
+        let nearBottom = pf.minY - vf.minY < nearThreshold
+        let nearLeft = pf.minX - vf.minX < nearThreshold
+
+        var list: [(CGPoint, TriggerBubbleTailEdge)] = []
+
+        if nearRight, nearTop {
+            list.append((CGPoint(x: pf.minX - gap - w, y: pf.minY - gap - h), .top))
+            list.append((CGPoint(x: pf.minX - gap - w, y: pf.maxY + gap), .bottom))
+        } else if nearRight {
+            list.append((CGPoint(x: pf.minX - gap - w, y: pf.maxY + gap), .bottom))
+            list.append((CGPoint(x: pf.minX - gap - w, y: midY - h / 2), .right))
+        } else if nearLeft {
+            list.append((CGPoint(x: pf.maxX + gap, y: pf.maxY + gap), .bottom))
+            list.append((CGPoint(x: pf.maxX + gap, y: midY - h / 2), .left))
+        } else if nearTop {
+            list.append((CGPoint(x: midX - w / 2, y: pf.minY - gap - h), .top))
+        } else if nearBottom {
+            list.append((CGPoint(x: midX - w / 2, y: pf.maxY + gap), .bottom))
+        }
+
+        list.append((CGPoint(x: midX - w / 2, y: pf.maxY + gap), .bottom))
+        list.append((CGPoint(x: midX - w / 2, y: pf.minY - gap - h), .top))
+        list.append((CGPoint(x: pf.minX - gap - w, y: midY - h / 2), .right))
+        list.append((CGPoint(x: pf.maxX + gap, y: midY - h / 2), .left))
+        list.append((CGPoint(x: pf.minX - gap - w, y: pf.maxY + gap), .bottom))
+        list.append((CGPoint(x: pf.minX - gap - w, y: pf.minY - gap - h), .top))
+        list.append((CGPoint(x: pf.maxX + gap, y: pf.maxY + gap), .bottom))
+        list.append((CGPoint(x: pf.maxX + gap, y: pf.minY - gap - h), .top))
+
+        return list
     }
 }
 

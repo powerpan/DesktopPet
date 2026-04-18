@@ -70,12 +70,15 @@ enum TestBubbleSample: String, Codable, CaseIterable, Identifiable, Sendable {
     case short
     case long
 
+    /// 短测试基准文案（长测试为其字符数的两倍，便于对比布局）。
+    private static let shortTestLine = "【测试·短】喵～这是短猫猫气泡，用来检查云朵是否紧凑。点气泡可以继续聊天哦。"
+
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
         case .short: return "短气泡（一小段）"
-        case .long: return "长气泡（多行）"
+        case .long: return "长气泡（短文本两倍长）"
         }
     }
 
@@ -83,15 +86,9 @@ enum TestBubbleSample: String, Codable, CaseIterable, Identifiable, Sendable {
     var cannedText: String {
         switch self {
         case .short:
-            return "【测试·短】喵～这是短猫猫气泡，用来检查云朵是否紧凑。点气泡可以继续聊天哦。"
+            return Self.shortTestLine
         case .long:
-            return """
-            【测试·长】这是一段刻意写得很长的旁白，用来检查：第一，多行文字时底部笔画是否会被裁切；第二，在内容很多时滚动区域是否顺手；第三，圆角与底板边缘是否干净。
-
-            七七猫伸个懒腰：主人若在看这段字，说明你在认真调试触发器，辛苦啦～建议再试着切换回短气泡对比手感。也可以多点几次「立即触发」，历史里会按「气泡测试」类型记下每次的固定文案。
-
-            （结尾再凑一句：风吹窗帘沙沙响，桌面上的时钟悄悄走过几秒。）
-            """
+            return Self.shortTestLine + Self.shortTestLine
         }
     }
 }
