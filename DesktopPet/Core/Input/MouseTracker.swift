@@ -17,12 +17,18 @@ final class MouseTracker {
     private var lastLocation: CGPoint = .zero
     private var lastHoverEmit: TimeInterval = 0
     private let hoverThrottle: TimeInterval = 0.25
+    private var lastPointerEmit: TimeInterval = 0
+    private let pointerEmitInterval: TimeInterval = 1.0 / 24.0
+    /// 用于「注视」等纯展示层：屏幕坐标，与 `NSEvent.mouseLocation` 一致。
+    var onPointerScreenLocation: ((CGPoint) -> Void)?
 
     func start() {
         guard timer == nil else { return }
         lastLocation = NSEvent.mouseLocation
         timer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
-            self?.sample()
+            Task { @MainActor in
+                self?.sample()
+            }
         }
         if let timer {
             RunLoop.main.add(timer, forMode: .common)
@@ -46,6 +52,12 @@ final class MouseTracker {
         let dy = current.y - lastLocation.y
         let speed = sqrt(dx * dx + dy * dy)
         lastLocation = current
+
+        let pointerNow = ProcessInfo.processInfo.systemUptime
+        if interactionSamplingEnabled, pointerNow - lastPointerEmit >= pointerEmitInterval {
+            lastPointerEmit = pointerNow
+            onPointerScreenLocation?(current)
+        }
 
         // 单次采样间隔内位移过大视为「快速甩动」
         if speed > 80 {

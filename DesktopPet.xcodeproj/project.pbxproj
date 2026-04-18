@@ -14,6 +14,7 @@
 		C10000000000000000000016 /* GlobalInputMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000016 /* GlobalInputMonitor.swift */; };
 		C10000000000000000000005 /* MouseTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000005 /* MouseTracker.swift */; };
 		C10000000000000000000006 /* InteractionEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000006 /* InteractionEvent.swift */; };
+		C10000000000000000000020 /* PointerTrackingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000020 /* PointerTrackingModel.swift */; };
 		C10000000000000000000007 /* PetConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000007 /* PetConfig.swift */; };
 		C10000000000000000000008 /* AccessibilityPermissionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000008 /* AccessibilityPermissionManager.swift */; };
 		C10000000000000000000009 /* PatrolScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000009 /* PatrolScheduler.swift */; };
@@ -43,6 +44,7 @@
 		B100000000000000000000016 /* GlobalInputMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalInputMonitor.swift; sourceTree = "<group>"; };
 		B100000000000000000000006 /* InteractionEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractionEvent.swift; sourceTree = "<group>"; };
 		B100000000000000000000007 /* PetConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetConfig.swift; sourceTree = "<group>"; };
+		B100000000000000000000020 /* PointerTrackingModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointerTrackingModel.swift; sourceTree = "<group>"; };
 		B100000000000000000000008 /* AccessibilityPermissionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPermissionManager.swift; sourceTree = "<group>"; };
 		B100000000000000000000009 /* PatrolScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatrolScheduler.swift; sourceTree = "<group>"; };
 		B10000000000000000000000A /* PetState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetState.swift; sourceTree = "<group>"; };
@@ -153,6 +155,7 @@
 			children = (
 				B100000000000000000000006 /* InteractionEvent.swift */,
 				B100000000000000000000007 /* PetConfig.swift */,
+				B100000000000000000000020 /* PointerTrackingModel.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -306,6 +309,7 @@
 				C10000000000000000000016 /* GlobalInputMonitor.swift in Sources */,
 				C10000000000000000000005 /* MouseTracker.swift in Sources */,
 				C10000000000000000000006 /* InteractionEvent.swift in Sources */,
+				C10000000000000000000020 /* PointerTrackingModel.swift in Sources */,
 				C10000000000000000000007 /* PetConfig.swift in Sources */,
 				C10000000000000000000008 /* AccessibilityPermissionManager.swift in Sources */,
 				C10000000000000000000009 /* PatrolScheduler.swift in Sources */,

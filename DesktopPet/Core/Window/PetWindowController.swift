@@ -11,12 +11,13 @@ final class PetWindowController: NSWindowController {
     private let petConfig = PetConfig.default
     private weak var passthroughRoot: PetRootContainerView?
 
-    init(settings: SettingsViewModel, stateMachine: PetStateMachine) {
+    init(settings: SettingsViewModel, stateMachine: PetStateMachine, pointer: PointerTrackingModel) {
         let rect = NSRect(x: 120, y: 240, width: petConfig.windowSize.width, height: petConfig.windowSize.height)
         let window = PetWindow(contentRect: rect)
         let rootView = PetContainerView()
             .environmentObject(settings)
             .environmentObject(stateMachine)
+            .environmentObject(pointer)
         let root = PetRootContainerView(rootView: rootView)
         window.contentView = root
         super.init(window: window)
@@ -51,11 +52,20 @@ final class PetWindowController: NSWindowController {
         guard let window else { return }
         var frame = window.frame
         let margin: CGFloat = 48
-        let candidates: [CGPoint] = [
+        var candidates: [CGPoint] = [
             CGPoint(x: visibleFrame.minX + margin, y: visibleFrame.minY + margin),
             CGPoint(x: visibleFrame.maxX - frame.width - margin, y: visibleFrame.minY + margin),
             CGPoint(x: visibleFrame.midX - frame.width / 2, y: visibleFrame.maxY - frame.height - margin),
         ]
+
+        let myPID = ProcessInfo.processInfo.processIdentifier
+        if Double.random(in: 0...1) < 0.5,
+           let front = ScreenGeometry.approximateFrontmostAppWindowFrame(excludingPID: myPID) {
+            let targetX = front.midX - frame.width / 2
+            let targetY = front.maxY - frame.height * 0.12
+            candidates.append(CGPoint(x: targetX, y: targetY))
+        }
+
         if let raw = candidates.randomElement() {
             frame.origin = ScreenGeometry.clampedOrigin(frame.size, origin: raw, in: visibleFrame, margin: margin)
             window.setFrame(frame, display: true, animate: true)

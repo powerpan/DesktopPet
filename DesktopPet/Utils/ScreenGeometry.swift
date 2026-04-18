@@ -43,4 +43,37 @@ enum ScreenGeometry {
             y: min(max(origin.y, minY), maxY)
         )
     }
+
+    /// 尝试取「前台其他应用」的主窗口外框（Quartz 屏幕坐标，与 `NSWindow.frame` / `NSEvent.mouseLocation` 一致）。
+    /// 用于巡逻时偶尔贴近活动窗口顶部；若系统未返回可用数据则返回 nil。
+    static func approximateFrontmostAppWindowFrame(excludingPID: pid_t) -> CGRect? {
+        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        guard let info = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
+            return nil
+        }
+        for entry in info {
+            let ownerPID = pid_t((entry["kCGWindowOwnerPID"] as? NSNumber)?.int32Value ?? 0)
+            if ownerPID == excludingPID { continue }
+
+            let layer = (entry["kCGWindowLayer"] as? NSNumber)?.intValue ?? 0
+            if layer != 0 { continue }
+
+            if let alphaNum = entry["kCGWindowAlpha"] as? NSNumber, alphaNum.doubleValue < 0.05 {
+                continue
+            }
+
+            guard let boundsDict = entry["kCGWindowBounds"] as? [String: Any] else {
+                continue
+            }
+            let x = (boundsDict["X"] as? NSNumber)?.doubleValue ?? 0
+            let y = (boundsDict["Y"] as? NSNumber)?.doubleValue ?? 0
+            let w = (boundsDict["Width"] as? NSNumber)?.doubleValue ?? 0
+            let h = (boundsDict["Height"] as? NSNumber)?.doubleValue ?? 0
+            let rect = CGRect(x: x, y: y, width: w, height: h)
+            if w < 180 || h < 120 { continue }
+            if rect.isEmpty || rect.isInfinite || rect.isNull { continue }
+            return rect
+        }
+        return nil
+    }
 }

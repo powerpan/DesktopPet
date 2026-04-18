@@ -16,6 +16,7 @@ final class AppCoordinator: ObservableObject {
     let stateMachine = PetStateMachine()
     let patrolScheduler = PatrolScheduler()
     let settingsViewModel = SettingsViewModel()
+    let pointerTrackingModel = PointerTrackingModel()
 
     private var petWindowController: PetWindowController?
     private var onboardingWindow: NSWindow?
@@ -64,6 +65,9 @@ final class AppCoordinator: ObservableObject {
         isPetVisible.toggle()
         petWindowController?.setPetVisible(isPetVisible)
         mouseTracker.interactionSamplingEnabled = isPetVisible
+        if !isPetVisible {
+            pointerTrackingModel.updateGaze(mouseScreen: .zero, petFrame: nil)
+        }
     }
 
     func presentOnboardingWindow() {
@@ -97,7 +101,7 @@ final class AppCoordinator: ObservableObject {
 
     private func preparePetWindow() {
         guard petWindowController == nil else { return }
-        let controller = PetWindowController(settings: settingsViewModel, stateMachine: stateMachine)
+        let controller = PetWindowController(settings: settingsViewModel, stateMachine: stateMachine, pointer: pointerTrackingModel)
         controller.showWindow(nil)
         petWindowController = controller
     }
@@ -174,6 +178,13 @@ final class AppCoordinator: ObservableObject {
         mouseTracker.petFrameProvider = { [weak self] in
             self?.petWindowController?.window?.frame
         }
+        mouseTracker.onPointerScreenLocation = { [weak self] point in
+            guard let self else { return }
+            self.pointerTrackingModel.updateGaze(
+                mouseScreen: point,
+                petFrame: self.petWindowController?.window?.frame
+            )
+        }
         mouseTracker.onInteraction = { [weak self] event in
             guard let self else { return }
             self.stateMachine.handle(event)
@@ -198,9 +209,14 @@ final class AppCoordinator: ObservableObject {
 
     private func bumpActivity() {
         idleSleepTimer?.invalidate()
+        if stateMachine.state == .sleep {
+            return
+        }
         let interval = PetConfig.default.idleToSleepInterval
         idleSleepTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
-            self?.stateMachine.handle(.idleTimeout)
+            Task { @MainActor in
+                self?.stateMachine.handle(.idleTimeout)
+            }
         }
         // 加入 common 模式，避免在滚动菜单栏等模式下计时器不触发
         if let idleSleepTimer {

@@ -7,6 +7,7 @@ import SwiftUI
 
 struct PetSpriteView: View {
     @EnvironmentObject private var stateMachine: PetStateMachine
+    @EnvironmentObject private var pointer: PointerTrackingModel
 
     var body: some View {
         VStack(spacing: 10) {
@@ -18,7 +19,10 @@ struct PetSpriteView: View {
                 .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
         }
+        .offset(x: pointer.gazeOffsetX)
+        .animation(.easeOut(duration: 0.12), value: pointer.gazeOffsetX)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
     }
 }
+

@@ -11,6 +11,8 @@ final class PetStateMachine: ObservableObject {
     @Published private(set) var state: PetState = .idle
 
     private var transientTask: Task<Void, Never>?
+    private var keyBurstCount = 0
+    private var keyBurstDecayTask: Task<Void, Never>?
 
     func handle(_ event: InteractionEvent) {
         switch event {
@@ -18,7 +20,9 @@ final class PetStateMachine: ObservableObject {
             if state == .sleep {
                 transition(to: .idle)
             }
-            scheduleTransient(to: .keyTap, durationNanoseconds: 160_000_000)
+            bumpKeyBurst()
+            let duration = keyTapDurationNanoseconds()
+            scheduleTransient(to: .keyTap, durationNanoseconds: duration)
         case .mouseMovedFast:
             if state == .sleep {
                 transition(to: .idle)
@@ -56,5 +60,23 @@ final class PetStateMachine: ObservableObject {
             guard !Task.isCancelled else { return }
             transition(to: .idle)
         }
+    }
+
+    private func bumpKeyBurst() {
+        keyBurstCount = min(keyBurstCount + 1, 18)
+        keyBurstDecayTask?.cancel()
+        keyBurstDecayTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+            keyBurstCount = max(0, keyBurstCount - 5)
+        }
+    }
+
+    /// 连击越快，敲击态略短，形成更跟手的节奏感。
+    private func keyTapDurationNanoseconds() -> UInt64 {
+        let base: UInt64 = 220_000_000
+        let step: UInt64 = 11_000_000
+        let sub = min(UInt64(keyBurstCount), 14) * step
+        return max(72_000_000, base &- sub)
     }
 }
