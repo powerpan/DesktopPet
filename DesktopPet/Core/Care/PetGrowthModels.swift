@@ -12,6 +12,14 @@ struct PetGrowthConfig: Codable, Equatable {
     var energyDrainPerHour: Double
     /// 每小时基础心情衰减
     var moodDrainPerHour: Double
+    /// 每次「喂食」成功：心情增量（0~1 刻度）
+    var feedMoodGain: Double
+    /// 每次「喂食」成功：能量增量
+    var feedEnergyGain: Double
+    /// 每次「戳戳」成功：心情增量
+    var petMoodGain: Double
+    /// 每次「戳戳」成功：能量增量（默认可为 0，与旧行为一致）
+    var petEnergyGain: Double
     /// 每小时是否尝试触发「随机成长事件」的概率权重 0...100（再乘以时段系数）
     var randomEventDensityPercent: Int
     /// 是否允许调用模型生成成长事件（失败则回退本地）
@@ -19,9 +27,74 @@ struct PetGrowthConfig: Codable, Equatable {
     /// 两次 AI 成长事件之间最少间隔（小时）
     var aiGrowthEventsMinIntervalHours: Double
 
+    enum CodingKeys: String, CodingKey {
+        case energyDrainPerHour
+        case moodDrainPerHour
+        case feedMoodGain
+        case feedEnergyGain
+        case petMoodGain
+        case petEnergyGain
+        case randomEventDensityPercent
+        case aiGrowthEventsEnabled
+        case aiGrowthEventsMinIntervalHours
+    }
+
+    init(
+        energyDrainPerHour: Double,
+        moodDrainPerHour: Double,
+        feedMoodGain: Double,
+        feedEnergyGain: Double,
+        petMoodGain: Double,
+        petEnergyGain: Double,
+        randomEventDensityPercent: Int,
+        aiGrowthEventsEnabled: Bool,
+        aiGrowthEventsMinIntervalHours: Double
+    ) {
+        self.energyDrainPerHour = energyDrainPerHour
+        self.moodDrainPerHour = moodDrainPerHour
+        self.feedMoodGain = feedMoodGain
+        self.feedEnergyGain = feedEnergyGain
+        self.petMoodGain = petMoodGain
+        self.petEnergyGain = petEnergyGain
+        self.randomEventDensityPercent = randomEventDensityPercent
+        self.aiGrowthEventsEnabled = aiGrowthEventsEnabled
+        self.aiGrowthEventsMinIntervalHours = aiGrowthEventsMinIntervalHours
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        energyDrainPerHour = try c.decodeIfPresent(Double.self, forKey: .energyDrainPerHour) ?? Self.default.energyDrainPerHour
+        moodDrainPerHour = try c.decodeIfPresent(Double.self, forKey: .moodDrainPerHour) ?? Self.default.moodDrainPerHour
+        feedMoodGain = try c.decodeIfPresent(Double.self, forKey: .feedMoodGain) ?? Self.default.feedMoodGain
+        feedEnergyGain = try c.decodeIfPresent(Double.self, forKey: .feedEnergyGain) ?? Self.default.feedEnergyGain
+        petMoodGain = try c.decodeIfPresent(Double.self, forKey: .petMoodGain) ?? Self.default.petMoodGain
+        petEnergyGain = try c.decodeIfPresent(Double.self, forKey: .petEnergyGain) ?? Self.default.petEnergyGain
+        randomEventDensityPercent = try c.decodeIfPresent(Int.self, forKey: .randomEventDensityPercent) ?? Self.default.randomEventDensityPercent
+        aiGrowthEventsEnabled = try c.decodeIfPresent(Bool.self, forKey: .aiGrowthEventsEnabled) ?? Self.default.aiGrowthEventsEnabled
+        aiGrowthEventsMinIntervalHours = try c.decodeIfPresent(Double.self, forKey: .aiGrowthEventsMinIntervalHours)
+            ?? Self.default.aiGrowthEventsMinIntervalHours
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(energyDrainPerHour, forKey: .energyDrainPerHour)
+        try c.encode(moodDrainPerHour, forKey: .moodDrainPerHour)
+        try c.encode(feedMoodGain, forKey: .feedMoodGain)
+        try c.encode(feedEnergyGain, forKey: .feedEnergyGain)
+        try c.encode(petMoodGain, forKey: .petMoodGain)
+        try c.encode(petEnergyGain, forKey: .petEnergyGain)
+        try c.encode(randomEventDensityPercent, forKey: .randomEventDensityPercent)
+        try c.encode(aiGrowthEventsEnabled, forKey: .aiGrowthEventsEnabled)
+        try c.encode(aiGrowthEventsMinIntervalHours, forKey: .aiGrowthEventsMinIntervalHours)
+    }
+
     static let `default` = PetGrowthConfig(
         energyDrainPerHour: 0.02,
         moodDrainPerHour: 0.012,
+        feedMoodGain: 0.12,
+        feedEnergyGain: 0.15,
+        petMoodGain: 0.06,
+        petEnergyGain: 0,
         randomEventDensityPercent: 35,
         aiGrowthEventsEnabled: false,
         aiGrowthEventsMinIntervalHours: 6
@@ -31,6 +104,10 @@ struct PetGrowthConfig: Codable, Equatable {
         var o = c
         o.energyDrainPerHour = min(0.5, max(0, o.energyDrainPerHour))
         o.moodDrainPerHour = min(0.5, max(0, o.moodDrainPerHour))
+        o.feedMoodGain = min(0.35, max(0, o.feedMoodGain))
+        o.feedEnergyGain = min(0.35, max(0, o.feedEnergyGain))
+        o.petMoodGain = min(0.35, max(0, o.petMoodGain))
+        o.petEnergyGain = min(0.25, max(0, o.petEnergyGain))
         o.randomEventDensityPercent = min(100, max(0, o.randomEventDensityPercent))
         o.aiGrowthEventsMinIntervalHours = min(168, max(1, o.aiGrowthEventsMinIntervalHours))
         return o

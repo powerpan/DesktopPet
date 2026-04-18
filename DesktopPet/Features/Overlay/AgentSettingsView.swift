@@ -404,6 +404,54 @@ struct AgentSettingsView: View {
                     step: 0.002
                 )
                 HStack {
+                    Text("每次喂食 · 心情")
+                    Spacer()
+                    Text(String(format: "%.0f%%", petCare.growthConfig.feedMoodGain * 100))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                Slider(
+                    value: growthFeedMoodGainBinding,
+                    in: 0 ... 0.35,
+                    step: 0.005
+                )
+                HStack {
+                    Text("每次喂食 · 能量")
+                    Spacer()
+                    Text(String(format: "%.0f%%", petCare.growthConfig.feedEnergyGain * 100))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                Slider(
+                    value: growthFeedEnergyGainBinding,
+                    in: 0 ... 0.35,
+                    step: 0.005
+                )
+                HStack {
+                    Text("每次戳戳 · 心情")
+                    Spacer()
+                    Text(String(format: "%.0f%%", petCare.growthConfig.petMoodGain * 100))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                Slider(
+                    value: growthPetMoodGainBinding,
+                    in: 0 ... 0.35,
+                    step: 0.005
+                )
+                HStack {
+                    Text("每次戳戳 · 能量")
+                    Spacer()
+                    Text(String(format: "%.0f%%", petCare.growthConfig.petEnergyGain * 100))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                Slider(
+                    value: growthPetEnergyGainBinding,
+                    in: 0 ... 0.25,
+                    step: 0.005
+                )
+                HStack {
                     Text("随机事件密度")
                     Spacer()
                     Text(growthRandomDensityPercentAndPLine)
@@ -425,7 +473,7 @@ struct AgentSettingsView: View {
             } header: {
                 Text("成长参数")
             } footer: {
-                Text("每小时衰减在宠物隐藏时也会累计。若距离上次结算已超过 3 小时（例如久未打开应用），只会按小时补扣心情/能量，不会补抽随机事件；回到 3 小时内后恢复按密度抽样（午间等时段略更容易）。密度 100% 且时段加权最高时，「每小时最多一次」随机尝试的成功概率上限约 90%。开启 AI 后，部分事件会请求模型生成 JSON（失败则自动用本地事件）；会消耗 API。")
+                Text("每小时衰减在宠物隐藏时也会累计。喂食/戳戳增量为 0～1 刻度上的一次成功加成（默认与旧版一致：喂食 +12% 心情、+15% 能量；戳戳 +6% 心情、能量 0%）。若距离上次结算已超过 3 小时（例如久未打开应用），只会按小时补扣心情/能量，不会补抽随机事件；回到 3 小时内后恢复按密度抽样（午间等时段略更容易）。密度 100% 且时段加权最高时，「每小时最多一次」随机尝试的成功概率上限约 90%。开启 AI 后，部分事件会请求模型生成 JSON（失败则自动用本地事件）；会消耗 API。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -671,6 +719,50 @@ struct AgentSettingsView: View {
             set: { v in
                 var c = petCare.growthConfig
                 c.moodDrainPerHour = v
+                petCare.growthConfig = PetGrowthConfig.clamped(c)
+            }
+        )
+    }
+
+    private var growthFeedMoodGainBinding: Binding<Double> {
+        Binding(
+            get: { petCare.growthConfig.feedMoodGain },
+            set: { v in
+                var c = petCare.growthConfig
+                c.feedMoodGain = v
+                petCare.growthConfig = PetGrowthConfig.clamped(c)
+            }
+        )
+    }
+
+    private var growthFeedEnergyGainBinding: Binding<Double> {
+        Binding(
+            get: { petCare.growthConfig.feedEnergyGain },
+            set: { v in
+                var c = petCare.growthConfig
+                c.feedEnergyGain = v
+                petCare.growthConfig = PetGrowthConfig.clamped(c)
+            }
+        )
+    }
+
+    private var growthPetMoodGainBinding: Binding<Double> {
+        Binding(
+            get: { petCare.growthConfig.petMoodGain },
+            set: { v in
+                var c = petCare.growthConfig
+                c.petMoodGain = v
+                petCare.growthConfig = PetGrowthConfig.clamped(c)
+            }
+        )
+    }
+
+    private var growthPetEnergyGainBinding: Binding<Double> {
+        Binding(
+            get: { petCare.growthConfig.petEnergyGain },
+            set: { v in
+                var c = petCare.growthConfig
+                c.petEnergyGain = v
                 petCare.growthConfig = PetGrowthConfig.clamped(c)
             }
         )

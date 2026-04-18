@@ -293,10 +293,11 @@ final class PetCareModel: ObservableObject {
         if let last = state.lastFeedAt, Date().timeIntervalSince(last) < feedCooldown {
             return false
         }
+        let g = PetGrowthConfig.clamped(growthConfig)
         var s = state
         s.lastFeedAt = Date()
-        s.mood = min(1, s.mood + 0.12)
-        s.energy = min(1, s.energy + 0.15)
+        s.mood = min(1, s.mood + g.feedMoodGain)
+        s.energy = min(1, s.energy + g.feedEnergyGain)
         upsertJournal(dayKey: dayKey(), on: &s) { row in
             row.feedCount += 1
         }
@@ -309,9 +310,11 @@ final class PetCareModel: ObservableObject {
         if let last = state.lastPetAt, Date().timeIntervalSince(last) < petCooldown {
             return false
         }
+        let g = PetGrowthConfig.clamped(growthConfig)
         var s = state
         s.lastPetAt = Date()
-        s.mood = min(1, s.mood + 0.06)
+        s.mood = min(1, s.mood + g.petMoodGain)
+        s.energy = min(1, s.energy + g.petEnergyGain)
         upsertJournal(dayKey: dayKey(), on: &s) { row in
             row.petCount += 1
         }
