@@ -309,23 +309,37 @@ struct AgentSettingsView: View {
     private var growthTab: some View {
         Form {
             Section {
-                Stepper(
-                    value: Binding(
-                        get: {
-                            let minutes = petCare.feedCooldownSeconds / 60
-                            return min(24 * 60, max(5, minutes))
-                        },
-                        set: { petCare.feedCooldownSeconds = min(86_400, max(300, $0 * 60)) }
-                    ),
-                    in: 5...(24 * 60),
-                    step: 1
-                ) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("喂食冷却")
-                        Text("当前约 \(growthFeedCooldownLabel)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("喂食冷却")
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Picker("小时", selection: growthFeedCooldownHourBinding) {
+                            ForEach(0 ... 24, id: \.self) { h in
+                                Text("\(h)").tag(h)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .accessibilityLabel("小时")
+                        .frame(minWidth: 88)
+
+                        Text("小时")
+
+                        Picker("分钟", selection: growthFeedCooldownMinuteBinding) {
+                            ForEach(growthFeedCooldownMinuteChoices, id: \.self) { m in
+                                Text(String(format: "%02d", m)).tag(m)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .accessibilityLabel("分钟")
+                        .frame(minWidth: 88)
+                        .disabled(growthFeedCooldownHourDisplay == 24)
+
+                        Text("分钟")
                     }
+                    Text("当前约 \(growthFeedCooldownLabel)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 Stepper(
                     "戳戳冷却：\(petCare.petCooldownSeconds) 秒",
@@ -336,7 +350,7 @@ struct AgentSettingsView: View {
             } header: {
                 Text("猫猫互动")
             } footer: {
-                Text("喂食：5 分钟～24 小时（按分钟调节）。戳戳：5～600 秒。会写入本机偏好，重启后仍生效；冷却中是否立刻按新值生效取决于距离上次操作的时间。")
+                Text("喂食：5 分钟～24 小时（用「小时 + 分钟」选择；满 24 小时时分钟固定为 00）。戳戳：5～600 秒。会写入本机偏好，重启后仍生效；冷却中是否立刻按新值生效取决于距离上次操作的时间。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -353,6 +367,72 @@ struct AgentSettingsView: View {
         if h > 0 { return "\(h) 小时" }
         if m > 0 { return "\(m) 分钟" }
         return "\(s) 秒"
+    }
+
+    /// 与 `PetCareModel` 一致：总分钟数 ∈ \[5, 1440\]（5 分钟～24 小时）。
+    private func growthFeedCooldownClampedTotalMinutes() -> Int {
+        min(24 * 60, max(5, petCare.feedCooldownSeconds / 60))
+    }
+
+    private func growthFeedCooldownSetTotalMinutes(_ total: Int) {
+        let t = min(24 * 60, max(5, total))
+        petCare.feedCooldownSeconds = t * 60
+    }
+
+    private var growthFeedCooldownHourDisplay: Int {
+        growthFeedCooldownClampedTotalMinutes() / 60
+    }
+
+    private var growthFeedCooldownMinuteChoices: [Int] {
+        let h = growthFeedCooldownHourDisplay
+        if h == 24 { return [0] }
+        if h == 0 { return Array(5 ... 59) }
+        return Array(0 ... 59)
+    }
+
+    private var growthFeedCooldownHourBinding: Binding<Int> {
+        Binding(
+            get: { growthFeedCooldownHourDisplay },
+            set: { newH in
+                let tot = growthFeedCooldownClampedTotalMinutes()
+                let m = tot % 60
+                let newTotal: Int
+                if newH == 24 {
+                    newTotal = 24 * 60
+                } else if newH == 0 {
+                    newTotal = max(5, m)
+                } else {
+                    newTotal = newH * 60 + m
+                }
+                growthFeedCooldownSetTotalMinutes(newTotal)
+            }
+        )
+    }
+
+    private var growthFeedCooldownMinuteBinding: Binding<Int> {
+        Binding(
+            get: {
+                let tot = growthFeedCooldownClampedTotalMinutes()
+                let h = tot / 60
+                let m = tot % 60
+                if h == 24 { return 0 }
+                if h == 0 { return max(5, m) }
+                return m
+            },
+            set: { newM in
+                let tot = growthFeedCooldownClampedTotalMinutes()
+                let h = tot / 60
+                let clampedM: Int
+                if h == 0 {
+                    clampedM = min(59, max(5, newM))
+                } else if h == 24 {
+                    clampedM = 0
+                } else {
+                    clampedM = min(59, max(0, newM))
+                }
+                growthFeedCooldownSetTotalMinutes(h * 60 + clampedM)
+            }
+        )
     }
 }
 
