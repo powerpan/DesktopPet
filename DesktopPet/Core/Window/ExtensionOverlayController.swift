@@ -27,6 +27,10 @@ final class ExtensionOverlayController {
         chatPanel?.isVisible == true
     }
 
+    func dismissChatPanel() {
+        chatPanel?.orderOut(nil)
+    }
+
     func toggleCarePanel(root: AnyView) {
         if let p = carePanel, p.isVisible {
             p.orderOut(nil)
@@ -157,6 +161,8 @@ final class ExtensionOverlayController {
         let hosting = NSHostingView(rootView: view)
         // 先给足够大的临时尺寸以便 SwiftUI 算出紧凑的 fittingSize；最终框由 layoutTriggerBubble 决定。
         hosting.setFrameSize(NSSize(width: 360, height: 400))
+        hosting.wantsLayer = true
+        hosting.layer?.backgroundColor = NSColor.clear.cgColor
         panel.contentView = hosting
         panel.alphaValue = 1
         panel.orderFrontRegardless()
@@ -211,9 +217,13 @@ final class ExtensionOverlayController {
         var h = content.fittingSize.height
         if !w.isFinite || w < 1 { w = 160 }
         if !h.isFinite || h < 1 { h = 72 }
-        // 紧凑：随内容变窄变矮；过长时由气泡内 ScrollView 限制高度，此处放宽面板高度上限。
+        // 紧凑：随内容变窄变矮；为下行笔画与阴影留垂直余量，避免第二行被裁切。
         w = min(320, max(96, w + 8))
-        h = min(380, max(52, h + 8))
+        h = min(380, max(52, h + 18))
+        // 与面板可视区域一致，避免 NSHostingView 大于窗体时出现直角底板或底部裁切。
+        content.frame = NSRect(x: 0, y: 0, width: w, height: h)
+        content.autoresizingMask = [.width, .height]
+        content.layoutSubtreeIfNeeded()
 
         let pf = pet.frame
         let nearRight = (vf.maxX - pf.maxX) < 130

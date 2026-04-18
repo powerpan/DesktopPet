@@ -32,13 +32,7 @@ final class AppCoordinator: ObservableObject {
         frontWatcher: frontmostAppWatcher,
         isPetVisible: { [weak self] in self?.isPetVisible ?? false },
         onTriggerSpeech: { [weak self] payload in
-            guard let self else { return }
-            self.agentSessionStore.triggerHistory.append(text: payload.text, kind: payload.triggerKind)
-            self.extensionOverlay.showTriggerBubble(text: payload.text) { [weak self] in
-                guard let self else { return }
-                self.agentSessionStore.startSessionFromTrigger(text: payload.text)
-                self.presentChatOverlay()
-            }
+            self?.deliverTriggerSpeech(payload)
         }
     )
 
@@ -61,6 +55,8 @@ final class AppCoordinator: ObservableObject {
         wireAccessibilityRecheck()
         wirePetWindowOverlayNotifications()
         wirePresentChatContinuingChannelFromSettings()
+        wireCloseChatOverlayFromPanel()
+        wireTestBubbleFromSettings()
 
         petCareModel.startCompanionTicking { [weak self] in self?.isPetVisible ?? false }
         triggerEngine.start()
@@ -216,6 +212,38 @@ final class AppCoordinator: ObservableObject {
                 self.presentChatOverlay()
             }
             .store(in: &cancellables)
+    }
+
+    private func wireCloseChatOverlayFromPanel() {
+        NotificationCenter.default.publisher(for: .desktopPetCloseChatOverlay)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.extensionOverlay.dismissChatPanel()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func wireTestBubbleFromSettings() {
+        NotificationCenter.default.publisher(for: .desktopPetFireTestBubble)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] note in
+                guard let self else { return }
+                let raw = note.userInfo?[DesktopPetNotificationUserInfoKey.testBubbleSample] as? String
+                let sample = TestBubbleSample(rawValue: raw ?? "") ?? .short
+                let text = sample.cannedText
+                self.deliverTriggerSpeech(TriggerSpeechPayload(text: text, triggerKind: .bubbleTest))
+            }
+            .store(in: &cancellables)
+    }
+
+    /// 条件触发或测试气泡：写入旁白历史并展示云朵（点气泡可续聊）。
+    private func deliverTriggerSpeech(_ payload: TriggerSpeechPayload) {
+        agentSessionStore.triggerHistory.append(text: payload.text, kind: payload.triggerKind)
+        extensionOverlay.showTriggerBubble(text: payload.text) { [weak self] in
+            guard let self else { return }
+            self.agentSessionStore.startSessionFromTrigger(text: payload.text)
+            self.presentChatOverlay()
+        }
     }
 
     private func wirePermissionAndInput() {

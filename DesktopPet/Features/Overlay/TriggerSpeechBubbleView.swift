@@ -10,24 +10,16 @@ struct TriggerSpeechBubbleView: View {
     /// 轻点气泡：通常先关气泡，再在回调里打开聊天等（由外层 `ExtensionOverlayController` 编排）。
     var onTap: () -> Void = {}
 
-    /// 较长旁白时使用滚动，避免占满屏幕；短句则高度随文字收紧。
+    private let textMaxWidth: CGFloat = 300
+
+    /// 较长旁白时使用滚动，避免占满屏幕。
     private var useScroll: Bool {
         text.count > 200 || text.components(separatedBy: .newlines).count > 6
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            Group {
-                if useScroll {
-                    ScrollView {
-                        textBlock
-                    }
-                    .frame(maxHeight: 200)
-                } else {
-                    textBlock
-                }
-            }
-
+            bubbleBody
             BubbleTailShape()
                 .fill(.ultraThinMaterial)
                 .frame(width: 16, height: 8)
@@ -35,23 +27,40 @@ struct TriggerSpeechBubbleView: View {
                     BubbleTailShape()
                         .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
                 }
-                .offset(y: -0.5)
+                .offset(y: -1)
+        }
+        .background(Color.clear)
+        .compositingGroup()
+        .shadow(color: .black.opacity(0.2), radius: 9, y: 3)
+        .contentShape(Rectangle())
+        .onTapGesture { onTap() }
+    }
+
+    /// 圆角底板与文字同一裁剪区域，避免描边/材质在圆角外露出直角感。
+    private var bubbleBody: some View {
+        Group {
+            if useScroll {
+                ScrollView {
+                    textBlock
+                }
+                .frame(maxHeight: 220)
+            } else {
+                textBlock
+            }
         }
         .padding(.horizontal, 12)
         .padding(.top, 10)
-        .padding(.bottom, 4)
+        .padding(.bottom, 8)
         .background {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.22), radius: 10, y: 4)
         }
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 1)
+                .inset(by: 0.5)
+                .stroke(Color.primary.opacity(0.12), lineWidth: 1)
         }
-        .fixedSize(horizontal: true, vertical: false)
-        .contentShape(Rectangle())
-        .onTapGesture { onTap() }
     }
 
     private var textBlock: some View {
@@ -59,7 +68,7 @@ struct TriggerSpeechBubbleView: View {
             .font(.callout)
             .foregroundStyle(.primary)
             .multilineTextAlignment(.leading)
-            .frame(maxWidth: 300, alignment: .leading)
+            .frame(maxWidth: textMaxWidth, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
     }
 }

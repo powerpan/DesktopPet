@@ -19,21 +19,34 @@ struct ChatOverlayView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("七七猫 · 对话")
-                    .font(.headline)
-                Text(keychainConfigured ? "钥匙串：已检测到 API Key" : "钥匙串：未检测到 API Key（请在智能体设置中保存）")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                channelToolbar
-                if let ch = session.activeChannel {
-                    Text("当前：\(ch.title) · 更新 \(formatted(ch.updatedAt))")
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("七七猫 · 对话")
+                        .font(.headline)
+                    Text(keychainConfigured ? "钥匙串：已检测到 API Key" : "钥匙串：未检测到 API Key（请在智能体设置中保存）")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    channelToolbar
+                    if let ch = session.activeChannel {
+                        Text("当前：\(ch.title) · 更新 \(formatted(ch.updatedAt))")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    Text("手动对话支持多会话频道（UserDefaults 持久化）。条件触发的旁白先入历史并以气泡展示；轻点气泡会新建会话带上文并打开本面板。")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
-                Text("手动对话支持多会话频道（UserDefaults 持久化）。条件触发的旁白先入历史并以气泡展示；轻点气泡会新建会话带上文并打开本面板。")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                Spacer(minLength: 0)
+                Button {
+                    NotificationCenter.default.post(name: .desktopPetCloseChatOverlay, object: nil)
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .symbolRenderingMode(.hierarchical)
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("关闭对话窗口")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)

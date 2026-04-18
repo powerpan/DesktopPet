@@ -174,4 +174,6 @@ struct TriggerSpeechHistoryListSheet: View {
 
 enum DesktopPetNotificationUserInfoKey {
     static let channelId = "channelId"
+    /// `TestBubbleSample.rawValue`（`short` / `long`）
+    static let testBubbleSample = "sample"
 }

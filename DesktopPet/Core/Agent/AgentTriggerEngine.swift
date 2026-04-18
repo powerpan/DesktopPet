@@ -112,7 +112,7 @@ final class AgentTriggerEngine: ObservableObject {
                 fired = evaluateKeyboard(rule: rule)
             case .frontApp:
                 fired = evaluateFrontApp(rule: rule, frontChanged: frontChanged, currentFront: currentFront)
-            case .screenSnap:
+            case .screenSnap, .bubbleTest:
                 fired = false
             }
             if fired {

@@ -177,6 +177,7 @@ struct AgentSettingsView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("触发器在满足条件时会自动请求模型写一句短旁白：写入旁白历史，并以宠窗旁云气泡展示。")
                     Text("轻点气泡会关闭气泡、以该旁白为上下文新建一个手动会话频道，并打开对话面板续聊。")
+                    Text("「气泡测试」不调用模型：在规则编辑页选择短/长固定文案后点「立即触发」，用于检查气泡布局与续聊流程。")
                     Text("每条规则有独立冷却，避免刷屏。定时与随机空闲适合日常使用；键盘与前台应用属于进阶能力，请谨慎开启。")
                 }
                 .font(.caption)
@@ -312,6 +313,7 @@ private struct TriggerRuleRow: View {
         case .keyboardPattern: return "模式「\(r.keyboardPattern)」"
         case .frontApp: return "前台包含「\(r.frontAppNameContains)」"
         case .screenSnap: return "占位，不触发"
+        case .bubbleTest: return "编辑内选手动触发短/长气泡"
         }
     }
 }
@@ -332,10 +334,13 @@ private struct TriggerRuleEditorSheet: View {
                     }
                     .disabled(true)
                     Stepper("冷却（秒）: \(Int(rule.cooldownSeconds))", value: $rule.cooldownSeconds, in: 30 ... 3600, step: 30)
+                        .disabled(rule.kind == .bubbleTest)
                 } header: {
                     Text("基本")
                 } footer: {
-                    Text("冷却：两次触发之间的最短间隔（秒）。触发一次后会进入冷却，期间即使条件仍满足也不会再请求。")
+                    Text(rule.kind == .bubbleTest
+                         ? "气泡测试仅用手动按钮触发，不走模型；冷却对自动轮询无影响（本条不参与定时评估）。"
+                         : "冷却：两次触发之间的最短间隔（秒）。触发一次后会进入冷却，期间即使条件仍满足也不会再请求。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -406,6 +411,29 @@ private struct TriggerRuleEditorSheet: View {
                         Text("截屏")
                     } footer: {
                         Text("开启后也不会请求截屏权限；与「隐私」Tab 中的截屏总开关为后续版本预留。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                case .bubbleTest:
+                    Section {
+                        Picker("测试文案", selection: $rule.testBubbleSample) {
+                            ForEach(TestBubbleSample.allCases) { s in
+                                Text(s.displayName).tag(s)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        Button("立即触发测试气泡") {
+                            NotificationCenter.default.post(
+                                name: .desktopPetFireTestBubble,
+                                object: nil,
+                                userInfo: [DesktopPetNotificationUserInfoKey.testBubbleSample: rule.testBubbleSample.rawValue]
+                            )
+                        }
+                    } header: {
+                        Text("气泡测试")
+                    } footer: {
+                        Text("不请求大模型，仅弹出与真实触发相同的旁白气泡与历史记录，便于自测布局。可在上方切换「短 / 长」后再点按钮对比效果。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)

@@ -15,6 +15,10 @@ extension Notification.Name {
     static let desktopPetAPIKeyDidChange = Notification.Name("desktopPetAPIKeyDidChange")
     /// 从设置「历史会话」选择某频道继续聊天：`userInfo["channelId"]` 为频道 UUID 字符串。
     static let desktopPetPresentChatContinuingChannel = Notification.Name("desktopPetPresentChatContinuingChannel")
+    /// 对话面板内「关闭」或等价操作：收起聊天浮动窗。
+    static let desktopPetCloseChatOverlay = Notification.Name("desktopPetCloseChatOverlay")
+    /// 智能体设置里「气泡测试」规则点击立即触发：`userInfo["sample"]` 为 `TestBubbleSample.rawValue`。
+    static let desktopPetFireTestBubble = Notification.Name("desktopPetFireTestBubble")
 }
 
 @MainActor
