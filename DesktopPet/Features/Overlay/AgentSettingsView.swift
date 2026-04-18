@@ -9,6 +9,7 @@ struct AgentSettingsView: View {
     @EnvironmentObject private var settings: AgentSettingsStore
     @EnvironmentObject private var session: AgentSessionStore
     @EnvironmentObject private var petCare: PetCareModel
+    @Environment(\.desktopPetAgentClient) private var desktopPetAgentClient: AgentClient?
 
     @State private var apiKeyDraft: String = ""
     @State private var keychainMessage: String?
@@ -20,6 +21,9 @@ struct AgentSettingsView: View {
     @State private var showTriggerUserPromptHistorySheet = false
     @State private var showNewKeyboardTriggerPrivacyHint = false
     @State private var selectedSettingsTab = 0
+    @State private var growthDebugRandomPreview: String?
+    @State private var growthDebugRandomTestUseAI = true
+    @State private var growthDebugRandomTestBusy = false
 
     private static let pendingAgentSettingsTabKey = "DesktopPet.ui.pendingAgentSettingsTab"
 
@@ -421,7 +425,7 @@ struct AgentSettingsView: View {
             } header: {
                 Text("成长参数")
             } footer: {
-                Text("每小时衰减在宠物隐藏时也会累计；随机事件按密度抽样，午间等时段略更容易发生。开启 AI 后，部分事件会请求模型生成 JSON（失败则自动用本地事件）；会消耗 API。")
+                Text("每小时衰减在宠物隐藏时也会累计。若距离上次结算已超过 3 小时（例如久未打开应用），只会按小时补扣心情/能量，不会补抽随机事件；回到 3 小时内后恢复按密度抽样（午间等时段略更容易）。开启 AI 后，部分事件会请求模型生成 JSON（失败则自动用本地事件）；会消耗 API。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -492,8 +496,144 @@ struct AgentSettingsView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+
+            Section {
+                if let d = petCare.state.lastDecayAt {
+                    Text("lastDecayAt（ISO8601）")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Text(growthDebugISO8601(d))
+                        .font(.caption.monospacedDigit())
+                        .textSelection(.enabled)
+                    Text("Unix 秒：\(Int64(d.timeIntervalSince1970))")
+                        .font(.caption.monospacedDigit())
+                        .textSelection(.enabled)
+                    let gap = Date().timeIntervalSince(d)
+                    Text("距今：\(formatGrowthDebugSeconds(gap))（\(gap <= 3 * 3600 ? "≤3 小时：真实结算可掷随机" : ">3 小时：真实结算仅固定衰减")）")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("lastDecayAt：nil（尚未写入锚点）")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Text("当前心情 \(String(format: "%.3f", petCare.state.mood)) · 能量 \(String(format: "%.3f", petCare.state.energy))（仅展示）")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                Toggle("试跑使用 AI（默认开：每次点击都请求模型）", isOn: $growthDebugRandomTestUseAI)
+                    .disabled(growthDebugRandomTestBusy)
+                Button("随机事件试跑（不改数值 / 不改 lastDecayAt）") {
+                    runGrowthDebugRandomTest()
+                }
+                .disabled(growthDebugRandomTestBusy)
+                if growthDebugRandomTestBusy {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                if let growthDebugRandomPreview {
+                    Text(growthDebugRandomPreview)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            } header: {
+                Text("调试")
+            } footer: {
+                Text("关闭「试跑使用 AI」时，只调用本地事件池与随机数；打开时每次点击都会向当前 Base URL / 模型发一次 JSON 试跑请求（不写回状态）。两种模式均不修改 lastDecayAt 与心情/能量。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .formStyle(.grouped)
+    }
+
+    private func runGrowthDebugRandomTest() {
+        if growthDebugRandomTestUseAI {
+            growthDebugRandomTestBusy = true
+            Task { @MainActor in
+                defer { growthDebugRandomTestBusy = false }
+                await runGrowthDebugAITest()
+            }
+        } else {
+            runGrowthDebugLocalRandomTest()
+        }
+    }
+
+    private func runGrowthDebugLocalRandomTest() {
+        var rng = SplitMix64(seed: UInt64.random(in: 1 ... UInt64.max))
+        let at = Date()
+        if let ev = PetLocalGrowthEventPool.sampleEvent(at: at, calendar: .current, rng: &rng) {
+            let h = Calendar.current.component(.hour, from: at)
+            growthDebugRandomPreview = """
+            [本地池]
+            抽样时刻本地小时=\(h)
+            code=\(ev.reasonCode)
+            \(ev.reasonText)
+            moodΔ=\(String(format: "%.4f", ev.moodDelta)) · energyΔ=\(String(format: "%.4f", ev.energyDelta))
+            """
+        } else {
+            growthDebugRandomPreview = "（未返回事件，极少见）"
+        }
+    }
+
+    private func runGrowthDebugAITest() async {
+        guard let client = desktopPetAgentClient else {
+            growthDebugRandomPreview = "「试跑使用 AI」已打开，但未注入 AgentClient。"
+            return
+        }
+        let at = Date()
+        let recentCodes = petCare.state.recentDecayEvents.prefix(20).map(\.reasonCode)
+        let user = PetGrowthAI.buildUserPrompt(
+            hourStart: at,
+            mood: petCare.state.mood,
+            energy: petCare.state.energy,
+            recentEventCodes: recentCodes,
+            localTemplateSummary: PetGrowthAI.localTemplateSummaryForPrompt()
+        )
+        let key = KeychainStore.readAPIKey()
+        let messages: [[String: String]] = [["role": "user", "content": user]]
+        do {
+            let text = try await client.completeChat(
+                baseURL: settings.baseURL,
+                model: settings.model,
+                apiKey: key,
+                systemPrompt: "你只输出 JSON。不要输出任何其它字符。",
+                messages: messages,
+                temperature: 0.85,
+                maxTokens: 512
+            )
+            if let parsed = PetGrowthAI.parseEvents(from: text), let ev = parsed.first {
+                let h = Calendar.current.component(.hour, from: at)
+                growthDebugRandomPreview = """
+                [AI 试跑 · 已解析]
+                请求时刻本地小时=\(h)
+                code=\(ev.reasonCode)
+                \(ev.reasonText)
+                moodΔ=\(String(format: "%.4f", ev.moodDelta)) · energyΔ=\(String(format: "%.4f", ev.energyDelta))
+                """
+            } else {
+                growthDebugRandomPreview = """
+                [AI 试跑 · 解析失败]
+                模型原文（截断）：
+                \(String(text.prefix(800)))
+                """
+            }
+        } catch {
+            growthDebugRandomPreview = "[AI 试跑 · 请求失败]\n\(error.localizedDescription)"
+        }
+    }
+
+    private func growthDebugISO8601(_ date: Date) -> String {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f.string(from: date)
+    }
+
+    private func formatGrowthDebugSeconds(_ t: TimeInterval) -> String {
+        if t < 120 { return String(format: "%.0f 秒", t) }
+        if t < 3600 { return String(format: "%.1f 分钟", t / 60) }
+        return String(format: "%.2f 小时", t / 3600)
     }
 
     private func shortDate(_ d: Date) -> String {

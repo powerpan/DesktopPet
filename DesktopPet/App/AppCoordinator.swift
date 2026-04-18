@@ -144,6 +144,7 @@ final class AppCoordinator: ObservableObject {
                 .environmentObject(agentSettingsStore)
                 .environmentObject(agentSessionStore)
                 .environmentObject(petCareModel)
+                .environment(\.desktopPetAgentClient, agentClient)
         ))
     }
 

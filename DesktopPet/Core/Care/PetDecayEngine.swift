@@ -1,6 +1,6 @@
 //
 // PetDecayEngine.swift
-// 按小时补算基础衰减，并按密度触发本地随机事件（可选标记尝试 AI）。
+// 按小时补算基础衰减；仅当距上次结算不超过 3 小时时才按密度触发随机/AI 事件，否则只补固定衰减。
 //
 
 import Foundation
@@ -50,6 +50,9 @@ enum PetDecayEngine {
         }
         wholeHours = min(wholeHours, maxCatchUpHoursPerCall)
 
+        /// 上次结算距今在 3 小时内才允许随机事件与 AI 标记；长时间离线只按小时扣基础心情/能量。
+        let allowRandomEvents = elapsed <= 3 * 3600
+
         let cfg = PetGrowthConfig.clamped(config)
         let density = Double(cfg.randomEventDensityPercent) / 100.0
 
@@ -61,6 +64,8 @@ enum PetDecayEngine {
 
             state.mood = clamp01(state.mood - cfg.moodDrainPerHour)
             state.energy = clamp01(state.energy - cfg.energyDrainPerHour)
+
+            guard allowRandomEvents else { continue }
 
             let p = min(0.95, density * period * 0.45)
             if rng.unitDouble() < p {

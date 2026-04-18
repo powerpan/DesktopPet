@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 enum AgentClientError: LocalizedError {
     case missingAPIKey
@@ -78,5 +79,19 @@ final class AgentClient {
         let text = content.trimmingCharacters(in: .whitespacesAndNewlines)
         if text.isEmpty { throw AgentClientError.emptyChoices }
         return text
+    }
+}
+
+// MARK: - SwiftUI 环境注入（设置页调试试跑等）
+
+private struct DesktopPetAgentClientKey: EnvironmentKey {
+    static let defaultValue: AgentClient? = nil
+}
+
+extension EnvironmentValues {
+    /// 由 `AppCoordinator.presentAgentSettingsWindow` 注入，供成长调试「试跑 AI」等使用。
+    var desktopPetAgentClient: AgentClient? {
+        get { self[DesktopPetAgentClientKey.self] }
+        set { self[DesktopPetAgentClientKey.self] = newValue }
     }
 }
