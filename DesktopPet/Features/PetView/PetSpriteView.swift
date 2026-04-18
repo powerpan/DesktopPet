@@ -9,15 +9,22 @@ struct PetSpriteView: View {
     @EnvironmentObject private var settings: SettingsViewModel
     @EnvironmentObject private var stateMachine: PetStateMachine
     @EnvironmentObject private var pointer: PointerTrackingModel
+    @EnvironmentObject private var deskMirror: DeskMirrorModel
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 6) {
+            Text("猫猫桌前（文字）")
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.tertiary)
+
+            DeskMirrorTextView()
+
             Text(PetAnimationDriver.title(for: stateMachine.state))
-                .font(.system(size: 40, weight: .bold, design: .rounded))
+                .font(.system(size: 22, weight: .bold, design: .rounded))
                 .accessibilityLabel(PetAnimationDriver.accessibilityLabel(for: stateMachine.state))
 
             Text(stateMachine.state.rawValue)
-                .font(.caption.monospaced())
+                .font(.caption2.monospaced())
                 .foregroundStyle(.secondary)
         }
         .offset(x: pointer.gazeOffsetX)

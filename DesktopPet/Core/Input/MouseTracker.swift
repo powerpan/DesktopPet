@@ -21,6 +21,8 @@ final class MouseTracker {
     private let pointerEmitInterval: TimeInterval = 1.0 / 24.0
     /// 用于「注视」等纯展示层：屏幕坐标，与 `NSEvent.mouseLocation` 一致。
     var onPointerScreenLocation: ((CGPoint) -> Void)?
+    /// 与上一次采样的屏幕坐标差分（`NSEvent.mouseLocation` 系：x 右为正，y **上**为正）；用于桌前鼠标垫镜像。
+    var onMouseDeltaScreen: ((CGVector) -> Void)?
 
     func start() {
         guard timer == nil else { return }
@@ -44,12 +46,15 @@ final class MouseTracker {
 
     private func sample() {
         let current = NSEvent.mouseLocation
+        let dx = current.x - lastLocation.x
+        let dy = current.y - lastLocation.y
+        if interactionSamplingEnabled {
+            onMouseDeltaScreen?(CGVector(dx: dx, dy: dy))
+        }
         guard interactionSamplingEnabled else {
             lastLocation = current
             return
         }
-        let dx = current.x - lastLocation.x
-        let dy = current.y - lastLocation.y
         let speed = sqrt(dx * dx + dy * dy)
         lastLocation = current
 

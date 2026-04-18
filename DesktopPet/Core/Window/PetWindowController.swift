@@ -15,7 +15,7 @@ final class PetWindowController: NSWindowController {
     /// 拖动缩放滑条期间固定用「第一次变化前」的窗口中心，避免每帧用 setFrame 后的 frame 重算中心导致舍入漂移（宠物往右下跑飞屏）。
     private var petScaleResizeAnchorScreen: CGPoint?
 
-    init(settings: SettingsViewModel, stateMachine: PetStateMachine, pointer: PointerTrackingModel) {
+    init(settings: SettingsViewModel, stateMachine: PetStateMachine, pointer: PointerTrackingModel, deskMirror: DeskMirrorModel) {
         self.settings = settings
         let initialSide = PetConfig.exteriorHitSide(scale: settings.petScale)
         let rect = NSRect(x: 120, y: 240, width: initialSide, height: initialSide)
@@ -24,6 +24,7 @@ final class PetWindowController: NSWindowController {
             .environmentObject(settings)
             .environmentObject(stateMachine)
             .environmentObject(pointer)
+            .environmentObject(deskMirror)
         let root = PetRootContainerView(rootView: rootView)
         root.hitClipSidePoints = initialSide
         window.contentView = root

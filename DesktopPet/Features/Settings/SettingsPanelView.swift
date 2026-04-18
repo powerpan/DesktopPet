@@ -11,6 +11,7 @@ struct SettingsPanelView: View {
     var body: some View {
         Form {
             Toggle("启用鼠标穿透", isOn: $viewModel.isClickThroughEnabled)
+            Toggle("桌前按键镜像（文字）", isOn: $viewModel.isDeskKeyMirrorEnabled)
             Toggle("启用巡逻", isOn: $viewModel.isPatrolEnabled)
             HStack {
                 Text("宠物缩放")

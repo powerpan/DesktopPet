@@ -17,6 +17,7 @@ final class AppCoordinator: ObservableObject {
     let patrolScheduler = PatrolScheduler()
     let settingsViewModel = SettingsViewModel()
     let pointerTrackingModel = PointerTrackingModel()
+    let deskMirrorModel = DeskMirrorModel()
 
     private var petWindowController: PetWindowController?
     private var onboardingWindow: NSWindow?
@@ -37,6 +38,7 @@ final class AppCoordinator: ObservableObject {
         wireAccessibilityRecheck()
 
         permissionManager.refreshStatus(prompt: false)
+        deskMirrorModel.setAccessibilityKeyboardMirrorGranted(permissionManager.isGranted)
         // 隐藏宠物时不应因屏外鼠标产生悬停/唤醒
         mouseTracker.interactionSamplingEnabled = isPetVisible
         mouseTracker.start()
@@ -71,6 +73,7 @@ final class AppCoordinator: ObservableObject {
         mouseTracker.interactionSamplingEnabled = isPetVisible
         if !isPetVisible {
             pointerTrackingModel.updateGaze(mouseScreen: .zero, petFrame: nil)
+            deskMirrorModel.resetPadCursor()
         }
     }
 
@@ -108,7 +111,12 @@ final class AppCoordinator: ObservableObject {
 
     private func preparePetWindow() {
         guard petWindowController == nil else { return }
-        let controller = PetWindowController(settings: settingsViewModel, stateMachine: stateMachine, pointer: pointerTrackingModel)
+        let controller = PetWindowController(
+            settings: settingsViewModel,
+            stateMachine: stateMachine,
+            pointer: pointerTrackingModel,
+            deskMirror: deskMirrorModel
+        )
         controller.showWindow(nil)
         petWindowController = controller
     }
@@ -119,6 +127,7 @@ final class AppCoordinator: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] granted in
                 guard let self else { return }
+                self.deskMirrorModel.setAccessibilityKeyboardMirrorGranted(granted)
                 if granted {
                     self.configureGlobalInputHandlers()
                     self.globalInput.restart()
@@ -187,8 +196,12 @@ final class AppCoordinator: ObservableObject {
     }
 
     private func configureGlobalInputHandlers() {
-        globalInput.onKeyDown = { [weak self] _ in
+        globalInput.onKeyDown = { [weak self] event in
             guard let self else { return }
+            self.deskMirrorModel.consumeKeyEvent(
+                event,
+                mirrorKeysEnabled: self.settingsViewModel.isDeskKeyMirrorEnabled
+            )
             self.stateMachine.handle(.keyboardInput)
             self.bumpActivity()
         }
@@ -252,6 +265,9 @@ final class AppCoordinator: ObservableObject {
             guard let self else { return }
             self.stateMachine.handle(event)
             self.bumpActivity()
+        }
+        mouseTracker.onMouseDeltaScreen = { [weak self] delta in
+            self?.deskMirrorModel.applyMouseDeltaScreen(delta)
         }
     }
 

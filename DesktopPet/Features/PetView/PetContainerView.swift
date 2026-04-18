@@ -30,8 +30,11 @@ struct PetContainerView: View {
 }
 
 #Preview {
-    PetContainerView()
+    let desk = DeskMirrorModel()
+    desk.setAccessibilityKeyboardMirrorGranted(true)
+    return PetContainerView()
         .environmentObject(SettingsViewModel())
         .environmentObject(PetStateMachine())
         .environmentObject(PointerTrackingModel())
+        .environmentObject(desk)
 }
