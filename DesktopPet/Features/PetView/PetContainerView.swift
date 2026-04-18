@@ -32,8 +32,11 @@ struct PetContainerView: View {
 #Preview {
     let desk = DeskMirrorModel()
     desk.setAccessibilityKeyboardMirrorGranted(true)
+    let side = PetConfig.petLayoutSide(scale: 1.0)
     return PetContainerView()
         .environmentObject(SettingsViewModel())
         .environmentObject(PetStateMachine())
         .environmentObject(desk)
+        // 与运行时宠物窗口一致：正方形，避免 Canvas 默认竖长把键盘挤没、圆角裁切异常。
+        .frame(width: side, height: side)
 }

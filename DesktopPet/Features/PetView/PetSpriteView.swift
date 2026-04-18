@@ -17,37 +17,49 @@ struct PetSpriteView: View {
 
     var body: some View {
         GeometryReader { geo in
+            // 父视图可能非正方形（如 Xcode Preview）；始终以短边为边长做「正方形卡片」，避免竖长区域把键盘挤到底部、圆角与背景错位。
             let side = max(1, min(geo.size.width, geo.size.height))
             let u = side / layoutReferenceSide
             let cornerRadius = min(side * 0.12, max(4, side * 0.5 - 1))
-            /// 水平 padding 后、再为 `PetContainerView` 右上角浮动按钮留出宽度，避免键盘/鼠标垫被裁切或叠在按钮下。
             let innerAfterHPadding = max(1, side - 8 * u)
-            let deskMirrorLayoutWidth = max(44, innerAfterHPadding - (26 + 8 * u))
+            let deskMirrorLayoutWidth = min(innerAfterHPadding - 2, max(32, innerAfterHPadding - (24 + 8 * u)))
 
-            VStack(spacing: 6 * u) {
+            VStack(alignment: .leading, spacing: max(3, 5 * u)) {
                 Text("猫猫桌前（文字）")
                     .font(.system(size: max(8, 11 * u), weight: .medium, design: .rounded))
                     .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.55)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 DeskMirrorTextView()
+                    .layoutPriority(1)
 
                 Text(PetAnimationDriver.title(for: stateMachine.state))
-                    .font(.system(size: max(12, 22 * u), weight: .bold, design: .rounded))
+                    .font(.system(size: min(side * 0.2, max(11, 20 * u)), weight: .bold, design: .rounded))
                     .accessibilityLabel(PetAnimationDriver.accessibilityLabel(for: stateMachine.state))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.45)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
                 Text(stateMachine.state.rawValue)
-                    .font(.system(size: max(8, 11 * u), design: .monospaced))
+                    .font(.system(size: max(7, 10 * u), design: .monospaced))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
             .padding(.horizontal, 4 * u)
             .padding(.vertical, 3 * u)
             .environment(\.petCardContentScale, u)
             .environment(\.petCardLayoutInnerWidth, deskMirrorLayoutWidth)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-            .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
+            // 明确正方形 + 顶部对齐：不要用 maxHeight .infinity 撑满竖向，否则子视图会被挤到可视区外，底部圆角像「缺一块」。
+            .frame(width: side, height: side, alignment: .top)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .allowsHitTesting(!settings.isClickThroughEnabled)
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .center)
         }
     }
 }
