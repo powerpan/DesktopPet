@@ -26,6 +26,8 @@ final class PetWindow: NSPanel {
         ignoresMouseEvents = false
         // 避免桌宠出现在「窗口」菜单里干扰用户
         isExcludedFromWindowsMenu = true
+        // 关闭自动窗口状态恢复，减少与 NSSecureCoding / NSXPCDecoder 相关的系统控制台告警概率
+        isRestorable = false
     }
 
     /// 非激活面板基类默认不可成为 key 时，点击内嵌 SwiftUI 按钮仍会触发 `makeKeyWindow`，控制台告警。此处允许在必要时成为 key，与 `becomesKeyOnlyIfNeeded = true` 配合。

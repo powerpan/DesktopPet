@@ -44,7 +44,9 @@ final class ExtensionOverlayController {
         ensureChatPanel()
         chatPanel?.contentView = NSHostingView(rootView: root)
         layoutChatPanel()
-        chatPanel?.orderFrontRegardless()
+        // 菜单栏 accessory 应用 + 可输入面板：需激活应用并让面板成为 key，TextField 才能接收键盘。
+        NSApp.activate(ignoringOtherApps: true)
+        chatPanel?.makeKeyAndOrderFront(nil)
     }
 
     func presentAgentSettings(root: AnyView) {
@@ -62,6 +64,7 @@ final class ExtensionOverlayController {
         )
         w.title = "智能体设置"
         w.isReleasedWhenClosed = false
+        w.isRestorable = false
         w.contentView = NSHostingView(rootView: root)
         w.center()
         agentSettingsWindow = w
@@ -82,12 +85,13 @@ final class ExtensionOverlayController {
         p.isOpaque = false
         p.hasShadow = true
         p.isReleasedWhenClosed = false
+        p.isRestorable = false
         carePanel = p
     }
 
     private func ensureChatPanel() {
         guard chatPanel == nil else { return }
-        let p = NSPanel(
+        let p = KeyableBorderlessPanel(
             contentRect: NSRect(x: 0, y: 0, width: 340, height: 420),
             styleMask: [.nonactivatingPanel, .borderless, .fullSizeContentView],
             backing: .buffered,
@@ -99,6 +103,9 @@ final class ExtensionOverlayController {
         p.isOpaque = false
         p.hasShadow = true
         p.isReleasedWhenClosed = false
+        p.becomesKeyOnlyIfNeeded = true
+        p.hidesOnDeactivate = false
+        p.isRestorable = false
         chatPanel = p
     }
 
@@ -123,5 +130,24 @@ final class ExtensionOverlayController {
     func repositionIfNeeded() {
         if carePanel?.isVisible == true { layoutCarePanel() }
         if chatPanel?.isVisible == true { layoutChatPanel() }
+    }
+}
+
+// MARK: - 可输入的浮动面板
+
+/// 默认 `NSPanel` 往往 `canBecomeKey == false`，内嵌 SwiftUI `TextField` 无法获得键盘焦点；与 `PetWindow` 同理显式允许成为 key。
+private final class KeyableBorderlessPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+
+    override var canBecomeMain: Bool { false }
+
+    override init(
+        contentRect: NSRect,
+        styleMask style: NSWindow.StyleMask,
+        backing backingStoreType: NSWindow.BackingStoreType,
+        defer flag: Bool
+    ) {
+        super.init(contentRect: contentRect, styleMask: style, backing: backingStoreType, defer: flag)
+        isRestorable = false
     }
 }

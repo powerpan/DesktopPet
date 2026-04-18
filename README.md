@@ -107,6 +107,11 @@ DesktopPet/
 xcodebuild -scheme DesktopPet -configuration Debug -derivedDataPath ./build/DerivedData build
 ```
 
+## 常见问题（Xcode 控制台）
+
+- **`NSXPCDecoder` / `NSSecureCoding` / `Allowed class list` 含 `NSObject`**：多为 **macOS 系统或 SwiftUI（菜单栏场景、`Settings`、窗口服务）** 在 XPC 解码时的内部告警，**不一定来自本仓库业务代码**。本工程已对各 `NSWindow` / `NSPanel` 设置 **`isRestorable = false`**，以降低与窗口状态恢复相关的噪声；若仍偶发出现，可在 Xcode 控制台按进程过滤 **DesktopPet**，或忽略该条（Apple 文档称未来可能升级为硬错误，届时需随系统/SDK 更新）。
+- **`decode: bad range`**：常与上述系统侧解码或调试器注入有关；若应用界面与功能正常，一般可视为良性日志。
+
 ## 需求文档
 
 - 详细 PRD：`docs/requirements.md`

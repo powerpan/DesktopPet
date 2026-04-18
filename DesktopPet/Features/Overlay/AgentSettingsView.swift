@@ -49,17 +49,29 @@ struct AgentSettingsView: View {
 
     private var connectionTab: some View {
         Form {
-            Section("服务端") {
+            Section {
                 TextField("Base URL", text: $settings.baseURL)
                 TextField("模型 id", text: $settings.model)
+            } header: {
+                Text("服务端")
+            } footer: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Base URL：OpenAI 兼容接口的根地址，须含 https://，不要拼 /v1/... 路径；DeepSeek 官方一般为 https://api.deepseek.com。")
+                    Text("模型 id：在控制台创建或查看，例如 deepseek-chat；填错会返回 HTTP 4xx。")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Section("API Key（钥匙串）") {
+
+            Section {
                 SecureField("粘贴 DeepSeek API Key", text: $apiKeyDraft)
                 HStack {
                     Button("保存到钥匙串") {
                         do {
                             try KeychainStore.saveAPIKey(apiKeyDraft)
                             keychainMessage = "已保存。"
+                            session.lastError = nil
                         } catch {
                             keychainMessage = error.localizedDescription
                         }
@@ -73,21 +85,47 @@ struct AgentSettingsView: View {
                 if let keychainMessage {
                     Text(keychainMessage).font(.caption).foregroundStyle(.secondary)
                 }
+            } header: {
+                Text("API Key（钥匙串）")
+            } footer: {
+                Text("仅保存在本机钥匙串，不会写入 UserDefaults 或明文文件。保存后若对话里仍提示未配置，可先关闭再打开对话面板刷新状态。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Section("生成参数") {
+
+            Section {
                 HStack {
-                    Text("温度")
+                    Text("温度 (temperature)")
                     Slider(value: $settings.temperature, in: 0 ... 1.5, step: 0.05)
                     Text(String(format: "%.2f", settings.temperature))
                         .font(.caption.monospacedDigit())
                         .frame(width: 44, alignment: .trailing)
                 }
                 Stepper("max_tokens：\(settings.maxTokens)", value: $settings.maxTokens, in: 64 ... 4096, step: 64)
+            } header: {
+                Text("生成参数")
+            } footer: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("温度：越高回答越随机、越有创意；越低越保守、越稳定。一般聊天约 0.6～0.9。")
+                    Text("max_tokens：模型单次回复最多生成的 token 数（约等于字数上限）；越大越耗额度与等待时间。")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+
             Section {
                 Button("清空当前对话") {
                     session.clearSession()
                 }
+            } header: {
+                Text("会话")
+            } footer: {
+                Text("仅清空本应用内存中的当前会话，不影响钥匙串与触发器配置。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .formStyle(.grouped)
@@ -95,10 +133,17 @@ struct AgentSettingsView: View {
 
     private var personalityTab: some View {
         Form {
-            Section("系统提示（人格）") {
+            Section {
                 TextEditor(text: $settings.systemPrompt)
                     .font(.body)
                     .frame(minHeight: 200)
+            } header: {
+                Text("系统提示（人格）")
+            } footer: {
+                Text("每次请求都会作为 system 消息发给模型，用来设定语气、称呼、回答语言等。对话面板里的聊天内容会接在它的后面。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .formStyle(.grouped)
@@ -107,9 +152,12 @@ struct AgentSettingsView: View {
     private var triggersTab: some View {
         Form {
             Section {
-                Text("每条规则有独立冷却；定时与随机空闲适合日常使用。键盘与前台应用属于进阶能力，请谨慎开启。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("触发器在满足条件时会自动请求模型写一句短旁白，并出现在对话列表里。")
+                    Text("每条规则有独立冷却，避免刷屏。定时与随机空闲适合日常使用；键盘与前台应用属于进阶能力，请谨慎开启。")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
             Section("列表") {
                 ForEach(settings.triggers) { rule in
@@ -138,13 +186,20 @@ struct AgentSettingsView: View {
 
     private var privacyTab: some View {
         Form {
-            Section("请求增强（高风险）") {
+            Section {
                 Toggle("在对话请求中附带键入摘要", isOn: $settings.attachKeySummary)
                 Text("依赖桌镜的键位标签摘要，可能暴露你正在输入的大致内容；默认关闭。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            } header: {
+                Text("请求增强（高风险）")
+            } footer: {
+                Text("开启后，会把桌镜里显示的「键位标签摘要」拼进发给模型的系统提示或触发旁白请求，仅在你主动发消息或触发器触发时才会上网。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Section("进阶触发总开关") {
+            Section {
                 Toggle("允许键盘模式触发", isOn: Binding(
                     get: { settings.keyboardTriggerMasterEnabled },
                     set: { newValue in
@@ -170,6 +225,13 @@ struct AgentSettingsView: View {
                 Text("当前版本不会截屏；此开关为后续能力预留。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            } header: {
+                Text("进阶触发总开关")
+            } footer: {
+                Text("键盘总闸：关闭后，所有「键盘模式」类触发器都不会匹配子串。截屏总闸：当前版本无实际截屏逻辑。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .formStyle(.grouped)
@@ -239,7 +301,7 @@ private struct TriggerRuleEditorSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("基本") {
+                Section {
                     Picker("类型", selection: $rule.kind) {
                         ForEach(AgentTriggerKind.allCases) { k in
                             Text(k.displayName).tag(k)
@@ -247,14 +309,28 @@ private struct TriggerRuleEditorSheet: View {
                     }
                     .disabled(true)
                     Stepper("冷却（秒）: \(Int(rule.cooldownSeconds))", value: $rule.cooldownSeconds, in: 30 ... 3600, step: 30)
+                } header: {
+                    Text("基本")
+                } footer: {
+                    Text("冷却：两次触发之间的最短间隔（秒）。触发一次后会进入冷却，期间即使条件仍满足也不会再请求。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 switch rule.kind {
                 case .timer:
-                    Section("定时") {
+                    Section {
                         Stepper("间隔（分钟）: \(rule.timerIntervalMinutes)", value: $rule.timerIntervalMinutes, in: 1 ... 24 * 60)
+                    } header: {
+                        Text("定时")
+                    } footer: {
+                        Text("从上一次触发完成起算，每隔这么多分钟最多触发一次（仍受冷却下限约束）。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 case .randomIdle:
-                    Section("随机空闲") {
+                    Section {
                         Stepper("空闲秒数: \(rule.randomIdleSeconds)", value: $rule.randomIdleSeconds, in: 10 ... 3600, step: 10)
                         HStack {
                             Text("触发概率")
@@ -262,23 +338,54 @@ private struct TriggerRuleEditorSheet: View {
                             Text(String(format: "%.0f%%", rule.randomIdleProbability * 100))
                                 .font(.caption.monospacedDigit())
                         }
+                    } header: {
+                        Text("随机空闲")
+                    } footer: {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("仅在宠物窗口可见时评估。空闲秒数：无键鼠活动达到该秒数后才可能触发。")
+                            Text("概率：每次抽样时掷骰，数值越大越容易触发；建议保持较低以免打扰。")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 case .keyboardPattern:
-                    Section("键盘模式") {
+                    Section {
                         Text("仅匹配模式串（最近按键缓冲），不保存全文日志。需打开「隐私」中的总开关。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         TextField("要匹配的子串", text: $rule.keyboardPattern)
+                    } header: {
+                        Text("键盘模式")
+                    } footer: {
+                        Text("在「最近按键」字符缓冲里查找是否包含该子串；大小写敏感。需已授予辅助功能。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 case .frontApp:
-                    Section("前台应用") {
+                    Section {
                         TextField("应用名包含（本地化名称子串）", text: $rule.frontAppNameContains)
+                    } header: {
+                        Text("前台应用")
+                    } footer: {
+                        Text("当前台应用切换到名称包含该子串的应用时触发一次（例如 Xcode、Safari）。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 case .screenSnap:
-                    Section("截屏") {
+                    Section {
                         Text("当前版本不会触发；占位以便后续接入 ScreenCaptureKit 等能力。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                    } header: {
+                        Text("截屏")
+                    } footer: {
+                        Text("开启后也不会请求截屏权限；与「隐私」Tab 中的截屏总开关为后续版本预留。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }

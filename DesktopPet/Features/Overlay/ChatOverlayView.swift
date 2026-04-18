@@ -3,6 +3,7 @@
 // 智能体对话叠加层（DeepSeek）。
 //
 
+import Combine
 import SwiftUI
 
 struct ChatOverlayView: View {
@@ -12,14 +13,20 @@ struct ChatOverlayView: View {
     private let client = AgentClient()
 
     @State private var draft: String = ""
+    @State private var keychainConfigured: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
-            Text("七七猫 · 对话")
-                .font(.headline)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("七七猫 · 对话")
+                    .font(.headline)
+                Text(keychainConfigured ? "钥匙串：已检测到 API Key" : "钥匙串：未检测到 API Key（请在智能体设置中保存）")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
 
             Divider()
 
@@ -60,6 +67,12 @@ struct ChatOverlayView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .onAppear {
+            keychainConfigured = KeychainStore.readAPIKey() != nil
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .desktopPetAPIKeyDidChange)) { _ in
+            keychainConfigured = KeychainStore.readAPIKey() != nil
+        }
     }
 
     private func bubble(_ m: ChatMessage) -> some View {

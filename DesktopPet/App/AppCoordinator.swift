@@ -104,12 +104,17 @@ final class AppCoordinator: ObservableObject {
     }
 
     func toggleChatOverlay() {
+        let wasVisible = extensionOverlay.isChatVisible()
         extensionOverlay.toggleChatPanel(root: AnyView(
             ChatOverlayView()
                 .environmentObject(agentSessionStore)
                 .environmentObject(agentSettingsStore)
                 .environmentObject(deskMirrorModel)
         ))
+        // 从隐藏变为显示时清掉旧错误，避免「已保存 Key 却仍显示未配置」的误导（lastError 来自上次发送失败）。
+        if extensionOverlay.isChatVisible(), !wasVisible {
+            agentSessionStore.lastError = nil
+        }
     }
 
     func presentAgentSettingsWindow() {
@@ -135,6 +140,7 @@ final class AppCoordinator: ObservableObject {
             window.contentView = hosting
             window.center()
             window.isReleasedWhenClosed = false
+            window.isRestorable = false
             onboardingWindow = window
             // 用户手动关窗后清空引用，否则无法再次从菜单打开
             NotificationCenter.default.publisher(for: NSWindow.willCloseNotification, object: window)

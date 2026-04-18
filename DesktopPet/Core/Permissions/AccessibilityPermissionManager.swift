@@ -11,6 +11,8 @@ import SwiftUI
 extension Notification.Name {
     /// 用户点击「重新检测」或等价操作时，由界面发出，由 `AppCoordinator` 统一刷新信任并重启键盘监听。
     static let desktopPetAccessibilityRecheck = Notification.Name("desktopPetAccessibilityRecheck")
+    /// 钥匙串中的 DeepSeek API Key 已写入或清除，供对话面板等刷新「已配置」提示。
+    static let desktopPetAPIKeyDidChange = Notification.Name("desktopPetAPIKeyDidChange")
 }
 
 @MainActor
