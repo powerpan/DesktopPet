@@ -41,6 +41,7 @@
 
 ## 已完成（便于对照，可随进度删减）
 
+- [x] **饲养 + DeepSeek 对话 + 触发器 MVP**：`Core/Care`、`Core/Agent`、`Features/Overlay`、`ExtensionOverlayController`；菜单栏饲养/对话显隐与智能体设置；`README` / `docs` 已同步摘要。
 - [x] 菜单栏 accessory、`NSPanel` 桌宠窗口、穿透与命中包络、`petScale` 与窗口锚定缩放。
 - [x] 辅助功能引导、Bundle ID、`NSAccessibilityUsageDescription`、TCC 诊断与延迟重检、全局键与 ⌘K。
 - [x] 状态机骨架、巡逻调度、设置持久化（穿透/巡逻/缩放）、`visualBaselineFactor` 默认体量。

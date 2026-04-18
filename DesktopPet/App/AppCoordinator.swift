@@ -17,6 +17,21 @@ final class AppCoordinator: ObservableObject {
     let patrolScheduler = PatrolScheduler()
     let settingsViewModel = SettingsViewModel()
     let deskMirrorModel = DeskMirrorModel()
+    let petCareModel = PetCareModel()
+    let agentSettingsStore = AgentSettingsStore()
+    let agentSessionStore = AgentSessionStore()
+    private let frontmostAppWatcher = FrontmostAppWatcher()
+    private let extensionOverlay = ExtensionOverlayController()
+    private let agentClient = AgentClient()
+
+    private lazy var triggerEngine = AgentTriggerEngine(
+        settings: agentSettingsStore,
+        session: agentSessionStore,
+        client: agentClient,
+        deskMirror: deskMirrorModel,
+        frontWatcher: frontmostAppWatcher,
+        isPetVisible: { [weak self] in self?.isPetVisible ?? false }
+    )
 
     private var petWindowController: PetWindowController?
     private var onboardingWindow: NSWindow?
@@ -35,6 +50,10 @@ final class AppCoordinator: ObservableObject {
         wireMouse()
         wireActivationRefresh()
         wireAccessibilityRecheck()
+        wirePetWindowOverlayNotifications()
+
+        petCareModel.startCompanionTicking { [weak self] in self?.isPetVisible ?? false }
+        triggerEngine.start()
 
         permissionManager.refreshStatus(prompt: false)
         deskMirrorModel.setAccessibilityKeyboardMirrorGranted(permissionManager.isGranted)
@@ -62,6 +81,8 @@ final class AppCoordinator: ObservableObject {
         patrolScheduler.stop()
         mouseTracker.stop()
         globalInput.stop()
+        triggerEngine.stop()
+        petCareModel.stopCompanionTicking()
         idleSleepTimer?.invalidate()
         idleSleepTimer = nil
     }
@@ -73,6 +94,30 @@ final class AppCoordinator: ObservableObject {
         if !isPetVisible {
             deskMirrorModel.resetMouseMirror()
         }
+    }
+
+    func toggleCareOverlay() {
+        extensionOverlay.toggleCarePanel(root: AnyView(
+            CareOverlayView()
+                .environmentObject(petCareModel)
+        ))
+    }
+
+    func toggleChatOverlay() {
+        extensionOverlay.toggleChatPanel(root: AnyView(
+            ChatOverlayView()
+                .environmentObject(agentSessionStore)
+                .environmentObject(agentSettingsStore)
+                .environmentObject(deskMirrorModel)
+        ))
+    }
+
+    func presentAgentSettingsWindow() {
+        extensionOverlay.presentAgentSettings(root: AnyView(
+            AgentSettingsView()
+                .environmentObject(agentSettingsStore)
+                .environmentObject(agentSessionStore)
+        ))
     }
 
     func presentOnboardingWindow() {
@@ -116,6 +161,20 @@ final class AppCoordinator: ObservableObject {
         )
         controller.showWindow(nil)
         petWindowController = controller
+        extensionOverlay.attachPetWindow(controller.window)
+    }
+
+    private func wirePetWindowOverlayNotifications() {
+        guard let window = petWindowController?.window else { return }
+        Publishers.MergeMany(
+            NotificationCenter.default.publisher(for: NSWindow.didMoveNotification, object: window),
+            NotificationCenter.default.publisher(for: NSWindow.didResizeNotification, object: window)
+        )
+        .receive(on: DispatchQueue.main)
+        .sink { [weak self] _ in
+            self?.extensionOverlay.repositionIfNeeded()
+        }
+        .store(in: &cancellables)
     }
 
     private func wirePermissionAndInput() {
@@ -200,6 +259,7 @@ final class AppCoordinator: ObservableObject {
                 mirrorKeysEnabled: self.settingsViewModel.isDeskKeyMirrorEnabled
             )
             self.stateMachine.handle(.keyboardInput)
+            self.triggerEngine.handleKeyDownForTriggers(event)
             self.bumpActivity()
         }
         globalInput.onKeyUp = { [weak self] event in
@@ -260,6 +320,7 @@ final class AppCoordinator: ObservableObject {
         mouseTracker.onInteraction = { [weak self] event in
             guard let self else { return }
             self.stateMachine.handle(event)
+            self.triggerEngine.noteUserActivity()
             self.bumpActivity()
         }
         mouseTracker.onMouseDeltaScreen = { [weak self] delta in
@@ -280,6 +341,7 @@ final class AppCoordinator: ObservableObject {
     }
 
     private func bumpActivity() {
+        triggerEngine.noteUserActivity()
         idleSleepTimer?.invalidate()
         if stateMachine.state == .sleep {
             return

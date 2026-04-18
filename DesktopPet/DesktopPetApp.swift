@@ -15,6 +15,15 @@ struct DesktopPetApp: App {
             Button("显示/隐藏宠物（⌘K）") {
                 appDelegate.coordinator.togglePetVisibility()
             }
+            Button("显示/隐藏饲养面板") {
+                appDelegate.coordinator.toggleCareOverlay()
+            }
+            Button("显示/隐藏对话面板") {
+                appDelegate.coordinator.toggleChatOverlay()
+            }
+            Button("智能体设置…") {
+                appDelegate.coordinator.presentAgentSettingsWindow()
+            }
             Button("辅助功能与权限说明…") {
                 appDelegate.coordinator.presentOnboardingWindow()
             }
@@ -29,6 +38,7 @@ struct DesktopPetApp: App {
         Settings {
             SettingsPanelView()
                 .environmentObject(appDelegate.coordinator.settingsViewModel)
+                .environmentObject(appDelegate.coordinator)
         }
     }
 }

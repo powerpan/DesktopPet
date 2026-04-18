@@ -36,6 +36,19 @@
 		C10000000000000000000023 /* DeskMirrorTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000023 /* DeskMirrorTextView.swift */; };
 		C10000000000000000000024 /* DeskMirrorKeyImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000024 /* DeskMirrorKeyImage.swift */; };
 		C20000000000000000000040 /* DeskMirror in Resources */ = {isa = PBXBuildFile; fileRef = B200000000000000000000040 /* DeskMirror */; };
+		C10000000000000000000025 /* PetCareState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000025 /* PetCareState.swift */; };
+		C10000000000000000000026 /* PetCareModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000026 /* PetCareModel.swift */; };
+		C10000000000000000000027 /* AgentModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000027 /* AgentModels.swift */; };
+		C10000000000000000000028 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000028 /* KeychainStore.swift */; };
+		C10000000000000000000029 /* AgentSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000029 /* AgentSettingsStore.swift */; };
+		C1000000000000000000002A /* AgentClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002A /* AgentClient.swift */; };
+		C1000000000000000000002B /* AgentSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002B /* AgentSessionStore.swift */; };
+		C1000000000000000000002C /* FrontmostAppWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002C /* FrontmostAppWatcher.swift */; };
+		C1000000000000000000002D /* AgentTriggerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002D /* AgentTriggerEngine.swift */; };
+		C1000000000000000000002E /* ExtensionOverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002E /* ExtensionOverlayController.swift */; };
+		C1000000000000000000002F /* CareOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002F /* CareOverlayView.swift */; };
+		C10000000000000000000030 /* ChatOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000030 /* ChatOverlayView.swift */; };
+		C10000000000000000000031 /* AgentSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000031 /* AgentSettingsView.swift */; };
 		C3D4E5F60718293A4B5C6D7E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8F /* ContentView.swift */; };
 		E5F60718293A4B5C6D7E8F90 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F60718293A4B5C6D7E8F90AB /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -69,6 +82,19 @@
 		B100000000000000000000022 /* DeskMirrorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskMirrorModel.swift; sourceTree = "<group>"; };
 		B100000000000000000000023 /* DeskMirrorTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskMirrorTextView.swift; sourceTree = "<group>"; };
 		B100000000000000000000024 /* DeskMirrorKeyImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskMirrorKeyImage.swift; sourceTree = "<group>"; };
+		B100000000000000000000025 /* PetCareState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetCareState.swift; sourceTree = "<group>"; };
+		B100000000000000000000026 /* PetCareModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetCareModel.swift; sourceTree = "<group>"; };
+		B100000000000000000000027 /* AgentModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentModels.swift; sourceTree = "<group>"; };
+		B100000000000000000000028 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		B100000000000000000000029 /* AgentSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSettingsStore.swift; sourceTree = "<group>"; };
+		B10000000000000000000002A /* AgentClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentClient.swift; sourceTree = "<group>"; };
+		B10000000000000000000002B /* AgentSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSessionStore.swift; sourceTree = "<group>"; };
+		B10000000000000000000002C /* FrontmostAppWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontmostAppWatcher.swift; sourceTree = "<group>"; };
+		B10000000000000000000002D /* AgentTriggerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentTriggerEngine.swift; sourceTree = "<group>"; };
+		B10000000000000000000002E /* ExtensionOverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionOverlayController.swift; sourceTree = "<group>"; };
+		B10000000000000000000002F /* CareOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CareOverlayView.swift; sourceTree = "<group>"; };
+		B100000000000000000000030 /* ChatOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatOverlayView.swift; sourceTree = "<group>"; };
+		B100000000000000000000031 /* AgentSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSettingsView.swift; sourceTree = "<group>"; };
 		B200000000000000000000040 /* DeskMirror */ = {isa = PBXFileReference; lastKnownFileType = folder; path = DeskMirror; sourceTree = "<group>"; };
 		B2C3D4E5F60718293A4B5C6D /* DesktopPetApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPetApp.swift; sourceTree = "<group>"; };
 		D4E5F60718293A4B5C6D7E8F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -135,6 +161,8 @@
 				A10000000000000000000007 /* Permissions */,
 				A10000000000000000000008 /* PetState */,
 				A10000000000000000000009 /* Window */,
+				A1000000000000000000000E /* Agent */,
+				A1000000000000000000000F /* Care */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -145,6 +173,7 @@
 				A1000000000000000000000A /* PetView */,
 				A1000000000000000000000D /* Onboarding */,
 				A1000000000000000000000B /* Settings */,
+				A10000000000000000000012 /* Overlay */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -211,6 +240,7 @@
 				B100000000000000000000017 /* PetRootContainerView.swift */,
 				B10000000000000000000000D /* PetWindow.swift */,
 				B10000000000000000000000E /* PetWindowController.swift */,
+				B10000000000000000000002E /* ExtensionOverlayController.swift */,
 			);
 			path = Window;
 			sourceTree = "<group>";
@@ -250,6 +280,39 @@
 				B100000000000000000000019 /* AccessibilityOnboardingView.swift */,
 			);
 			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000000E /* Agent */ = {
+			isa = PBXGroup;
+			children = (
+				B100000000000000000000027 /* AgentModels.swift */,
+				B100000000000000000000028 /* KeychainStore.swift */,
+				B100000000000000000000029 /* AgentSettingsStore.swift */,
+				B10000000000000000000002A /* AgentClient.swift */,
+				B10000000000000000000002B /* AgentSessionStore.swift */,
+				B10000000000000000000002C /* FrontmostAppWatcher.swift */,
+				B10000000000000000000002D /* AgentTriggerEngine.swift */,
+			);
+			path = Agent;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000000F /* Care */ = {
+			isa = PBXGroup;
+			children = (
+				B100000000000000000000025 /* PetCareState.swift */,
+				B100000000000000000000026 /* PetCareModel.swift */,
+			);
+			path = Care;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000012 /* Overlay */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000002F /* CareOverlayView.swift */,
+				B100000000000000000000030 /* ChatOverlayView.swift */,
+				B100000000000000000000031 /* AgentSettingsView.swift */,
+			);
+			path = Overlay;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -352,6 +415,19 @@
 				C10000000000000000000017 /* PetRootContainerView.swift in Sources */,
 				C10000000000000000000018 /* AnimationDriver.swift in Sources */,
 				C10000000000000000000019 /* AccessibilityOnboardingView.swift in Sources */,
+				C10000000000000000000025 /* PetCareState.swift in Sources */,
+				C10000000000000000000026 /* PetCareModel.swift in Sources */,
+				C10000000000000000000027 /* AgentModels.swift in Sources */,
+				C10000000000000000000028 /* KeychainStore.swift in Sources */,
+				C10000000000000000000029 /* AgentSettingsStore.swift in Sources */,
+				C1000000000000000000002A /* AgentClient.swift in Sources */,
+				C1000000000000000000002B /* AgentSessionStore.swift in Sources */,
+				C1000000000000000000002C /* FrontmostAppWatcher.swift in Sources */,
+				C1000000000000000000002D /* AgentTriggerEngine.swift in Sources */,
+				C1000000000000000000002E /* ExtensionOverlayController.swift in Sources */,
+				C1000000000000000000002F /* CareOverlayView.swift in Sources */,
+				C10000000000000000000030 /* ChatOverlayView.swift in Sources */,
+				C10000000000000000000031 /* AgentSettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

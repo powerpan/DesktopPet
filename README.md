@@ -26,12 +26,15 @@
 
 ## 使用说明
 
-- **菜单栏**：点击爪印图标可显示/隐藏宠物、打开权限说明、进入系统「设置…」面板（`⌘,`）、退出应用。
+- **菜单栏**：点击爪印图标可显示/隐藏宠物、**显示/隐藏饲养面板**、**显示/隐藏对话面板**、打开**智能体设置**（DeepSeek API Key 存钥匙串、触发器与隐私开关）、打开权限说明、进入系统「设置…」面板（`⌘,`）、退出应用。
 - **桌镜卡片**：标题为 **「七七猫1.0」**；底部保留 **英文** 状态枚举名（如 `idle`、`keyTap`）；键入历史为单行摘要，与桌镜图叠层分离布局。
 - **⌘K**：全局快捷键，切换宠物窗口显示（需已授予辅助功能）。
 - **鼠标穿透**：菜单栏 **设置…** 与窗口右上角按钮共用同一开关。开启时精灵区不参与命中；`PetRootContainerView` 包络外 `hitTest` 为 `nil`，包络内只转发 `NSHostingView.hitTest`（**不用** `?? hostingView`）。`PetSpriteView` 使用与圆角一致的 `contentShape`。宠物根视图**不再**整卡 `.padding(8)`，窗口边长由 `PetConfig.exteriorHitSide` 取「视觉边长 + 约 6pt」以尽量消掉隐形外圈。穿透关闭时拖窗请点在**材质卡片**上。
 - **缩放**：滑条 **0.6～1.2**（最大整窗约等于此前仅拉到 1.2× 时的体量，不再支持 1.8）。卡片画布基准 **176pt**（`PetConfig.petCanvasLayoutPoints`，小于原 220）以减小占位。`visualBaselineFactor`（0.6）仍使 **1.0 档** 视觉约等于更早一版「相对 0.6」的体量。连续拖动滑条时窗口以**本轮第一次**屏幕中心为锚缩放并夹紧在可见桌面内。
-- **设置**：菜单栏图标 → **设置…**，可调整穿透、巡逻、缩放；选项写入 `UserDefaults`，重启后保留。
+- **设置**：菜单栏图标 → **设置…**，可调整穿透、巡逻、缩放；选项写入 `UserDefaults`，重启后保留。同一面板底部可打开 **智能体与触发器设置**（独立窗口）。
+- **饲养与陪伴**：心情/能量条、喂食与戳戳（带冷却）、宠物可见时累计「今日陪伴」秒数；数据 `UserDefaults` 持久化。
+- **智能体对话**：对话面板内发消息调用 DeepSeek 兼容 `chat/completions`（非流式）；未配置 Key 或网络错误时界面有提示。
+- **触发器**：支持定时、随机空闲、键盘模式子串、前台应用名变化；每条规则独立冷却。键盘模式与「请求附带键入摘要」属敏感能力，默认关并在设置中有说明；截屏类触发为占位，当前不会发起截屏。
 
 ## 分发与沙盒
 
@@ -43,7 +46,9 @@
 DesktopPet/
 ├── App/                 # AppDelegate、AppCoordinator（生命周期与模块编排）
 ├── Core/
-│   ├── Window/          # PetWindow(NSPanel)、PetWindowController、PetRootContainerView
+│   ├── Window/          # PetWindow(NSPanel)、PetWindowController、ExtensionOverlayController、…
+│   ├── Agent/           # AgentClient、AgentSettingsStore、AgentSessionStore、触发引擎、Keychain
+│   ├── Care/            # PetCareState、PetCareModel（饲养持久化与计时）
 │   ├── Animation/       # AnimationDriver（状态到展示占位，可替换为序列帧/视频）
 │   ├── Permissions/     # 辅助功能检测
 │   ├── Input/           # GlobalInputMonitor（keyDown/keyUp、⌘K）、MouseTracker
@@ -51,6 +56,7 @@ DesktopPet/
 │   └── Models/          # PetConfig、DeskMirrorModel、PhysicalKeyLayout、InteractionEvent 等
 ├── Features/
 │   ├── PetView/         # PetSpriteView、DeskMirrorTextView、DeskMirrorKeyImage、…
+│   ├── Overlay/         # CareOverlayView、ChatOverlayView、AgentSettingsView
 │   ├── Onboarding/      # 权限说明 SwiftUI 视图
 │   └── Settings/        # 设置表单与持久化 ViewModel
 ├── Resources/
@@ -77,12 +83,35 @@ DesktopPet/
 - 设置项（穿透、巡逻、缩放）持久化。
 - 辅助功能：`AXIsProcessTrusted` 诊断文案、`tccutil` 与签名自检说明；未授权时延迟登记 TCC 列表与多次重检；`PetWindow` 允许必要时成为 key 以避免 `makeKeyWindow` 控制台告警。
 - **桌前镜像**：`DeskMirrorTextView` 整幅 `cover` / `nohand_cover` 与爪印、鼠标方向 PNG 同比例叠放；`DeskMirrorKeyImage` 负责 Bundle 路径与宽高比；`DeskMirrorModel` 维护物理高亮、展示层延迟与鼠标方向防抖。
+- **饲养 / 智能体 / 叠加窗**：由 `ExtensionOverlayController` 锚定在宠窗旁；`AppCoordinator` 编排 `PetCareModel`、`AgentTriggerEngine`、`FrontmostAppWatcher` 与键鼠活动采样；`⌘K` 与桌镜主流程保持独立。
+
+## 扩展功能（饲养与智能体）
+
+以下能力**不替代**桌镜主卡片，叠加面板锚定在宠物窗口旁，可通过菜单栏独立显隐。
+
+| 能力 | 说明 |
+|------|------|
+| 饲养面板 | `PetCareModel` / `PetCareState`：`UserDefaults` 持久化；心情与能量条、喂食（长冷却）与戳戳（短冷却）、宠物**可见**时累计今日陪伴秒数；跨日自动重置当日陪伴并小幅回补数值。 |
+| 对话面板 | `ChatOverlayView` + `AgentSessionStore`：非流式 `POST …/v1/chat/completions`（`AgentClient`）；仅向 API 发送 `user`/`assistant` 角色消息；系统提示词可在设置中编辑。 |
+| 智能体设置 | 独立窗口（多 Tab）：连接（Base URL、模型、温度、max_tokens）、人格（系统提示词）、触发器列表（增删改、冷却与各类型参数）、隐私（键入摘要、键盘总闸、截屏占位开关）。 |
+| API Key | `KeychainStore` 读写，**不写入** `UserDefaults`。 |
+| 触发器 | `AgentTriggerEngine`：定时、随机空闲、键盘子串匹配（仅内存环形缓冲，不落盘原文）、前台应用名子串（`FrontmostAppWatcher`）；每条规则 `cooldown`；截屏类型为占位，当前**不会**请求截屏权限或上传图像。 |
+
+**首次使用建议**：菜单栏 → **智能体设置…** → 填写 Base URL（默认 `https://api.deepseek.com`）与模型名 → **保存到钥匙串** → 打开 **对话面板** 试发一条。无网络或 Key 无效时，错误文案显示在输入区上方。
+
+**隐私提示**：「附带键入摘要」会把桌镜生成的键位标签摘要拼进系统提示（对话与部分触发旁白）；「键盘模式触发」需在隐私 Tab 开启总闸并经二次确认；二者默认关闭。详见 [`docs/TODO_AGENT_AND_CARE.md`](docs/TODO_AGENT_AND_CARE.md) 与设置内文案。
+
+**命令行编译示例**（可选，DerivedData 放在仓库内便于清理）：
+
+```bash
+xcodebuild -scheme DesktopPet -configuration Debug -derivedDataPath ./build/DerivedData build
+```
 
 ## 需求文档
 
 - 详细 PRD：`docs/requirements.md`
 - 待办与后续工作：`docs/TODO.md`
-- **扩展规划**（饲养、智能体 DeepSeek、叠加 UI、菜单栏触发与 API 设置）：`docs/TODO_AGENT_AND_CARE.md`
+- **扩展规划与实现对照**（饲养、智能体 DeepSeek、叠加 UI、触发器与合规待办）：`docs/TODO_AGENT_AND_CARE.md`
 
 ## 许可证
 

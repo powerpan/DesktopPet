@@ -7,6 +7,7 @@ import SwiftUI
 
 struct SettingsPanelView: View {
     @EnvironmentObject private var viewModel: SettingsViewModel
+    @EnvironmentObject private var coordinator: AppCoordinator
 
     var body: some View {
         Form {
@@ -20,6 +21,11 @@ struct SettingsPanelView: View {
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
+            Section("饲养与智能体") {
+                Button("打开智能体与触发器设置…") {
+                    coordinator.presentAgentSettingsWindow()
+                }
+            }
         }
         .padding()
         .frame(width: 320)
@@ -29,4 +35,5 @@ struct SettingsPanelView: View {
 #Preview {
     SettingsPanelView()
         .environmentObject(SettingsViewModel())
+        .environmentObject(AppCoordinator())
 }
