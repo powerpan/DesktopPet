@@ -256,7 +256,7 @@ final class AgentTriggerEngine: ObservableObject {
             }
             let d = trigger.defaultPromptTemplate.trimmingCharacters(in: .whitespacesAndNewlines)
             if !d.isEmpty { return d }
-            return AgentTriggerRule.standardPrologueTemplate
+            return AgentTriggerRule.defaultPromptTemplate(for: trigger.kind)
         }()
         return rawTemplate
             .replacingOccurrences(of: "{extra}", with: extra)
@@ -294,7 +294,7 @@ final class AgentTriggerEngine: ObservableObject {
                 maxTokens: min(settings.maxTokens, 256)
             )
             if let onTriggerSpeech {
-                onTriggerSpeech(TriggerSpeechPayload(text: text, triggerKind: trigger.kind))
+                onTriggerSpeech(TriggerSpeechPayload(text: text, triggerKind: trigger.kind, userPrompt: userLine))
             } else {
                 session.appendAssistant(text)
             }

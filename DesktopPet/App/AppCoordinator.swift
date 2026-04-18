@@ -231,14 +231,14 @@ final class AppCoordinator: ObservableObject {
                 let raw = note.userInfo?[DesktopPetNotificationUserInfoKey.testBubbleSample] as? String
                 let sample = TestBubbleSample(rawValue: raw ?? "") ?? .short
                 let text = sample.cannedText
-                self.deliverTriggerSpeech(TriggerSpeechPayload(text: text, triggerKind: .bubbleTest))
+                self.deliverTriggerSpeech(TriggerSpeechPayload(text: text, triggerKind: .bubbleTest, userPrompt: nil))
             }
             .store(in: &cancellables)
     }
 
     /// 条件触发或测试气泡：写入旁白历史并展示云朵（点气泡可续聊）。
     private func deliverTriggerSpeech(_ payload: TriggerSpeechPayload) {
-        agentSessionStore.triggerHistory.append(text: payload.text, kind: payload.triggerKind)
+        agentSessionStore.triggerHistory.append(text: payload.text, kind: payload.triggerKind, userPrompt: payload.userPrompt)
         extensionOverlay.showTriggerBubble(text: payload.text) { [weak self] in
             guard let self else { return }
             self.agentSessionStore.startSessionFromTrigger(text: payload.text)

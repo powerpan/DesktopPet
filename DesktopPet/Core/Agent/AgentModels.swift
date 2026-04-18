@@ -31,15 +31,28 @@ struct ChatChannel: Identifiable, Equatable, Codable {
 /// 条件触发旁白历史条目（持久化）。
 struct TriggerSpeechRecord: Identifiable, Equatable, Codable {
     var id: UUID
+    /// 模型返回的旁白正文（气泡与续聊上下文）。
     var text: String
     var triggerKind: AgentTriggerKind
     var createdAt: Date
+    /// 本次请求中发给模型的 user 消息全文（占位符已替换）；无模型调用（如气泡测试）为 nil。
+    var userPromptSent: String?
+
+    init(id: UUID = UUID(), text: String, triggerKind: AgentTriggerKind, createdAt: Date = Date(), userPromptSent: String? = nil) {
+        self.id = id
+        self.text = text
+        self.triggerKind = triggerKind
+        self.createdAt = createdAt
+        self.userPromptSent = userPromptSent
+    }
 }
 
 /// 触发成功后交给 UI / 历史记录的一包数据。
 struct TriggerSpeechPayload: Equatable {
     var text: String
     var triggerKind: AgentTriggerKind
+    /// 已渲染占位符、即将作为 user 发给模型的内容；无模型调用时可为 nil。
+    var userPrompt: String?
 }
 
 enum AgentTriggerKind: String, Codable, CaseIterable, Identifiable {
@@ -133,8 +146,74 @@ enum TestBubbleSample: String, Codable, CaseIterable, Identifiable, Sendable {
 }
 
 struct AgentTriggerRule: Identifiable, Equatable, Codable {
-    /// 与 `firePrologue` 历史行为一致的默认 user 模板（含 `{extra}` 占位）。
+    /// 与 `firePrologue` 历史行为一致的通用回退 user 模板（含 `{extra}` 占位）。
     static let standardPrologueTemplate = "请用一两句简体中文，像桌宠一样对用户说点什么。{extra}"
+
+    /// 无路由命中、或磁盘上未保存默认模板时的「按触发器类型」默认 user 文案（可含 `{extra}`、`{triggerKind}`、`{matchedCondition}`、`{keySummary}`）。
+    static func defaultPromptTemplate(for kind: AgentTriggerKind) -> String {
+        switch kind {
+        case .timer:
+            return """
+            定时铃响了，又到了可以陪用户说一句话的片刻。{extra}
+            请用一两句简体中文，像桌宠一样轻松问好：可以好奇 Ta 刚刚在忙什么、要不要喝水或伸懒腰，不要写列表或长篇。
+            """
+        case .randomIdle:
+            return """
+            用户已经安静了一阵，也许离开键盘或在发呆。{extra}
+            请用一两句简体中文，像桌宠一样温柔搭话：轻声问要不要休息一下、看看远处或活动肩颈，语气俏皮不写小作文。
+            """
+        case .keyboardPattern:
+            return """
+            这是「键盘模式」触发的旁白请求；若没有更细的路由命中，说明只走了基础匹配。{extra}
+            请用一两句简体中文像桌宠一样接话：若内容可能涉及密码或隐私，要温和提醒保护好自己、避免泄露；否则可爱随聊即可。
+            """
+        case .frontApp:
+            return """
+            用户刚刚切换了前台应用。{extra}
+            请用一两句简体中文，像桌宠一样对「正在用哪类软件」开个轻松玩笑或祝 Ta 专注愉快，不要捏造具体窗口内容或敏感数据。触发类型：{triggerKind}
+            """
+        case .screenSnap:
+            return """
+            （截屏类触发仍为规划能力，当前不会真的截屏或读画面。）{extra}
+            请用一两句简体中文像桌宠一样打个招呼即可，勿假定已看到用户屏幕。触发类型：{triggerKind}
+            """
+        case .bubbleTest:
+            return standardPrologueTemplate
+        }
+    }
+
+    /// 用户点击「添加旁白路由」时，新路由 `promptTemplate` 的初值（偏「本条条件命中」场景，仍支持占位符）。
+    static func newRoutePromptTemplate(for kind: AgentTriggerKind) -> String {
+        switch kind {
+        case .timer:
+            return """
+            本条路由条件满足时，定时间隔已到。{extra}
+            请用一两句简体中文像桌宠一样问候用户；可结合「定时」开个小玩笑，不要冗长。
+            """
+        case .randomIdle:
+            return """
+            本条路由条件满足时，用户已空闲足够久。{extra}
+            请用一两句简体中文像桌宠一样轻声闲聊，鼓励适当放松，语气暖。
+            """
+        case .keyboardPattern:
+            return """
+            本条键盘旁白路由已命中。条件概要：{matchedCondition}。{extra}
+            请用一两句简体中文像桌宠一样接话；若与密码、账号或隐私相关，请温柔提醒防泄露与截图风险，不要说教。
+            """
+        case .frontApp:
+            return """
+            本条前台旁白路由已命中。条件概要：{matchedCondition}。{extra}
+            请用一两句简体中文像桌宠一样对用户刚切到的应用氛围随口调侃或加油，不编造应用内隐私细节。
+            """
+        case .screenSnap:
+            return """
+            （截屏能力占位。）本路由条件：{matchedCondition}。{extra}
+            请用一两句简体中文像桌宠一样简短回应，勿假设已取得屏幕或图像内容。
+            """
+        case .bubbleTest:
+            return standardPrologueTemplate
+        }
+    }
 
     var id: UUID
     var enabled: Bool
@@ -246,12 +325,12 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
     ) -> (routes: [TriggerPromptRoute], defaultPromptTemplate: String) {
         guard routes.isEmpty else {
             let def = defaultPromptTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? Self.standardPrologueTemplate
+                ? Self.defaultPromptTemplate(for: kind)
                 : defaultPromptTemplate
             return (routes, def)
         }
         let def = defaultPromptTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? Self.standardPrologueTemplate
+            ? Self.defaultPromptTemplate(for: kind)
             : defaultPromptTemplate
         switch kind {
         case .keyboardPattern:
@@ -286,13 +365,14 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
     }
 
     static func new(kind: AgentTriggerKind) -> AgentTriggerRule {
-        let std = Self.standardPrologueTemplate
+        let def = Self.defaultPromptTemplate(for: kind)
+        let routeTmpl = Self.newRoutePromptTemplate(for: kind)
         let defaultRoutes: [TriggerPromptRoute]
         let kbd: String
         let front: String
         switch kind {
         case .timer, .randomIdle, .screenSnap:
-            defaultRoutes = [TriggerPromptRoute(enabled: true, priority: 0, conditions: [.always], promptTemplate: std)]
+            defaultRoutes = [TriggerPromptRoute(enabled: true, priority: 0, conditions: [.always], promptTemplate: routeTmpl)]
             kbd = ""
             front = ""
         case .keyboardPattern:
@@ -303,7 +383,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             kbd = ""
             front = "Xcode"
             defaultRoutes = [
-                TriggerPromptRoute(enabled: true, priority: 0, conditions: [.frontAppContains("Xcode")], promptTemplate: std),
+                TriggerPromptRoute(enabled: true, priority: 0, conditions: [.frontAppContains("Xcode")], promptTemplate: routeTmpl),
             ]
         case .bubbleTest:
             defaultRoutes = []
@@ -323,7 +403,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             frontAppNameContains: front,
             testBubbleSample: .short,
             routes: defaultRoutes,
-            defaultPromptTemplate: std
+            defaultPromptTemplate: def
         )
     }
 }

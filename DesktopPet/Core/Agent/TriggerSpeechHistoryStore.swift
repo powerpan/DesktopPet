@@ -21,10 +21,17 @@ final class TriggerSpeechHistoryStore: ObservableObject {
         load()
     }
 
-    func append(text: String, kind: AgentTriggerKind) {
+    func append(text: String, kind: AgentTriggerKind, userPrompt: String? = nil) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return }
-        let r = TriggerSpeechRecord(id: UUID(), text: t, triggerKind: kind, createdAt: Date())
+        let prompt = userPrompt?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let r = TriggerSpeechRecord(
+            id: UUID(),
+            text: t,
+            triggerKind: kind,
+            createdAt: Date(),
+            userPromptSent: (prompt?.isEmpty == false) ? prompt : nil
+        )
         records.insert(r, at: 0)
         if records.count > maxRecords {
             records = Array(records.prefix(maxRecords))

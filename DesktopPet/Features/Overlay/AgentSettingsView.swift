@@ -16,6 +16,7 @@ struct AgentSettingsView: View {
     @AppStorage("DesktopPet.agent.keyboardMasterRiskAcknowledged") private var keyboardRiskAcknowledged = false
     @State private var showConversationChannelsSheet = false
     @State private var showTriggerSpeechHistorySheet = false
+    @State private var showTriggerUserPromptHistorySheet = false
 
     var body: some View {
         TabView {
@@ -124,6 +125,9 @@ struct AgentSettingsView: View {
                 Button("查看条件触发旁白历史…") {
                     showTriggerSpeechHistorySheet = true
                 }
+                Button("查看触发器发给模型的请求…") {
+                    showTriggerUserPromptHistorySheet = true
+                }
                 Button("清空当前频道消息") {
                     session.clearSession()
                 }
@@ -136,7 +140,7 @@ struct AgentSettingsView: View {
             } header: {
                 Text("会话与历史")
             } footer: {
-                Text("多会话频道与消息保存在 UserDefaults；「清空当前频道」只影响当前选中会话。「旁白历史」记录条件触发文案（最多约 200 条）。重置会话会删除所有频道并恢复为单一空会话。在频道表中进入某频道可浏览全部消息，并可一键切回该频道并打开对话面板。")
+                Text("多会话频道与消息保存在 UserDefaults；「清空当前频道」只影响当前选中会话。「旁白历史」记录模型返回的旁白正文；「发给模型的请求」记录同一次触发里作为 user 发给大模型的全文（占位符已替换，最多约 200 条与旁白历史共用条数）。清空旁白历史会同时清空这两类展示所依赖的数据。重置会话会删除所有频道并恢复为单一空会话。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -149,6 +153,10 @@ struct AgentSettingsView: View {
         }
         .sheet(isPresented: $showTriggerSpeechHistorySheet) {
             TriggerSpeechHistoryListSheet(isPresented: $showTriggerSpeechHistorySheet)
+                .environmentObject(session)
+        }
+        .sheet(isPresented: $showTriggerUserPromptHistorySheet) {
+            TriggerUserPromptHistorySheet(isPresented: $showTriggerUserPromptHistorySheet)
                 .environmentObject(session)
         }
     }
@@ -344,6 +352,29 @@ private struct TriggerRuleRow: View {
     }
 }
 
+/// 旁白请求模板中占位符的说明（默认模板与单条路由模板共用）。
+private struct PromptPlaceholderHelp: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("占位符（须一字不差、含花括号）可在模板任意位置插入；未写的占位符不会出现在最终发给模型的文字里。")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("· {extra} — 由应用自动拼好的一段「场景说明」：固定带有「（系统触发：某某类型）」；若你在「隐私」里打开了「附带键入摘要」，也会把截断后的键位摘要接在这同一段后面。建议保留，方便模型知道是谁在触发。")
+                Text("· {triggerKind} — 替换为当前规则的类型中文名，例如「键盘模式」「定时」「随机空闲」。")
+                Text("· {matchedCondition} — 替换为本次命中的那条旁白路由的条件摘要（例如「按键含「abc」且 空闲≥120s」），便于模型理解命中分支。")
+                Text("· {keySummary} — 仅键入摘要的短片段（与 {extra} 里可能带的摘要同源）；未开「附带键入摘要」时为空字符串。适合在模板中间单独引用摘要、而不想整段复述 {extra} 时使用。")
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            Text("示例：「用户可能刚输入了敏感内容。{extra} 请用两句简体中文温柔提醒。」若不写任何占位符，则整段模板会原样作为 user 消息发送。")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 private struct TriggerRuleEditorSheet: View {
     @State var rule: AgentTriggerRule
     @EnvironmentObject private var settings: AgentSettingsStore
@@ -378,10 +409,11 @@ private struct TriggerRuleEditorSheet: View {
                         TextEditor(text: $rule.defaultPromptTemplate)
                             .font(.body)
                             .frame(minHeight: 72)
+                        PromptPlaceholderHelp()
                     } header: {
                         Text("默认旁白请求（无路由命中）")
                     } footer: {
-                        Text("发给模型的一条 user 消息模板。占位符：`{extra}`（系统触发说明等）、`{triggerKind}`、`{matchedCondition}`、`{keySummary}`（需打开键入摘要）。留空则使用内置默认。")
+                        Text("发给模型的一条 user 消息（user role）。当没有任何旁白路由的条件被满足时，使用本模板。整段留空则使用应用内置默认句式。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -410,15 +442,26 @@ private struct TriggerRuleEditorSheet: View {
                                 Button("编辑") {
                                     editingRouteIndex = index
                                 }
+                                Button {
+                                    removeRoute(at: index)
+                                } label: {
+                                    Image(systemName: "trash")
+                                }
+                                .buttonStyle(.borderless)
+                                .foregroundStyle(.red)
+                                .help("删除此旁白路由")
+                                .accessibilityLabel("删除此旁白路由")
                             }
                         }
                         .onDelete { idx in
-                            rule.routes.remove(atOffsets: idx)
+                            for i in idx.sorted(by: >) {
+                                removeRoute(at: i)
+                            }
                         }
 
                         Button("添加旁白路由") {
                             let nextP = (rule.routes.map(\.priority).max() ?? 0) + 1
-                            let tmpl = AgentTriggerRule.standardPrologueTemplate
+                            let tmpl = AgentTriggerRule.newRoutePromptTemplate(for: rule.kind)
                             let conds: [TriggerRouteCondition] = {
                                 switch rule.kind {
                                 case .keyboardPattern: return [.keyboardContains("")]
@@ -447,10 +490,13 @@ private struct TriggerRuleEditorSheet: View {
                     } header: {
                         Text("旁白路由（优先级高先匹配）")
                     } footer: {
-                        Text("每条路由内多个条件为 AND。键盘类路由至少包含一个「按键包含」条件，否则不会匹配。同一次触发只选用一条路由的提示语。")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("每条路由内多个条件为 AND。键盘类路由至少包含一个「按键包含」且子串非空，否则不会匹配。同一次触发只选用一条路由的提示语。")
+                            Text("删除：点每行右侧废纸篓；macOS 分组表单里左滑删除往往不可用。")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
 
@@ -581,6 +627,19 @@ private struct TriggerRuleEditorSheet: View {
         .frame(minWidth: 400, minHeight: 360)
     }
 
+    /// 删除旁白路由并修正正在编辑的 sheet 下标，避免索引错乱。
+    private func removeRoute(at index: Int) {
+        guard rule.routes.indices.contains(index) else { return }
+        rule.routes.remove(at: index)
+        if let ei = editingRouteIndex {
+            if ei == index {
+                editingRouteIndex = nil
+            } else if ei > index {
+                editingRouteIndex = ei - 1
+            }
+        }
+    }
+
     private func routeSummary(_ route: TriggerPromptRoute) -> String {
         let cond = route.conditions.isEmpty
             ? "（无条件）"
@@ -660,10 +719,11 @@ private struct TriggerPromptRouteEditorSheet: View {
                     TextEditor(text: $draft.promptTemplate)
                         .font(.body)
                         .frame(minHeight: 120)
+                    PromptPlaceholderHelp()
                 } header: {
                     Text("本路由发给模型的 user 模板")
                 } footer: {
-                    Text("占位符：`{extra}`、`{triggerKind}`、`{matchedCondition}`、`{keySummary}`。空内容将回退到规则级默认模板。")
+                    Text("若本路由模板整段留空，触发时会回退到上方的「默认旁白请求」模板。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -703,6 +763,14 @@ private struct TriggerPromptRouteEditorSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
+                }
+                ToolbarItem(placement: .destructiveAction) {
+                    Button("删除本路由", role: .destructive) {
+                        if rule.routes.indices.contains(routeIndex) {
+                            rule.routes.remove(at: routeIndex)
+                        }
+                        dismiss()
+                    }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") {

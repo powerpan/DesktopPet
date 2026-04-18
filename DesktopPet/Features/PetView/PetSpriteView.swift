@@ -27,7 +27,7 @@ struct PetSpriteView: View {
             let deskMirrorLayoutWidth = max(28, side - padLeading - padTrailing)
 
             VStack(alignment: .leading, spacing: max(3, 5 * u)) {
-                Text("七七猫1.0")
+                Text("七七猫2.0")
                     .font(.system(size: max(8, 11 * u), weight: .medium, design: .rounded))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)

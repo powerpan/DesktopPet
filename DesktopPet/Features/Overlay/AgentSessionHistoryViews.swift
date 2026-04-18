@@ -145,6 +145,16 @@ struct TriggerSpeechHistoryListSheet: View {
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
+                            if let req = r.userPromptSent, !req.isEmpty {
+                                Text("发给模型的 user")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                Text(req)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                                    .lineLimit(4)
+                            }
                             Text(r.text)
                                 .font(.body)
                                 .textSelection(.enabled)
@@ -163,12 +173,76 @@ struct TriggerSpeechHistoryListSheet: View {
         .frame(minWidth: 440, minHeight: 480)
     }
 
-    private static func shortDate(_ d: Date) -> String {
+    fileprivate static func shortDate(_ d: Date) -> String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "zh_CN")
         f.dateStyle = .short
         f.timeStyle = .medium
         return f.string(from: d)
+    }
+}
+
+// MARK: - 触发器发给模型的 user 请求历史
+
+struct TriggerUserPromptHistorySheet: View {
+    @EnvironmentObject private var session: AgentSessionStore
+    @Binding var isPresented: Bool
+
+    private var entries: [TriggerSpeechRecord] {
+        session.triggerHistory.records.filter { ($0.userPromptSent?.isEmpty == false) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if entries.isEmpty {
+                    ContentUnavailableView(
+                        "暂无请求记录",
+                        systemImage: "text.document",
+                        description: Text("仅「经过大模型」的条件旁白会保存本条。气泡测试不请求模型；若升级前产生的旧旁白历史也可能没有请求正文。")
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List(entries) { r in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text(r.triggerKind.displayName)
+                                    .font(.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 2)
+                                    .background(.quaternary, in: Capsule())
+                                Spacer()
+                                Text(TriggerSpeechHistoryListSheet.shortDate(r.createdAt))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let p = r.userPromptSent {
+                                Text(p)
+                                    .font(.body)
+                                    .textSelection(.enabled)
+                            }
+                            Divider()
+                            Text("模型返回的旁白（同一条记录）")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                            Text(r.text)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                                .lineLimit(3)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+            .navigationTitle("触发器发给模型的请求")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") { isPresented = false }
+                }
+            }
+        }
+        .frame(minWidth: 440, minHeight: 480)
     }
 }
 
