@@ -30,8 +30,10 @@ struct TriggerSpeechBubbleView: View {
                 .offset(y: -1)
         }
         .background(Color.clear)
+        // 先栅格化为带透明度的位图，避免透明 NSPanel 里未绘制像素被合成黑色直角底板。
+        .drawingGroup(opaque: false)
         .compositingGroup()
-        .shadow(color: .black.opacity(0.2), radius: 9, y: 3)
+        .shadow(color: .black.opacity(0.22), radius: 10, y: 4)
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
     }

@@ -162,7 +162,9 @@ final class ExtensionOverlayController {
         // 先给足够大的临时尺寸以便 SwiftUI 算出紧凑的 fittingSize；最终框由 layoutTriggerBubble 决定。
         hosting.setFrameSize(NSSize(width: 360, height: 400))
         hosting.wantsLayer = true
+        hosting.layer?.isOpaque = false
         hosting.layer?.backgroundColor = NSColor.clear.cgColor
+        hosting.layer?.masksToBounds = false
         panel.contentView = hosting
         panel.alphaValue = 1
         panel.orderFrontRegardless()
@@ -196,7 +198,9 @@ final class ExtensionOverlayController {
         p.level = .floating
         p.backgroundColor = .clear
         p.isOpaque = false
-        p.hasShadow = true
+        // 系统按窗体矩形画阴影时，透明气泡四角常出现深色「直角框」；阴影改由 SwiftUI 绘制。
+        p.hasShadow = false
+        p.titlebarAppearsTransparent = true
         p.isReleasedWhenClosed = false
         p.isRestorable = false
         p.hidesOnDeactivate = false
