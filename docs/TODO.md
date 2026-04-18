@@ -2,14 +2,23 @@
 
 > 与 `docs/requirements.md` 目标对照后的缺口清单；完成项请勾掉并可在 PR 中注明。
 
+## 产品方向（与当前实现对齐）
+
+- **默认**：宠物卡片内为**桌前键盘 + 鼠标垫镜像**（`PetSpriteView` / `DeskMirrorTextView` 等），不依赖序列帧资源即可用。
+- **拖动窗口时**：切换为**猫猫动作序列**（序列帧或 GIF 先打通一种）；松手拖回桌镜 UI。
+- **注意**：巡逻、`petScale` 缩放等会**程序化 `setFrame`**，需与用户拖窗区分（见中优先级「拖动静默」），避免拖一半误切桌镜或误播动画。
+
 ## 高优先级
 
-- [ ] **真实动画管线**：用序列帧或 GIF（先打通一种状态即可）替换 `PetAnimationDriver` 占位大字；与 `PetStateMachine` 状态绑定播放/循环。
-- [ ] **资源目录**：按 PRD 建立 `Resources/Animations/`（idle、walk、keytap、jump、sleep 等）与加载路径；缺失时降级提示。
+- [ ] **拖窗检测 + 展示切换**：`PetWindow` / `PetWindowController`（或 `NSWindowDelegate`）维护「用户正在拖动」状态（`ObservableObject` / `Environment` 注入 `PetContainerView`）；`PetSpriteView` 按状态在 **桌镜根布局** 与 **动画视图** 间切换。
+- [ ] **拖动专用动画管线**：首版只需 **一套循环序列**（如 `drag_loop`）；用 `Timer`/`TimelineView`/`Image` 轮播或 `NSImage` 绑定；缺失资源时降级为当前大字/占位图。
+- [ ] **资源与加载路径**：在工程内增加 **`DesktopPet/Resources/Animations/`**（或 Xcode **Folder Reference** 指向该目录），首版子目录示例：`Drag/` 下放 `frame_0001.png` … 或单文件 `drag.gif`；**不必**先铺满 `idle/walk/keyTap` 全状态。`Assets.xcassets` 继续留给 **App Icon / AccentColor**；大量帧图优先放 **Bundle 子目录** 以免 asset catalog 臃肿。
+- [ ] **与状态机的关系（二期）**：巡逻 `walk`、敲击 `keyTap` 等是否也在非桌镜模式下播动画，与「仅拖窗播」可拆分里程碑；`PetAnimationDriver` 可演进为「桌镜文案 + 资源名映射」的薄层。
 - [ ] **单元测试**：新增 Test 目标；至少覆盖 `PetStateMachine` 迁移、巡逻边界/可见区、`PetConfig.exteriorHitSide` 与缩放锚点相关逻辑（可选）。
 
 ## 中优先级
 
+- [ ] **拖动静默与程序化位移**：`applyWindowSize` / `nudgePatrolStep` 打标期间不视为用户拖动；必要时在 `setFrame` 前后短暂屏蔽 `windowDidMove` 推断。
 - [ ] **鼠标互动打磨**：按距离、速度、停留时间细化触发阈值；验收「接近/远离自然、无高频抖动」（PRD F3）。
 - [ ] **巡逻与 walk**：巡逻节奏与 `walk` 状态/动画语义对齐；巡逻间隔可进设置（当前多为常量）。
 - [ ] **无辅助功能降级**：明确无权限时的行为（仅本地键、仅菜单提示等）并写进 README/PRD。
