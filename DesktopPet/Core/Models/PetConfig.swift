@@ -34,10 +34,10 @@ struct PetConfig {
         return petCanvasLayoutPoints * s * visualBaselineFactor
     }
 
-    /// 窗口与 `PetRootContainerView.hitClipSidePoints`：`petLayoutSide` + **slack**（舍入与右上角按钮），并设最小边长。
+    /// 窗口与 `PetRootContainerView.hitClipSidePoints`：`petLayoutSide` + **slack**（舍入、右上角按钮、圆角抗锯齿与缩放时内容边距），避免裁切圆角。
     static func exteriorHitSide(scale: Double) -> CGFloat {
         let visualSide = petLayoutSide(scale: scale)
-        let slack: CGFloat = 6
+        let slack: CGFloat = 14
         return max(72, ceil(visualSide + slack))
     }
 }

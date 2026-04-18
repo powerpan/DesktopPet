@@ -35,6 +35,5 @@ struct PetContainerView: View {
     return PetContainerView()
         .environmentObject(SettingsViewModel())
         .environmentObject(PetStateMachine())
-        .environmentObject(PointerTrackingModel())
         .environmentObject(desk)
 }

@@ -16,7 +16,6 @@ final class AppCoordinator: ObservableObject {
     let stateMachine = PetStateMachine()
     let patrolScheduler = PatrolScheduler()
     let settingsViewModel = SettingsViewModel()
-    let pointerTrackingModel = PointerTrackingModel()
     let deskMirrorModel = DeskMirrorModel()
 
     private var petWindowController: PetWindowController?
@@ -72,7 +71,6 @@ final class AppCoordinator: ObservableObject {
         petWindowController?.setPetVisible(isPetVisible)
         mouseTracker.interactionSamplingEnabled = isPetVisible
         if !isPetVisible {
-            pointerTrackingModel.updateGaze(mouseScreen: .zero, petFrame: nil)
             deskMirrorModel.resetPadCursor()
         }
     }
@@ -114,7 +112,6 @@ final class AppCoordinator: ObservableObject {
         let controller = PetWindowController(
             settings: settingsViewModel,
             stateMachine: stateMachine,
-            pointer: pointerTrackingModel,
             deskMirror: deskMirrorModel
         )
         controller.showWindow(nil)
@@ -253,13 +250,6 @@ final class AppCoordinator: ObservableObject {
     private func wireMouse() {
         mouseTracker.petFrameProvider = { [weak self] in
             self?.petWindowController?.window?.frame
-        }
-        mouseTracker.onPointerScreenLocation = { [weak self] point in
-            guard let self else { return }
-            self.pointerTrackingModel.updateGaze(
-                mouseScreen: point,
-                petFrame: self.petWindowController?.window?.frame
-            )
         }
         mouseTracker.onInteraction = { [weak self] event in
             guard let self else { return }

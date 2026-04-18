@@ -31,7 +31,6 @@
 		C10000000000000000000017 /* PetRootContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000017 /* PetRootContainerView.swift */; };
 		C10000000000000000000018 /* AnimationDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000018 /* AnimationDriver.swift */; };
 		C10000000000000000000019 /* AccessibilityOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000019 /* AccessibilityOnboardingView.swift */; };
-		C10000000000000000000020 /* PointerTrackingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000020 /* PointerTrackingModel.swift */; };
 		C10000000000000000000021 /* PhysicalKeyLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000021 /* PhysicalKeyLayout.swift */; };
 		C10000000000000000000022 /* DeskMirrorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000022 /* DeskMirrorModel.swift */; };
 		C10000000000000000000023 /* DeskMirrorTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000023 /* DeskMirrorTextView.swift */; };
@@ -64,7 +63,6 @@
 		B100000000000000000000017 /* PetRootContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRootContainerView.swift; sourceTree = "<group>"; };
 		B100000000000000000000018 /* AnimationDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationDriver.swift; sourceTree = "<group>"; };
 		B100000000000000000000019 /* AccessibilityOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityOnboardingView.swift; sourceTree = "<group>"; };
-		B100000000000000000000020 /* PointerTrackingModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointerTrackingModel.swift; sourceTree = "<group>"; };
 		B100000000000000000000021 /* PhysicalKeyLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhysicalKeyLayout.swift; sourceTree = "<group>"; };
 		B100000000000000000000022 /* DeskMirrorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskMirrorModel.swift; sourceTree = "<group>"; };
 		B100000000000000000000023 /* DeskMirrorTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeskMirrorTextView.swift; sourceTree = "<group>"; };
@@ -169,7 +167,6 @@
 			children = (
 				B100000000000000000000006 /* InteractionEvent.swift */,
 				B100000000000000000000007 /* PetConfig.swift */,
-				B100000000000000000000020 /* PointerTrackingModel.swift */,
 				B100000000000000000000021 /* PhysicalKeyLayout.swift */,
 				B100000000000000000000022 /* DeskMirrorModel.swift */,
 			);
@@ -318,7 +315,6 @@
 				C10000000000000000000016 /* GlobalInputMonitor.swift in Sources */,
 				C10000000000000000000005 /* MouseTracker.swift in Sources */,
 				C10000000000000000000006 /* InteractionEvent.swift in Sources */,
-				C10000000000000000000020 /* PointerTrackingModel.swift in Sources */,
 				C10000000000000000000021 /* PhysicalKeyLayout.swift in Sources */,
 				C10000000000000000000022 /* DeskMirrorModel.swift in Sources */,
 				C10000000000000000000007 /* PetConfig.swift in Sources */,

@@ -8,22 +8,23 @@ import SwiftUI
 struct DeskMirrorTextView: View {
     @EnvironmentObject private var deskMirror: DeskMirrorModel
     @EnvironmentObject private var settings: SettingsViewModel
+    @Environment(\.petCardContentScale) private var u
 
     private let padCols = 7
     private let padRows = 5
 
     var body: some View {
-        HStack(alignment: .top, spacing: 6) {
+        HStack(alignment: .top, spacing: 6 * u) {
             keyboardBlock
             mousePadBlock
         }
-        .font(.system(.caption2, design: .monospaced))
-        .minimumScaleFactor(0.65)
+        .font(.system(size: max(7, 10 * u), design: .monospaced))
+        .minimumScaleFactor(0.55)
     }
 
     @ViewBuilder
     private var keyboardBlock: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 2 * u) {
             if !settings.isDeskKeyMirrorEnabled {
                 Text("已在设置中关闭按键镜像")
                     .foregroundStyle(.secondary)
@@ -34,7 +35,7 @@ struct DeskMirrorTextView: View {
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 ForEach(Array(PhysicalKeyLayout.keyboardRows.enumerated()), id: \.offset) { _, row in
-                    HStack(spacing: 2) {
+                    HStack(spacing: 2 * u) {
                         ForEach(Array(row.enumerated()), id: \.offset) { _, code in
                             keyCell(code: code)
                         }
@@ -42,12 +43,12 @@ struct DeskMirrorTextView: View {
                 }
                 if let code = deskMirror.highlightedKeyCode, PhysicalKeyLayout.cell(forKeyCode: code) == nil {
                     Text("其它 \(deskMirror.lastKeyLabel)")
-                        .font(.system(size: 8, design: .monospaced))
+                        .font(.system(size: max(6, 8 * u), design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
                 if !deskMirror.recentKeyLabelsSummary.isEmpty {
                     Text(deskMirror.recentKeyLabelsSummary)
-                        .font(.system(size: 8, design: .monospaced))
+                        .font(.system(size: max(6, 8 * u), design: .monospaced))
                         .foregroundStyle(.tertiary)
                         .lineLimit(2)
                 }
@@ -61,11 +62,14 @@ struct DeskMirrorTextView: View {
         let on = deskMirror.highlightedKeyCode == code
             && deskMirror.accessibilityKeyboardMirrorGranted
             && settings.isDeskKeyMirrorEnabled
+        let cellFont = max(6, 9 * u)
+        let padH = max(1, 2 * u)
+        let padV = max(0.5, 1 * u)
         return Text(label)
-            .font(.system(size: 9, weight: on ? .bold : .regular, design: .monospaced))
-            .padding(.horizontal, 2)
-            .padding(.vertical, 1)
-            .background(on ? Color.accentColor.opacity(0.35) : Color.clear, in: RoundedRectangle(cornerRadius: 3))
+            .font(.system(size: cellFont, weight: on ? .bold : .regular, design: .monospaced))
+            .padding(.horizontal, padH)
+            .padding(.vertical, padV)
+            .background(on ? Color.accentColor.opacity(0.35) : Color.clear, in: RoundedRectangle(cornerRadius: 3 * u))
     }
 
     private func shortLabel(for code: UInt16) -> String {
@@ -103,16 +107,18 @@ struct DeskMirrorTextView: View {
     }
 
     private var mousePadBlock: some View {
-        VStack(alignment: .center, spacing: 2) {
+        let cell = max(5, 7 * u)
+        let padW = CGFloat(padCols) * cell + 8 * u
+        return VStack(alignment: .center, spacing: 2 * u) {
             Text("垫")
-                .font(.system(size: 8, design: .rounded))
+                .font(.system(size: max(6, 8 * u), design: .rounded))
                 .foregroundStyle(.tertiary)
-            padGrid
+            padGrid(cellSize: cell)
         }
-        .frame(width: CGFloat(padCols) * 7 + 8)
+        .frame(width: padW)
     }
 
-    private var padGrid: some View {
+    private func padGrid(cellSize: CGFloat) -> some View {
         let nx = max(-1, min(1, deskMirror.padCursorNormalized.x))
         let ny = max(-1, min(1, deskMirror.padCursorNormalized.y))
         let cx = (nx + 1) * 0.5 * CGFloat(padCols - 1)
@@ -125,13 +131,13 @@ struct DeskMirrorTextView: View {
                 HStack(spacing: 0) {
                     ForEach(0 ..< padCols, id: \.self) { c in
                         Text(r == iy && c == ix ? "●" : "·")
-                            .frame(width: 7, height: 9)
-                            .font(.system(size: 8, weight: .medium, design: .monospaced))
+                            .frame(width: cellSize, height: cellSize * 1.15)
+                            .font(.system(size: max(6, 8 * u), weight: .medium, design: .monospaced))
                     }
                 }
             }
         }
-        .padding(4)
-        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 4))
+        .padding(4 * u)
+        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 4 * u))
     }
 }

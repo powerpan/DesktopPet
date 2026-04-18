@@ -36,7 +36,7 @@ final class PetStateMachine: ObservableObject {
             if state == .sleep {
                 transition(to: .idle)
             }
-            // 悬停只驱动 PointerTrackingModel 的注视偏移，不再改状态机，避免打断 keyTap/jump
+            // 靠近宠物窗口仅作唤醒等轻量逻辑，不再驱动画面位移，避免打断 keyTap/jump
         case .patrolRequested:
             if state == .sleep {
                 transition(to: .idle)
