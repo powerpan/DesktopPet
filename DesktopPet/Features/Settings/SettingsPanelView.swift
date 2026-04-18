@@ -1,3 +1,8 @@
+//
+// SettingsPanelView.swift
+// 系统「设置」场景中的表单：绑定 SettingsViewModel 的穿透、巡逻与缩放。
+//
+
 import SwiftUI
 
 struct SettingsPanelView: View {

@@ -1,3 +1,8 @@
+//
+// PetWindowController.swift
+// 宠物窗口控制器：组装 SwiftUI 根视图与穿透容器，负责巡逻时移动窗口、显隐与穿透开关。
+//
+
 import AppKit
 import SwiftUI
 
@@ -18,6 +23,7 @@ final class PetWindowController: NSWindowController {
         shouldCascadeWindows = false
         passthroughRoot = root
         window.isReleasedWhenClosed = false
+        // 首次出现尽量落在当前鼠标所在屏的安全区内
         let vf = ScreenGeometry.visibleFrameContainingMouse()
         if !vf.isEmpty {
             var f = window.frame
@@ -37,6 +43,7 @@ final class PetWindowController: NSWindowController {
 
     func setPassthrough(_ enabled: Bool) {
         passthroughRoot?.passthroughEnabled = enabled
+        // 穿透开启时不要用「拖背景移动」，以免与点击穿透冲突；关闭穿透则可拖窗体移动
         window?.isMovableByWindowBackground = !enabled
     }
 

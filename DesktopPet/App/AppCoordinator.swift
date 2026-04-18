@@ -1,3 +1,8 @@
+//
+// AppCoordinator.swift
+// 应用中枢：创建宠物浮动窗与权限说明窗，串联辅助功能、全局键盘、鼠标采样、巡逻、设置与宠物状态机。
+//
+
 import AppKit
 import Combine
 import Foundation
@@ -15,6 +20,7 @@ final class AppCoordinator: ObservableObject {
     private var petWindowController: PetWindowController?
     private var onboardingWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
+    /// 空闲一段时间后触发「进入睡眠」
     private var idleSleepTimer: Timer?
     private var isPetVisible = true
 
@@ -27,9 +33,11 @@ final class AppCoordinator: ObservableObject {
         wireActivationRefresh()
 
         permissionManager.refreshStatus(prompt: false)
+        // 隐藏宠物时不应因屏外鼠标产生悬停/唤醒
         mouseTracker.interactionSamplingEnabled = isPetVisible
         mouseTracker.start()
 
+        // 若用户已预先勾选辅助功能，Combine 可能不会发「从 false→true」，需主动启动监听
         if permissionManager.isGranted {
             configureGlobalInputHandlers()
             globalInput.start()
@@ -74,6 +82,7 @@ final class AppCoordinator: ObservableObject {
             window.center()
             window.isReleasedWhenClosed = false
             onboardingWindow = window
+            // 用户手动关窗后清空引用，否则无法再次从菜单打开
             NotificationCenter.default.publisher(for: NSWindow.willCloseNotification, object: window)
                 .prefix(1)
                 .sink { [weak self] _ in
@@ -136,6 +145,7 @@ final class AppCoordinator: ObservableObject {
         patrolScheduler.onPatrolTick = { [weak self] in
             guard let self else { return }
             guard self.settingsViewModel.isPatrolEnabled else { return }
+            // 隐藏时不再移动窗口，避免不可见仍在「巡逻」
             guard self.isPetVisible else { return }
             self.stateMachine.handle(.patrolRequested)
             self.petWindowController?.nudgePatrolStep(in: ScreenGeometry.visibleFrameContainingMouse())
@@ -177,6 +187,7 @@ final class AppCoordinator: ObservableObject {
             .sink { [weak self] _ in
                 guard let self else { return }
                 self.permissionManager.refreshStatus(prompt: false)
+                // 从「系统设置 → 隐私」返回后重新挂监听，避免权限刚开仍无键盘
                 if self.permissionManager.isGranted {
                     self.configureGlobalInputHandlers()
                     self.globalInput.start()
@@ -191,6 +202,7 @@ final class AppCoordinator: ObservableObject {
         idleSleepTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
             self?.stateMachine.handle(.idleTimeout)
         }
+        // 加入 common 模式，避免在滚动菜单栏等模式下计时器不触发
         if let idleSleepTimer {
             RunLoop.main.add(idleSleepTimer, forMode: .common)
         }

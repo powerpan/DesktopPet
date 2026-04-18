@@ -1,3 +1,8 @@
+//
+// AccessibilityOnboardingView.swift
+// 辅助功能说明与引导：解释为何需要权限，并提供打开系统设置、重新检测等操作。
+//
+
 import AppKit
 import SwiftUI
 

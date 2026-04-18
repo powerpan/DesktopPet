@@ -1,3 +1,8 @@
+//
+// SettingsFloatingButton.swift
+// 宠物窗口右上角小按钮：切换「鼠标穿透」开关，图标随状态变化。
+//
+
 import SwiftUI
 
 struct SettingsFloatingButton: View {

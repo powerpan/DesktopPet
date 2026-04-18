@@ -1,3 +1,8 @@
+//
+// SettingsViewModel.swift
+// 设置状态与 UserDefaults 持久化：穿透、巡逻、缩放；缩放读出后夹紧到与 Slider 一致的范围。
+//
+
 import Combine
 import Foundation
 import SwiftUI
@@ -37,6 +42,7 @@ final class SettingsViewModel: ObservableObject {
         }
         petScale = min(max(petScale, 0.6), 1.8)
 
+        // 跳过首帧，避免 init 时把默认值再写回磁盘
         $isClickThroughEnabled
             .dropFirst()
             .sink { [weak self] value in

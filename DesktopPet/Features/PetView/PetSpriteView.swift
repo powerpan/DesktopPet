@@ -1,3 +1,8 @@
+//
+// PetSpriteView.swift
+// 宠物画面占位：根据状态机显示大字状态标题（后续可换成精灵图或动画视图）。
+//
+
 import SwiftUI
 
 struct PetSpriteView: View {
