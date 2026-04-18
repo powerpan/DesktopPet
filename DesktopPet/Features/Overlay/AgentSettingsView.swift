@@ -584,11 +584,15 @@ struct AgentSettingsView: View {
         }
         let at = Date()
         let recentCodes = petCare.state.recentDecayEvents.prefix(20).map(\.reasonCode)
+        let recentTexts = petCare.state.recentDecayEvents.prefix(12).map(\.reasonText)
+        let creativitySeed = Int.random(in: 0 ..< 1_000_000)
         let user = PetGrowthAI.buildUserPrompt(
             hourStart: at,
             mood: petCare.state.mood,
             energy: petCare.state.energy,
             recentEventCodes: recentCodes,
+            recentReasonTexts: recentTexts,
+            creativitySeed: creativitySeed,
             localTemplateSummary: PetGrowthAI.localTemplateSummaryForPrompt()
         )
         let key = KeychainStore.readAPIKey()
@@ -600,13 +604,13 @@ struct AgentSettingsView: View {
                 apiKey: key,
                 systemPrompt: "你只输出 JSON。不要输出任何其它字符。",
                 messages: messages,
-                temperature: 0.85,
+                temperature: 1.08,
                 maxTokens: 512
             )
             if let parsed = PetGrowthAI.parseEvents(from: text), let ev = parsed.first {
                 let h = Calendar.current.component(.hour, from: at)
                 growthDebugRandomPreview = """
-                [AI 试跑 · 已解析]
+                [AI 试跑 · 已解析] seed=\(creativitySeed)
                 请求时刻本地小时=\(h)
                 code=\(ev.reasonCode)
                 \(ev.reasonText)
