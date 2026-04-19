@@ -23,6 +23,9 @@ final class SlackSyncController: ObservableObject {
     private var pollTask: Task<Void, Never>?
     private var outboundObserver: NSObjectProtocol?
     private weak var sessionRef: AgentSessionStore?
+    private weak var screenWatchTasksRef: ScreenWatchTaskStore?
+    private weak var agentClientRef: AgentClient?
+    private weak var agentSettingsRef: AgentSettingsStore?
     private var dedupTs: [String] = []
     private var backoffSeconds: Double = 0
     private let maxDedup = 800
@@ -73,8 +76,16 @@ final class SlackSyncController: ObservableObject {
         statusMessage = "已绑定：Slack \(sid) → 本地会话。"
     }
 
-    func start(session: AgentSessionStore) {
+    func start(
+        session: AgentSessionStore,
+        screenWatchTasks: ScreenWatchTaskStore,
+        agentClient: AgentClient,
+        agentSettings: AgentSettingsStore
+    ) {
         sessionRef = session
+        screenWatchTasksRef = screenWatchTasks
+        agentClientRef = agentClient
+        agentSettingsRef = agentSettings
         pollTask?.cancel()
         outboundObserver = NotificationCenter.default.addObserver(
             forName: .desktopPetConversationDidAppendMessage,
@@ -99,6 +110,20 @@ final class SlackSyncController: ObservableObject {
             self.outboundObserver = nil
         }
         sessionRef = nil
+        screenWatchTasksRef = nil
+        agentClientRef = nil
+        agentSettingsRef = nil
+    }
+
+    /// 盯屏命中等：在指定频道发帖，可选挂在 `thread_ts` 下。
+    func postSlackThreadReply(channelId: String, threadTs: String?, text: String) async {
+        guard integrationConfig.enabled else { return }
+        guard let token = KeychainStore.readSlackBotToken(), !token.isEmpty else { return }
+        do {
+            _ = try await SlackWebAPI.chatPostMessage(token: token, channel: channelId, text: text, threadTs: threadTs)
+        } catch {
+            statusMessage = "Slack 发送失败：\(error.localizedDescription)"
+        }
     }
 
     // MARK: - Persistence
@@ -269,11 +294,115 @@ final class SlackSyncController: ObservableObject {
             return
         }
 
+        if await handlePetWatchSlackMessage(raw: raw, slackTs: slackTs, slackChannelId: slackChannelId, session: session) {
+            return
+        }
+
         guard let binding = bindings.first(where: { $0.slackChannelId == slackChannelId }) else {
             statusMessage = "收到 Slack 消息但未绑定本地频道，请在「集成」中绑定或使用 `!pet new 标题`。"
             return
         }
         session.appendSlackInboundUser(channelId: binding.localChannelId, text: raw, slackTs: slackTs, slackChannelId: slackChannelId)
+    }
+
+    /// Slack 盯屏：`!pet watch` / `!pet 盯屏` 或自然语言；仅 OCR + 可选模型兜底（无亮度启发式）。无需已绑定本地会话也会在原帖下回复确认。
+    private func handlePetWatchSlackMessage(
+        raw: String,
+        slackTs: String,
+        slackChannelId: String,
+        session: AgentSessionStore
+    ) async -> Bool {
+        guard integrationConfig.enabled, integrationConfig.syncInbound else { return false }
+        guard let tasks = screenWatchTasksRef else { return false }
+
+        let draft: SlackPetWatchDraft?
+        if let q = SlackPetWatchCommand.parseQuickCommand(raw) {
+            draft = q
+        } else if SlackPetWatchCommand.shouldAttemptNaturalLanguageParse(raw) {
+            draft = await resolveWatchDraftWithModel(userRaw: raw)
+        } else {
+            draft = nil
+        }
+        guard let d = draft else { return false }
+
+        let ocr = d.ocrSubstring.trimmingCharacters(in: .whitespacesAndNewlines)
+        let vision = d.visionUserHint.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !ocr.isEmpty || !vision.isEmpty else { return false }
+
+        var conditions: [ScreenWatchCondition] = []
+        if !ocr.isEmpty {
+            conditions.append(.ocrContains(text: ocr, caseInsensitive: true))
+        }
+        let useVision = !vision.isEmpty
+
+        let finalTitle: String = {
+            let t = d.taskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !t.isEmpty { return t }
+            if !ocr.isEmpty, vision.isEmpty { return "Slack盯屏：\(ocr)" }
+            if ocr.isEmpty, !vision.isEmpty { return "Slack盯屏（模型）" }
+            return "Slack盯屏"
+        }()
+
+        let task = ScreenWatchTask(
+            title: finalTitle,
+            isEnabled: true,
+            sampleIntervalSeconds: 3,
+            conditions: conditions,
+            useVisionFallback: useVision,
+            visionUserHint: vision,
+            visionFallbackCooldownSeconds: 30,
+            repeatAfterHit: false,
+            repeatCooldownSeconds: 60,
+            creationSource: .slackAutomated,
+            slackReportChannelId: slackChannelId,
+            slackReportThreadTs: slackTs
+        )
+        tasks.upsert(task)
+
+        var ack = "🐱 已为你创建盯屏任务「\(finalTitle)」（猫猫自动）。"
+        if !ocr.isEmpty { ack += "\n· OCR 包含：\(ocr)" }
+        if useVision { ack += "\n· 已开模型兜底（截图 YES/NO）。" } else { ack += "\n· 未开模型兜底（仅 OCR）。" }
+        ack += "\n命中后我会在此线程回复你。"
+        await postSlackThreadReply(channelId: slackChannelId, threadTs: slackTs, text: ack)
+
+        if let binding = bindings.first(where: { $0.slackChannelId == slackChannelId }) {
+            session.appendSystemNoticeInChannel(
+                channelId: binding.localChannelId,
+                text: "（Slack）猫猫已创建盯屏任务「\(finalTitle)」，仅 OCR\(useVision ? "+模型兜底" : "")。"
+            )
+        }
+        statusMessage = "已从 Slack 创建盯屏任务「\(finalTitle)」。"
+        return true
+    }
+
+    private func resolveWatchDraftWithModel(userRaw: String) async -> SlackPetWatchDraft? {
+        guard let client = agentClientRef, let settings = agentSettingsRef else { return nil }
+        let key = KeychainStore.readAPIKey(forProvider: settings.activeAPIProvider)
+        guard let key, !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let sys = """
+        你是解析器。用户通过 Slack 让桌宠「盯屏」：根据 Mac 主屏截图判断是否出现某文字（OCR），和/或用多模态模型根据截图判断是否满足某描述。
+        只输出一个 JSON 对象，不要 markdown，不要解释。字段：
+        - create (bool): 用户是否在请求盯屏、看着/盯着屏幕、留意界面变化、进度是否完成、是否出现某字样等。
+        - taskTitle (string): 短标题（中文优先，≤40字）。
+        - ocrSubstring (string): 若用户关心屏幕上是否出现某固定文字，填子串；否则空串。
+        - visionUserHint (string): 若需要看图才能判断（如训练是否完成、界面是否处于某状态），写成给多模态模型的简短判断说明（中文）；否则空串。
+        重要：用户说「进度条满了/走完/到 100%/加载完成」等依赖条形区域视觉、又无稳定可 OCR 的固定短语文案时，必须把判定要求写进 visionUserHint（例如「主屏当前焦点窗口里，主要进度条是否已明显填满或接近完成」），不要留空；ocrSubstring 可留空。
+        当 create 为 true 时，ocrSubstring 与 visionUserHint 至少一项非空；否则 create 为 false。
+        """
+        do {
+            let reply = try await client.completeChat(
+                baseURL: settings.baseURL,
+                model: settings.model,
+                apiKey: key,
+                systemPrompt: sys,
+                messages: [["role": "user", "content": userRaw]],
+                temperature: 0.1,
+                maxTokens: 400
+            )
+            return SlackPetWatchCommand.draftFromModelJSON(reply)
+        } catch {
+            return nil
+        }
     }
 
     // MARK: - Outbound
@@ -295,7 +424,7 @@ final class SlackSyncController: ObservableObject {
         let prefix = role == "user" ? "🐱 用户" : "🐱 猫猫"
         let outbound = "\(prefix)：\(text)"
         do {
-            let data = try await SlackWebAPI.chatPostMessage(token: token, channel: binding.slackChannelId, text: outbound)
+            let data = try await SlackWebAPI.chatPostMessage(token: token, channel: binding.slackChannelId, text: outbound, threadTs: nil)
             let dec = JSONDecoder()
             dec.keyDecodingStrategy = .convertFromSnakeCase
             let env = try dec.decode(SlackChatPostEnvelope.self, from: data)
@@ -385,12 +514,15 @@ private enum SlackWebAPI {
         return data
     }
 
-    static func chatPostMessage(token: String, channel: String, text: String) async throws -> Data {
+    static func chatPostMessage(token: String, channel: String, text: String, threadTs: String? = nil) async throws -> Data {
         var req = URLRequest(url: URL(string: "https://slack.com/api/chat.postMessage")!)
         req.httpMethod = "POST"
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
-        let body: [String: Any] = ["channel": channel, "text": text]
+        var body: [String: Any] = ["channel": channel, "text": text]
+        if let ts = threadTs?.trimmingCharacters(in: .whitespacesAndNewlines), !ts.isEmpty {
+            body["thread_ts"] = ts
+        }
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, resp) = try await URLSession.shared.data(for: req)
         if let http = resp as? HTTPURLResponse, http.statusCode == 429 {

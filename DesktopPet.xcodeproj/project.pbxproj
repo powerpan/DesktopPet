@@ -55,6 +55,7 @@
 		C10000000000000000000034 /* TriggerSpeechHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000034 /* TriggerSpeechHistoryStore.swift */; };
 		C10000000000000000000035 /* AgentSessionHistoryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000035 /* AgentSessionHistoryViews.swift */; };
 		C10000000000000000000046 /* MainScreenRegionPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000046 /* MainScreenRegionPicker.swift */; };
+		C10000000000000000000047 /* ScreenWatchTaskEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000047 /* ScreenWatchTaskEditorSheet.swift */; };
 		C10000000000000000000036 /* PetGrowthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000036 /* PetGrowthModels.swift */; };
 		C10000000000000000000037 /* PetLocalGrowthEventPool.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000037 /* PetLocalGrowthEventPool.swift */; };
 		C10000000000000000000038 /* PetDecayEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000038 /* PetDecayEngine.swift */; };
@@ -63,6 +64,7 @@
 		C1000000000000000000003B /* TriggerSpeechSnapshotStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003B /* TriggerSpeechSnapshotStorage.swift */; };
 		C10000000000000000000041 /* SlackTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000041 /* SlackTypes.swift */; };
 		C10000000000000000000042 /* SlackSyncController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000042 /* SlackSyncController.swift */; };
+		C10000000000000000000048 /* SlackPetWatchCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000048 /* SlackPetWatchCommand.swift */; };
 		C10000000000000000000043 /* ScreenWatchPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000043 /* ScreenWatchPersistence.swift */; };
 		C10000000000000000000044 /* ScreenWatchDetectors.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000044 /* ScreenWatchDetectors.swift */; };
 		C10000000000000000000045 /* ScreenWatchRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000045 /* ScreenWatchRunner.swift */; };
@@ -118,6 +120,7 @@
 		B100000000000000000000034 /* TriggerSpeechHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriggerSpeechHistoryStore.swift; sourceTree = "<group>"; };
 		B100000000000000000000035 /* AgentSessionHistoryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSessionHistoryViews.swift; sourceTree = "<group>"; };
 		B100000000000000000000046 /* MainScreenRegionPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainScreenRegionPicker.swift; sourceTree = "<group>"; };
+		B100000000000000000000047 /* ScreenWatchTaskEditorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenWatchTaskEditorSheet.swift; sourceTree = "<group>"; };
 		B100000000000000000000036 /* PetGrowthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetGrowthModels.swift; sourceTree = "<group>"; };
 		B100000000000000000000037 /* PetLocalGrowthEventPool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetLocalGrowthEventPool.swift; sourceTree = "<group>"; };
 		B100000000000000000000038 /* PetDecayEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetDecayEngine.swift; sourceTree = "<group>"; };
@@ -126,6 +129,7 @@
 		B10000000000000000000003B /* TriggerSpeechSnapshotStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriggerSpeechSnapshotStorage.swift; sourceTree = "<group>"; };
 		B100000000000000000000041 /* SlackTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackTypes.swift; sourceTree = "<group>"; };
 		B100000000000000000000042 /* SlackSyncController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackSyncController.swift; sourceTree = "<group>"; };
+		B100000000000000000000048 /* SlackPetWatchCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackPetWatchCommand.swift; sourceTree = "<group>"; };
 		B100000000000000000000043 /* ScreenWatchPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenWatchPersistence.swift; sourceTree = "<group>"; };
 		B100000000000000000000044 /* ScreenWatchDetectors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenWatchDetectors.swift; sourceTree = "<group>"; };
 		B100000000000000000000045 /* ScreenWatchRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenWatchRunner.swift; sourceTree = "<group>"; };
@@ -209,6 +213,7 @@
 			children = (
 				B100000000000000000000041 /* SlackTypes.swift */,
 				B100000000000000000000042 /* SlackSyncController.swift */,
+				B100000000000000000000048 /* SlackPetWatchCommand.swift */,
 			);
 			path = Integrations;
 			sourceTree = "<group>";
@@ -385,6 +390,7 @@
 				B100000000000000000000031 /* AgentSettingsView.swift */,
 				B100000000000000000000035 /* AgentSessionHistoryViews.swift */,
 				B100000000000000000000046 /* MainScreenRegionPicker.swift */,
+				B100000000000000000000047 /* ScreenWatchTaskEditorSheet.swift */,
 				B100000000000000000000032 /* TriggerSpeechBubbleView.swift */,
 			);
 			path = Overlay;
@@ -510,6 +516,7 @@
 				C1000000000000000000003B /* TriggerSpeechSnapshotStorage.swift in Sources */,
 				C10000000000000000000035 /* AgentSessionHistoryViews.swift in Sources */,
 				C10000000000000000000046 /* MainScreenRegionPicker.swift in Sources */,
+				C10000000000000000000047 /* ScreenWatchTaskEditorSheet.swift in Sources */,
 				C10000000000000000000036 /* PetGrowthModels.swift in Sources */,
 				C10000000000000000000037 /* PetLocalGrowthEventPool.swift in Sources */,
 				C10000000000000000000038 /* PetDecayEngine.swift in Sources */,
@@ -517,6 +524,7 @@
 				C1000000000000000000003A /* ScreenCaptureService.swift in Sources */,
 				C10000000000000000000041 /* SlackTypes.swift in Sources */,
 				C10000000000000000000042 /* SlackSyncController.swift in Sources */,
+				C10000000000000000000048 /* SlackPetWatchCommand.swift in Sources */,
 				C10000000000000000000043 /* ScreenWatchPersistence.swift in Sources */,
 				C10000000000000000000044 /* ScreenWatchDetectors.swift in Sources */,
 				C10000000000000000000045 /* ScreenWatchRunner.swift in Sources */,

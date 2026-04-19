@@ -1,7 +1,7 @@
 import time
 
 # 模拟一个耗时约60秒的任务
-total_steps = 60
+total_steps = 100
 for i in range(total_steps + 1):
     # \r 将光标移回行首，end='' 防止自动换行
     # 这样就可以不断覆盖同一行，形成动态效果

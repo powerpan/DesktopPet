@@ -173,6 +173,17 @@ final class AgentConversationStore: ObservableObject {
         persist()
     }
 
+    /// 向指定本地会话频道追加系统提示（不切换当前选中频道）。
+    func appendSystemNoticeInChannel(channelId: UUID, text: String) {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty, let i = channels.firstIndex(where: { $0.id == channelId }) else { return }
+        var ch = channels[i]
+        ch.messages.append(ChatMessage(role: "system", content: t))
+        ch.updatedAt = Date()
+        channels[i] = ch
+        persist()
+    }
+
     /// Slack 入站：写入指定本地频道，**不**切换当前选中频道。
     func appendSlackInboundUser(channelId: UUID, text: String, slackTs: String, slackChannelId: String) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)

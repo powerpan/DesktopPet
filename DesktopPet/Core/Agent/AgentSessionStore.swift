@@ -84,6 +84,10 @@ final class AgentSessionStore: ObservableObject {
         conversation.appendSystemNotice(text)
     }
 
+    func appendSystemNoticeInChannel(channelId: UUID, text: String) {
+        conversation.appendSystemNoticeInChannel(channelId: channelId, text: text)
+    }
+
     func appendSlackInboundUser(channelId: UUID, text: String, slackTs: String, slackChannelId: String) {
         conversation.appendSlackInboundUser(channelId: channelId, text: text, slackTs: slackTs, slackChannelId: slackChannelId)
     }

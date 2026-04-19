@@ -50,8 +50,24 @@ struct NormalizedRect: Codable, Equatable {
 enum ScreenWatchCondition: Codable, Equatable {
     /// 主屏截图 OCR 后是否包含子串。
     case ocrContains(text: String, caseInsensitive: Bool)
-    /// 在矩形内比较左 1/5 与右 1/5 平均亮度；`|Δ| <= deltaThreshold` 时认为「条已够均匀」类完成态（启发式）。`deltaThreshold` 为允许的最大亮度差（0…1）。
+    /// 在矩形内比较左 1/5 与右 1/5 平均亮度；`|Δ| <= deltaThreshold` 且本次启用任务期间曾出现过足够大的 `|Δ|` 时认为「够均匀」类完成态（Runner 维护武装状态）。`deltaThreshold` 为允许的最大亮度差（0…1）。
     case progressBarFilled(rect: NormalizedRect, deltaThreshold: Double)
+}
+
+/// 盯屏任务创建来源（持久化）。
+enum ScreenWatchTaskCreationSource: String, Codable, Equatable {
+    /// 用户在「集成」里手动创建/编辑。
+    case userManual = "userManual"
+    /// 猫猫在 Slack 根据用户话自动创建。
+    case slackAutomated = "slackAutomated"
+}
+
+/// 盯屏命中后气泡旁白的生成策略（`AppCoordinator.notifyScreenWatchHit`）。
+enum ScreenWatchHitNarrativeKind: Equatable {
+    /// 本地 OCR / 进度条启发式命中；旁白优先走模型，失败再用柔和兜底。
+    case localHeuristic
+    /// 模型 YES/NO 兜底命中；气泡仍用事件里的技术摘要。
+    case visionFallback
 }
 
 struct ScreenWatchTask: Identifiable, Codable, Equatable {
@@ -66,11 +82,22 @@ struct ScreenWatchTask: Identifiable, Codable, Equatable {
     var visionUserHint: String
     /// 模型兜底（多模态）两次 `completeChat` 之间的最短间隔（秒），按任务配置；建议长任务设大一些。
     var visionFallbackCooldownSeconds: Double
+    /// 命中并旁白后是否保持启用，以便再次盯同一条件（需配合 `repeatCooldownSeconds` 防抖）。
+    var repeatAfterHit: Bool
+    /// 可重复模式下，两次命中之间的最短间隔（秒），钳在 5…86400。
+    var repeatCooldownSeconds: Double
+    var creationSource: ScreenWatchTaskCreationSource
+    /// Slack 命中报告：`chat.postMessage` 的 `channel`；仅 `slackAutomated` 使用。
+    var slackReportChannelId: String?
+    /// Slack 命中报告：可选 `thread_ts`（挂在用户原话下）。
+    var slackReportThreadTs: String?
     var createdAt: Date
 
     enum CodingKeys: String, CodingKey {
         case id, title, isEnabled, sampleIntervalSeconds, conditions
-        case useVisionFallback, visionUserHint, visionFallbackCooldownSeconds, createdAt
+        case useVisionFallback, visionUserHint, visionFallbackCooldownSeconds
+        case repeatAfterHit, repeatCooldownSeconds, createdAt
+        case creationSource, slackReportChannelId, slackReportThreadTs
     }
 
     init(
@@ -82,6 +109,11 @@ struct ScreenWatchTask: Identifiable, Codable, Equatable {
         useVisionFallback: Bool = false,
         visionUserHint: String = "",
         visionFallbackCooldownSeconds: Double = 15,
+        repeatAfterHit: Bool = false,
+        repeatCooldownSeconds: Double = 60,
+        creationSource: ScreenWatchTaskCreationSource = .userManual,
+        slackReportChannelId: String? = nil,
+        slackReportThreadTs: String? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -92,6 +124,11 @@ struct ScreenWatchTask: Identifiable, Codable, Equatable {
         self.useVisionFallback = useVisionFallback
         self.visionUserHint = visionUserHint
         self.visionFallbackCooldownSeconds = Self.clampVisionCooldownSeconds(visionFallbackCooldownSeconds)
+        self.repeatAfterHit = repeatAfterHit
+        self.repeatCooldownSeconds = Self.clampRepeatCooldownSeconds(repeatCooldownSeconds)
+        self.creationSource = creationSource
+        self.slackReportChannelId = slackReportChannelId
+        self.slackReportThreadTs = slackReportThreadTs
         self.createdAt = createdAt
     }
 
@@ -105,8 +142,14 @@ struct ScreenWatchTask: Identifiable, Codable, Equatable {
         useVisionFallback = try c.decode(Bool.self, forKey: .useVisionFallback)
         visionUserHint = try c.decode(String.self, forKey: .visionUserHint)
         createdAt = try c.decode(Date.self, forKey: .createdAt)
-        let raw = try c.decodeIfPresent(Double.self, forKey: .visionFallbackCooldownSeconds) ?? 15
-        visionFallbackCooldownSeconds = Self.clampVisionCooldownSeconds(raw)
+        let rawVision = try c.decodeIfPresent(Double.self, forKey: .visionFallbackCooldownSeconds) ?? 15
+        visionFallbackCooldownSeconds = Self.clampVisionCooldownSeconds(rawVision)
+        repeatAfterHit = try c.decodeIfPresent(Bool.self, forKey: .repeatAfterHit) ?? false
+        let rawRepeat = try c.decodeIfPresent(Double.self, forKey: .repeatCooldownSeconds) ?? 60
+        repeatCooldownSeconds = Self.clampRepeatCooldownSeconds(rawRepeat)
+        creationSource = try c.decodeIfPresent(ScreenWatchTaskCreationSource.self, forKey: .creationSource) ?? .userManual
+        slackReportChannelId = try c.decodeIfPresent(String.self, forKey: .slackReportChannelId)
+        slackReportThreadTs = try c.decodeIfPresent(String.self, forKey: .slackReportThreadTs)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -119,12 +162,57 @@ struct ScreenWatchTask: Identifiable, Codable, Equatable {
         try c.encode(useVisionFallback, forKey: .useVisionFallback)
         try c.encode(visionUserHint, forKey: .visionUserHint)
         try c.encode(visionFallbackCooldownSeconds, forKey: .visionFallbackCooldownSeconds)
+        try c.encode(repeatAfterHit, forKey: .repeatAfterHit)
+        try c.encode(repeatCooldownSeconds, forKey: .repeatCooldownSeconds)
+        try c.encode(creationSource, forKey: .creationSource)
+        try c.encodeIfPresent(slackReportChannelId, forKey: .slackReportChannelId)
+        try c.encodeIfPresent(slackReportThreadTs, forKey: .slackReportThreadTs)
         try c.encode(createdAt, forKey: .createdAt)
     }
 
     private static func clampVisionCooldownSeconds(_ raw: Double) -> Double {
         if raw.isNaN || raw.isInfinite { return 15 }
         return min(86_400, max(1, raw))
+    }
+
+    private static func clampRepeatCooldownSeconds(_ raw: Double) -> Double {
+        if raw.isNaN || raw.isInfinite { return 60 }
+        return min(86_400, max(5, raw))
+    }
+}
+
+// MARK: - 盯屏表单辅助（编辑/新建共用）
+
+extension ScreenWatchTask {
+    /// 从条件列表取出首个 OCR 子串；无则空字符串。
+    var firstOCRSubstring: String {
+        for c in conditions {
+            if case let .ocrContains(text, _) = c { return text }
+        }
+        return ""
+    }
+
+    /// 首个进度条条件（矩形 + 阈值）；无则 `nil`。
+    var firstProgressBarCondition: (rect: NormalizedRect, deltaThreshold: Double)? {
+        for c in conditions {
+            if case let .progressBarFilled(rect, deltaThreshold) = c {
+                return (rect, deltaThreshold)
+            }
+        }
+        return nil
+    }
+
+    /// 与新建表单一致：先 OCR（若有），再进度条（若有）。
+    static func buildConditions(ocrText: String, progressRect: NormalizedRect?, progressDelta: Double) -> [ScreenWatchCondition] {
+        var out: [ScreenWatchCondition] = []
+        let ocr = ocrText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !ocr.isEmpty {
+            out.append(.ocrContains(text: ocr, caseInsensitive: true))
+        }
+        if let r = progressRect {
+            out.append(.progressBarFilled(rect: r, deltaThreshold: progressDelta))
+        }
+        return out
     }
 }
 

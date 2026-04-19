@@ -14,6 +14,8 @@ private enum ScreenWatchKeys {
 @MainActor
 final class ScreenWatchTaskStore: ObservableObject {
     @Published private(set) var tasks: [ScreenWatchTask] = []
+    /// 非持久化：进度条启发式是否已观察到「左右足够不对称」（由 `ScreenWatchRunner` 写入，供设置界面展示）。
+    @Published private(set) var progressHeuristicArmedByTaskId: [UUID: Bool] = [:]
 
     private let defaults = UserDefaults.standard
 
@@ -45,7 +47,28 @@ final class ScreenWatchTaskStore: ObservableObject {
 
     func remove(id: UUID) {
         tasks.removeAll { $0.id == id }
+        var m = progressHeuristicArmedByTaskId
+        m.removeValue(forKey: id)
+        progressHeuristicArmedByTaskId = m
         persist()
+    }
+
+    func clearAllProgressHeuristicArmedSnapshots() {
+        progressHeuristicArmedByTaskId = [:]
+    }
+
+    func setProgressHeuristicArmed(taskId: UUID, isArmed: Bool) {
+        var m = progressHeuristicArmedByTaskId
+        if m[taskId] == isArmed { return }
+        m[taskId] = isArmed
+        progressHeuristicArmedByTaskId = m
+    }
+
+    func removeProgressHeuristicArmed(taskId: UUID) {
+        var m = progressHeuristicArmedByTaskId
+        guard m[taskId] != nil else { return }
+        m.removeValue(forKey: taskId)
+        progressHeuristicArmedByTaskId = m
     }
 
     func replaceAll(_ new: [ScreenWatchTask]) {

@@ -21,8 +21,17 @@ enum ScreenWatchOCRDetector {
                 }
                 let request = VNRecognizeTextRequest { request, _ in
                     let observations = (request.results as? [VNRecognizedTextObservation]) ?? []
-                    let lines = observations.compactMap { $0.topCandidates(1).first?.string }
-                    let hay = lines.joined(separator: "\n")
+                    // 合并每条识别的多个候选，降低「正确字形在 top-2」时的漏检；并显式包含中文，利于界面小字。
+                    var chunks: [String] = []
+                    chunks.reserveCapacity(observations.count * 4)
+                    for obs in observations {
+                        let cands = obs.topCandidates(6)
+                        for c in cands {
+                            let s = c.string.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !s.isEmpty { chunks.append(s) }
+                        }
+                    }
+                    let hay = chunks.joined(separator: "\n")
                     let ok: Bool
                     if caseInsensitive {
                         ok = hay.range(of: substring, options: .caseInsensitive) != nil
@@ -32,6 +41,7 @@ enum ScreenWatchOCRDetector {
                     cont.resume(returning: ok)
                 }
                 request.recognitionLevel = .accurate
+                request.recognitionLanguages = ["zh-Hans", "zh-Hant", "en-US"]
                 let handler = VNImageRequestHandler(cgImage: cg, options: [:])
                 do {
                     try handler.perform([request])
@@ -45,13 +55,30 @@ enum ScreenWatchOCRDetector {
 
 enum ScreenWatchProgressHeuristic {
     /// 在归一化矩形内比较**左 1/5** 与**右 1/5** 的平均亮度（Rec.709，约 0=黑…1=白）。
-    /// 典型「从左往右填满」的进度条：未完成时常一侧更亮、一侧更暗，**左右平均亮度差较大**；走完后整条常为同一颜色，**差值接近 0**。
-    /// 当 `|右侧平均 − 左侧平均| <= deltaThreshold` 时返回 true。`deltaThreshold` 表示**允许的最大亮度差**（如 0.08 ≈ 8 个百分点）。
-    /// 局限：若 0% 时轨条左右也已经很均匀，单靠本规则无法区分「未开始」与「已满」，请配合 OCR 或模型兜底。
-    static func progressLikelyFilled(jpegData: Data, rect: NormalizedRect, deltaThreshold: Double) -> Bool {
+    /// 典型「从左往右填满」：未完成时常 **`|左−右|` 较大**；走完后整条颜色接近一致，**`|左−右|` 很小**。
+    /// 为避免 0% 时整条底轨颜色已很均匀而误判为「已满」，需先观察到一次足够大的左右不对称（`armed = true`），
+    /// 之后才在 **`|左−右| <= maxLuminanceDelta`** 时返回 true。若任务从接近 100% 才开始盯，可能一直无法武装，请用模型兜底或 OCR。
+    static func progressLikelyFilled(
+        jpegData: Data,
+        rect: NormalizedRect,
+        maxLuminanceDelta: Double,
+        armed: inout Bool
+    ) -> Bool {
+        guard let (l, r) = leftRightFifthMeanLuminances(jpegData: jpegData, rect: rect) else { return false }
+        let delta = abs(r - l)
+        let cap = max(0, min(1, maxLuminanceDelta))
+        // 至少出现一次「明显在走进度」的不对称，才接受后续的「够均匀」。
+        let armNeed = min(0.45, max(0.12, cap + 0.08, cap * 2.0))
+        if delta >= armNeed {
+            armed = true
+        }
+        return armed && delta <= cap
+    }
+
+    private static func leftRightFifthMeanLuminances(jpegData: Data, rect: NormalizedRect) -> (Double, Double)? {
         guard let img = NSImage(data: jpegData),
               let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil)
-        else { return false }
+        else { return nil }
         let w = CGFloat(cg.width)
         let h = CGFloat(cg.height)
         let outer = CGRect(
@@ -60,16 +87,15 @@ enum ScreenWatchProgressHeuristic {
             width: rect.width * Double(w),
             height: rect.height * Double(h)
         ).integral
-        guard outer.width >= 10, outer.height >= 6 else { return false }
+        guard outer.width >= 10, outer.height >= 6 else { return nil }
         let fifthW = outer.width / 5
-        guard fifthW >= 1 else { return false }
+        guard fifthW >= 1 else { return nil }
         let left = CGRect(x: outer.minX, y: outer.minY, width: fifthW, height: outer.height)
         let right = CGRect(x: outer.maxX - fifthW, y: outer.minY, width: fifthW, height: outer.height)
-        guard let cgL = cg.cropping(to: left), let cgR = cg.cropping(to: right) else { return false }
+        guard let cgL = cg.cropping(to: left), let cgR = cg.cropping(to: right) else { return nil }
         let l = averageLuminance(cgImage: cgL) ?? 0
         let r = averageLuminance(cgImage: cgR) ?? 0
-        let cap = max(0, min(1, deltaThreshold))
-        return abs(r - l) <= cap
+        return (l, r)
     }
 
     private static func averageLuminance(cgImage: CGImage) -> Double? {

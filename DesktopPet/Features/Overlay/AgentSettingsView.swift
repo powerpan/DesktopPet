@@ -6,6 +6,11 @@
 import AppKit
 import SwiftUI
 
+/// `sheet(item:)` 承载正在编辑的盯屏任务 id。
+private struct ScreenWatchEditorPresentation: Identifiable, Equatable {
+    let id: UUID
+}
+
 struct AgentSettingsView: View {
     @EnvironmentObject private var settings: AgentSettingsStore
     @EnvironmentObject private var session: AgentSessionStore
@@ -43,6 +48,10 @@ struct AgentSettingsView: View {
     /// 进度条启发式在主屏上框选的区域（内部存为相对主屏的归一化矩形，与截屏 UV 一致）。
     @State private var watchPickedProgressRect: NormalizedRect?
     @State private var watchDelta: String = "0.08"
+    @State private var watchRepeatAfterHit = false
+    @State private var watchRepeatCDMinutes: String = "0"
+    @State private var watchRepeatCDSeconds: String = "60"
+    @State private var screenWatchEditorPresentation: ScreenWatchEditorPresentation?
 
     /// 待打开设置窗口时选中的 Tab（0=连接 … 6=集成）；与通知 `agentSettingsTabIndex` 一致。
     private static let pendingAgentSettingsTabKeyV2 = "DesktopPet.ui.pendingAgentSettingsTab.v2"
@@ -829,7 +838,7 @@ struct AgentSettingsView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     HStack(alignment: .firstTextBaseline) {
                         Text("最大允许左右亮度差")
-                        TextField("0.08", text: $watchDelta)
+                        TextField("", text: $watchDelta, prompt: Text("0.08").foregroundStyle(.tertiary))
                             .frame(width: 56)
                             .multilineTextAlignment(.trailing)
                         Text("（0～1）")
@@ -841,7 +850,29 @@ struct AgentSettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    Text("默认 0.08：左右平均亮度最多相差约 8 个百分点即视为「够均匀」。阈值越大越容易满足（更早触发）；越小越严格。注意：若未开始时整条轨左右也很均匀，单靠本项可能与 100% 混淆，请配合 OCR 或模型兜底。")
+                    Text("默认 0.08：左右平均亮度最多相差约 8 个百分点即视为「够均匀」。阈值越大越容易满足（更早触发）；越小越严格。为避免 0% 时整条底轨已很均匀而误判，会先要求在本任务运行期间出现过一次「左右明显不对称」，再接受「够均匀」；若从接近 100% 才开始盯屏，可能一直不满足，请配合 OCR 或模型兜底。")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                Toggle("命中后仍继续盯屏（可重复使用）", isOn: $watchRepeatAfterHit)
+                if watchRepeatAfterHit {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("再次命中最短间隔")
+                        TextField("分", text: $watchRepeatCDMinutes)
+                            .frame(width: 48)
+                            .multilineTextAlignment(.trailing)
+                        Text("分")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("秒", text: $watchRepeatCDSeconds)
+                            .frame(width: 48)
+                            .multilineTextAlignment(.trailing)
+                        Text("秒（0…59）")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text("可重复时两次命中之间的最短等待，避免条件一直为真时连续旁白。")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -853,12 +884,37 @@ struct AgentSettingsView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .firstTextBaseline) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(t.title).font(.headline)
-                                Text(t.isEnabled ? "运行中" : "已停用/已命中")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Text(t.title).font(.headline)
+                                    if t.creationSource == .slackAutomated {
+                                        Text("Slack")
+                                            .font(.caption2.weight(.semibold))
+                                            .foregroundStyle(.secondary)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(.quaternary.opacity(0.6), in: Capsule())
+                                            .help("该任务由 Slack 里让猫猫盯屏自动创建；仅 OCR / 模型兜底，不含进度条亮度启发式。")
+                                    }
+                                }
+                                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                    Text(watchTaskBaseState(t))
+                                        .foregroundStyle(.secondary)
+                                    if t.firstProgressBarCondition != nil, t.isEnabled, t.creationSource != .slackAutomated {
+                                        Text(watchProgressHeuristicArmedLabel(t))
+                                            .foregroundStyle(watchProgressHeuristicArmedColor(t))
+                                            .help("进度条启发式：需先观察到左右平均亮度差足够大，「够均匀」判定才会生效。")
+                                    }
+                                    Text("·")
+                                        .foregroundStyle(.tertiary)
+                                    Text(watchTaskRepeatPart(t))
+                                        .foregroundStyle(.tertiary)
+                                }
+                                .font(.caption2)
                             }
                             Spacer()
+                            Button("编辑") {
+                                screenWatchEditorPresentation = ScreenWatchEditorPresentation(id: t.id)
+                            }
                             Toggle("", isOn: screenWatchEnabledBinding(for: t))
                                 .labelsHidden()
                             Button("删除", role: .destructive) {
@@ -890,7 +946,7 @@ struct AgentSettingsView: View {
             } header: {
                 Text("盯屏任务")
             } footer: {
-                Text("启用进度条启发式时，请在主屏拖拽框选区域（Esc 取消）；无需手填数字。模型兜底在本地未命中时才会调用，冷却可按任务用「分 + 秒」配置（已添加的任务可在列表中修改）。")
+                Text("启用进度条启发式时，请在主屏拖拽框选区域（Esc 取消）；无需手填数字。模型兜底在本地未命中时才会调用。已添加的任务可点「编辑」修改条件、兜底说明、是否重复使用及间隔。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -927,6 +983,32 @@ struct AgentSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .sheet(item: $screenWatchEditorPresentation) { item in
+            ScreenWatchTaskEditorSheet(taskId: item.id)
+                .environmentObject(screenWatchTasks)
+                .frame(minWidth: 480, minHeight: 560)
+        }
+    }
+
+    private func watchTaskBaseState(_ t: ScreenWatchTask) -> String {
+        t.isEnabled ? "运行中" : "已停用/已命中"
+    }
+
+    private func watchTaskRepeatPart(_ t: ScreenWatchTask) -> String {
+        if t.repeatAfterHit {
+            let sec = Int(t.repeatCooldownSeconds.rounded())
+            return "可重复 · 再次命中≥\(sec)秒"
+        }
+        return "单次"
+    }
+
+    private func watchProgressHeuristicArmedLabel(_ t: ScreenWatchTask) -> String {
+        let armed = screenWatchTasks.progressHeuristicArmedByTaskId[t.id] ?? false
+        return armed ? "· 已见证不对称" : "· 待见证不对称"
+    }
+
+    private func watchProgressHeuristicArmedColor(_ t: ScreenWatchTask) -> Color {
+        (screenWatchTasks.progressHeuristicArmedByTaskId[t.id] ?? false) ? .secondary : .orange
     }
 
     /// 进度条启发式的亮度差阈值：与算法中 0…1 亮度同量纲，超出范围则钳制。
@@ -944,6 +1026,16 @@ struct AgentSettingsView: View {
         let sclamped = min(59, max(0, sRaw))
         let total = mclamped * 60 + sclamped
         return Double(max(1, min(86_400, total)))
+    }
+
+    /// 可重复模式下再次命中的最短间隔（总秒数 5…86400）。
+    private static func repeatCooldownTotalSeconds(minutesString: String, secondsString: String) -> Double {
+        let m = Int(minutesString.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let sRaw = Int(secondsString.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let mclamped = max(0, m)
+        let sclamped = min(59, max(0, sRaw))
+        let total = mclamped * 60 + sclamped
+        return Double(max(5, min(86_400, total)))
     }
 
     private func visionCooldownMinutesBinding(for taskId: UUID) -> Binding<String> {
@@ -1018,6 +1110,10 @@ struct AgentSettingsView: View {
             minutesString: watchVisionCDMinutes,
             secondsString: watchVisionCDSeconds
         )
+        let repeatCooldown = Self.repeatCooldownTotalSeconds(
+            minutesString: watchRepeatCDMinutes,
+            secondsString: watchRepeatCDSeconds
+        )
         let task = ScreenWatchTask(
             title: title,
             isEnabled: true,
@@ -1025,12 +1121,17 @@ struct AgentSettingsView: View {
             conditions: conditions,
             useVisionFallback: watchUseVision,
             visionUserHint: hint,
-            visionFallbackCooldownSeconds: visionCooldown
+            visionFallbackCooldownSeconds: visionCooldown,
+            repeatAfterHit: watchRepeatAfterHit,
+            repeatCooldownSeconds: repeatCooldown
         )
         screenWatchTasks.upsert(task)
         watchNewTitle = ""
         watchOCRText = ""
         watchPickedProgressRect = nil
+        watchRepeatAfterHit = false
+        watchRepeatCDMinutes = "0"
+        watchRepeatCDSeconds = "60"
     }
 
     private func runGrowthDebugRandomTest() {
