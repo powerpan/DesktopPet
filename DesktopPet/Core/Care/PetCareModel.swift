@@ -252,7 +252,7 @@ final class PetCareModel: ObservableObject {
                 creativitySeed: creativitySeed,
                 localTemplateSummary: PetGrowthAI.localTemplateSummaryForPrompt()
             )
-            let key = KeychainStore.readAPIKey()
+            let key = KeychainStore.readAPIKey(forProvider: settings.activeAPIProvider)
             let messages: [[String: String]] = [["role": "user", "content": user]]
             do {
                 let text = try await client.completeChat(

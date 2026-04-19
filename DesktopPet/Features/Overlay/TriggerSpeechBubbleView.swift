@@ -105,12 +105,13 @@ struct TriggerSpeechBubbleView: View {
 
     /// 用 CoreText 在 `textMaxWidth` 下排版，取各行 `useGlyphPathBounds` 宽度最大值，与 SwiftUI 换行更一致且末行可收紧。
     private var fittedTextWidth: CGFloat {
-        guard !text.isEmpty else { return 1 }
+        let sizingText = InlineMarkdownBubble.plainForSizing(text)
+        guard !sizingText.isEmpty else { return 1 }
         let font = NSFont.preferredFont(forTextStyle: .callout, options: [:])
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineBreakMode = .byWordWrapping
         let attrs: [NSAttributedString.Key: Any] = [.font: font, .paragraphStyle: paragraph]
-        let attrString = NSAttributedString(string: text, attributes: attrs)
+        let attrString = NSAttributedString(string: sizingText, attributes: attrs)
         let framesetter = CTFramesetterCreateWithAttributedString(attrString)
         let path = CGPath(
             rect: CGRect(x: 0, y: 0, width: textMaxWidth, height: 200_000),
@@ -135,7 +136,7 @@ struct TriggerSpeechBubbleView: View {
     }
 
     private var textBlock: some View {
-        Text(text)
+        Text(InlineMarkdownBubble.attributedDisplayString(text))
             .font(.callout)
             .foregroundStyle(.primary)
             .multilineTextAlignment(.leading)

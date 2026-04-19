@@ -1,6 +1,6 @@
 //
 // AgentSettingsStore.swift
-// 智能体非敏感配置（UserDefaults）；API Key 见 KeychainStore。
+// 智能体非敏感配置（UserDefaults）；多套 Base URL / 模型分列保存，当前服务商见 `activeAPIProvider`；API Key 见 KeychainStore。
 //
 
 import Combine
@@ -25,8 +25,23 @@ private enum AgentSettingsKeys {
     static let triggersFormatVersion = "DesktopPet.agent.triggersFormatVersion"
 }
 
+private enum ProviderStorage {
+    static let slotsMigrated = "DesktopPet.agent.providerSlotsV1"
+    static let active = "DesktopPet.agent.activeProvider"
+
+    static func urlKey(_ p: AgentAPIProvider) -> String {
+        "DesktopPet.agent.provider.\(p.rawValue).baseURL"
+    }
+
+    static func modelKey(_ p: AgentAPIProvider) -> String {
+        "DesktopPet.agent.provider.\(p.rawValue).model"
+    }
+}
+
 @MainActor
 final class AgentSettingsStore: ObservableObject {
+    /// 当前使用的服务商（决定读写的 Base URL / 模型槽位与钥匙串账户）。
+    @Published var activeAPIProvider: AgentAPIProvider
     @Published var baseURL: String
     @Published var model: String
     @Published var systemPrompt: String
@@ -47,8 +62,16 @@ final class AgentSettingsStore: ObservableObject {
     private let defaults = UserDefaults.standard
 
     init() {
-        baseURL = defaults.string(forKey: AgentSettingsKeys.baseURL) ?? "https://api.deepseek.com"
-        model = defaults.string(forKey: AgentSettingsKeys.model) ?? "deepseek-chat"
+        let legacyBase = defaults.string(forKey: AgentSettingsKeys.baseURL) ?? AgentAPIProvider.deepseek.defaultBaseURL
+        let legacyModel = defaults.string(forKey: AgentSettingsKeys.model) ?? AgentAPIProvider.deepseek.defaultModel
+        Self.migrateProviderSlotsIfNeeded(defaults: defaults, legacyBase: legacyBase, legacyModel: legacyModel)
+
+        let active = AgentAPIProvider(rawValue: defaults.string(forKey: ProviderStorage.active) ?? "") ?? .deepseek
+        activeAPIProvider = active
+        let slot = Self.loadSlot(defaults: defaults, for: active)
+        baseURL = slot.url
+        model = slot.model
+
         systemPrompt = defaults.string(forKey: AgentSettingsKeys.systemPrompt)
             ?? "你是「七七猫」，一只住在用户桌面上的小猫助手。回答简短、可爱，用简体中文。"
         temperature = defaults.object(forKey: AgentSettingsKeys.temperature) as? Double ?? 0.7
@@ -80,8 +103,19 @@ final class AgentSettingsStore: ObservableObject {
             defaults.set(2, forKey: AgentSettingsKeys.triggersFormatVersion)
         }
 
-        $baseURL.dropFirst().debounce(for: .milliseconds(200), scheduler: DispatchQueue.main).sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.baseURL) }.store(in: &cancellables)
-        $model.dropFirst().debounce(for: .milliseconds(200), scheduler: DispatchQueue.main).sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.model) }.store(in: &cancellables)
+        // Base URL / 模型与「当前服务商」强相关：若用 debounce，用户快速切换服务商时，迟到的写入可能污染新槽位，故改为即时落盘。
+        $baseURL.dropFirst().sink { [weak self] v in
+            guard let self else { return }
+            self.defaults.set(v, forKey: ProviderStorage.urlKey(self.activeAPIProvider))
+            self.defaults.set(v, forKey: AgentSettingsKeys.baseURL)
+        }.store(in: &cancellables)
+
+        $model.dropFirst().sink { [weak self] v in
+            guard let self else { return }
+            self.defaults.set(v, forKey: ProviderStorage.modelKey(self.activeAPIProvider))
+            self.defaults.set(v, forKey: AgentSettingsKeys.model)
+        }.store(in: &cancellables)
+
         $systemPrompt.dropFirst().debounce(for: .milliseconds(200), scheduler: DispatchQueue.main).sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.systemPrompt) }.store(in: &cancellables)
         $temperature.dropFirst().debounce(for: .milliseconds(200), scheduler: DispatchQueue.main).sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.temperature) }.store(in: &cancellables)
         $maxTokens.dropFirst().debounce(for: .milliseconds(200), scheduler: DispatchQueue.main).sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.maxTokens) }.store(in: &cancellables)
@@ -101,6 +135,53 @@ final class AgentSettingsStore: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+    }
+
+    /// 切换当前服务商：先保存当前编辑中的 Base URL / 模型到旧槽位，再载入新槽位。
+    func setActiveAPIProvider(_ newProvider: AgentAPIProvider) {
+        guard newProvider != activeAPIProvider else { return }
+        persistWorkingConnectionToSlot(for: activeAPIProvider)
+        activeAPIProvider = newProvider
+        defaults.set(newProvider.rawValue, forKey: ProviderStorage.active)
+        let slot = Self.loadSlot(defaults: defaults, for: newProvider)
+        baseURL = slot.url
+        model = slot.model
+        defaults.set(baseURL, forKey: AgentSettingsKeys.baseURL)
+        defaults.set(model, forKey: AgentSettingsKeys.model)
+    }
+
+    private func persistWorkingConnectionToSlot(for provider: AgentAPIProvider) {
+        defaults.set(baseURL, forKey: ProviderStorage.urlKey(provider))
+        defaults.set(model, forKey: ProviderStorage.modelKey(provider))
+    }
+
+    private static func migrateProviderSlotsIfNeeded(defaults: UserDefaults, legacyBase: String, legacyModel: String) {
+        guard !defaults.bool(forKey: ProviderStorage.slotsMigrated) else { return }
+        for p in AgentAPIProvider.allCases {
+            if defaults.string(forKey: ProviderStorage.urlKey(p)) == nil {
+                switch p {
+                case .deepseek:
+                    defaults.set(legacyBase, forKey: ProviderStorage.urlKey(p))
+                case .qwenCompatible, .custom:
+                    defaults.set(p.defaultBaseURL, forKey: ProviderStorage.urlKey(p))
+                }
+            }
+            if defaults.string(forKey: ProviderStorage.modelKey(p)) == nil {
+                switch p {
+                case .deepseek:
+                    defaults.set(legacyModel, forKey: ProviderStorage.modelKey(p))
+                case .qwenCompatible, .custom:
+                    defaults.set(p.defaultModel, forKey: ProviderStorage.modelKey(p))
+                }
+            }
+        }
+        defaults.set(true, forKey: ProviderStorage.slotsMigrated)
+    }
+
+    private static func loadSlot(defaults: UserDefaults, for provider: AgentAPIProvider) -> (url: String, model: String) {
+        let u = defaults.string(forKey: ProviderStorage.urlKey(provider)) ?? provider.defaultBaseURL
+        let m = defaults.string(forKey: ProviderStorage.modelKey(provider)) ?? provider.defaultModel
+        return (u, m)
     }
 
     func upsertTrigger(_ rule: AgentTriggerRule) {

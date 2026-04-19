@@ -93,10 +93,13 @@ struct ChatOverlayView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .onAppear {
-            keychainConfigured = KeychainStore.readAPIKey() != nil
+            keychainConfigured = KeychainStore.readAPIKey(forProvider: agentSettings.activeAPIProvider) != nil
+        }
+        .onChange(of: agentSettings.activeAPIProvider) { _, _ in
+            keychainConfigured = KeychainStore.readAPIKey(forProvider: agentSettings.activeAPIProvider) != nil
         }
         .onReceive(NotificationCenter.default.publisher(for: .desktopPetAPIKeyDidChange)) { _ in
-            keychainConfigured = KeychainStore.readAPIKey() != nil
+            keychainConfigured = KeychainStore.readAPIKey(forProvider: agentSettings.activeAPIProvider) != nil
         }
         .alert("重命名当前会话", isPresented: $showRenameAlert) {
             TextField("标题", text: $renameDraft)
@@ -181,7 +184,7 @@ struct ChatOverlayView: View {
             let isUser = m.role == "user"
             HStack {
                 if isUser { Spacer(minLength: 24) }
-                Text(m.content)
+                Text(InlineMarkdownBubble.attributedDisplayString(m.content))
                     .font(.callout)
                     .padding(10)
                     .background(isUser ? Color.accentColor.opacity(0.25) : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
@@ -198,7 +201,7 @@ struct ChatOverlayView: View {
         session.appendUser(t)
         session.setSending(true)
         session.lastError = nil
-        let key = KeychainStore.readAPIKey()
+        let key = KeychainStore.readAPIKey(forProvider: agentSettings.activeAPIProvider)
 
         var systemPrompt = agentSettings.systemPrompt
         if agentSettings.attachKeySummary {

@@ -1,6 +1,6 @@
 //
 // AgentSettingsView.swift
-// DeepSeek 连接、人格、触发器与隐私相关开关（API Key 仅钥匙串）。
+// 模型连接（多套 Base URL / 模型 / Key）、人格、触发器与隐私相关开关（API Key 仅钥匙串）。
 //
 
 import AppKit
@@ -49,7 +49,7 @@ struct AgentSettingsView: View {
         .frame(minWidth: 480, minHeight: 520)
         .padding(12)
         .onAppear {
-            apiKeyDraft = KeychainStore.readAPIKey() ?? ""
+            apiKeyDraft = KeychainStore.readAPIKey(forProvider: settings.activeAPIProvider) ?? ""
             if let v = UserDefaults.standard.object(forKey: Self.pendingAgentSettingsTabKey) as? Int {
                 UserDefaults.standard.removeObject(forKey: Self.pendingAgentSettingsTabKey)
                 if (0 ... 4).contains(v) {
@@ -81,7 +81,7 @@ struct AgentSettingsView: View {
             }
             Button("关闭", role: .cancel) {}
         } message: {
-            Text("开启后，满足条件的「截屏」触发器会通过 ScreenCaptureKit 截取主显示器画面，经缩放与 JPEG 压缩后，作为多模态请求的一部分发往你在「连接」里配置的 Base URL 与模型。画面可能包含屏幕上任何可见内容；请在会议或投屏场景关闭总开关或对应规则。默认不落盘原图。若模型不支持图像，应用会尝试自动改为纯文字重试一次。")
+            Text("开启后，满足条件的「截屏」触发器会通过 ScreenCaptureKit 截取主显示器画面，经缩放与 JPEG 压缩后，作为多模态请求的一部分发往你在「连接」里为**当前服务商**配置的 Base URL 与模型。画面可能包含屏幕上任何可见内容；请在会议或投屏场景关闭总开关或对应规则。默认不落盘原图。若模型不支持图像，应用会尝试自动改为纯文字重试一次。")
         }
         .alert("请打开键盘模式总开关", isPresented: $showNewKeyboardTriggerPrivacyHint) {
             Button("好的", role: .cancel) {}
@@ -93,14 +93,43 @@ struct AgentSettingsView: View {
     private var connectionTab: some View {
         Form {
             Section {
+                Picker("当前服务商", selection: Binding(
+                    get: { settings.activeAPIProvider },
+                    set: { new in
+                        // 避免在 SwiftUI 更新周期内同步改写 ObservableObject，导致运行期断言/警告。
+                        Task { @MainActor in
+                            settings.setActiveAPIProvider(new)
+                            apiKeyDraft = KeychainStore.readAPIKey(forProvider: new) ?? ""
+                        }
+                    }
+                )) {
+                    ForEach(AgentAPIProvider.allCases) { p in
+                        Text(p.pickerLabel).tag(p)
+                    }
+                }
+                .onChange(of: settings.activeAPIProvider) { _, new in
+                    apiKeyDraft = KeychainStore.readAPIKey(forProvider: new) ?? ""
+                }
+            } header: {
+                Text("模型配置")
+            } footer: {
+                Text("每一套服务商各自保存 Base URL、模型 id 与 API Key。切换时会载入该套已保存的地址与模型；请为当前选中的服务商单独粘贴并保存 Key。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Section {
                 TextField("Base URL", text: $settings.baseURL)
                 TextField("模型 id", text: $settings.model)
             } header: {
-                Text("服务端")
+                Text("服务端（当前：\(settings.activeAPIProvider.pickerLabel)）")
             } footer: {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Base URL：OpenAI 兼容接口的根地址，须含 https://，不要拼 /v1/... 路径；DeepSeek 官方一般为 https://api.deepseek.com。")
-                    Text("模型 id：在控制台创建或查看，例如 deepseek-chat；填错会返回 HTTP 4xx。")
+                    Text("Base URL：OpenAI 兼容 Chat Completions 的根地址，须含 https://，**不要**手动拼 `/v1/chat/completions`（应用会自动追加）。")
+                    Text("DeepSeek 示例：https://api.deepseek.com")
+                    Text("通义千问（DashScope 兼容模式）示例：https://dashscope.aliyuncs.com/compatible-mode；模型如 qwen-vl-plus（截屏多模态）、qwen-turbo 等以控制台为准。")
+                    Text("自定义：可填其它兼容网关；模型 id 填对方文档中的名称。")
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -108,30 +137,30 @@ struct AgentSettingsView: View {
             }
 
             Section {
-                SecureField("粘贴 DeepSeek API Key", text: $apiKeyDraft)
+                SecureField("粘贴当前服务商的 API Key", text: $apiKeyDraft)
                 HStack {
                     Button("保存到钥匙串") {
                         do {
-                            try KeychainStore.saveAPIKey(apiKeyDraft)
-                            keychainMessage = "已保存。"
+                            try KeychainStore.saveAPIKey(apiKeyDraft, forProvider: settings.activeAPIProvider)
+                            keychainMessage = "已保存（\(settings.activeAPIProvider.pickerLabel)）。"
                             session.lastError = nil
                         } catch {
                             keychainMessage = error.localizedDescription
                         }
                     }
-                    Button("清除钥匙串中的 Key", role: .destructive) {
-                        KeychainStore.deleteAPIKey()
+                    Button("清除当前服务商的 Key", role: .destructive) {
+                        KeychainStore.deleteAPIKey(forProvider: settings.activeAPIProvider)
                         apiKeyDraft = ""
-                        keychainMessage = "已清除。"
+                        keychainMessage = "已清除（\(settings.activeAPIProvider.pickerLabel)）。"
                     }
                 }
                 if let keychainMessage {
                     Text(keychainMessage).font(.caption).foregroundStyle(.secondary)
                 }
             } header: {
-                Text("API Key（钥匙串）")
+                Text("API Key（钥匙串 · \(settings.activeAPIProvider.pickerLabel)）")
             } footer: {
-                Text("仅保存在本机钥匙串，不会写入 UserDefaults 或明文文件。保存后若对话里仍提示未配置，可先关闭再打开对话面板刷新状态。")
+                Text("仅保存在本机钥匙串，不会写入 UserDefaults 或明文文件；各服务商使用不同钥匙串账户，互不影响。保存后若对话里仍提示未配置，可先关闭再打开对话面板刷新状态。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -652,7 +681,7 @@ struct AgentSettingsView: View {
             creativitySeed: creativitySeed,
             localTemplateSummary: PetGrowthAI.localTemplateSummaryForPrompt()
         )
-        let key = KeychainStore.readAPIKey()
+        let key = KeychainStore.readAPIKey(forProvider: settings.activeAPIProvider)
         let messages: [[String: String]] = [["role": "user", "content": user]]
         do {
             let text = try await client.completeChat(
@@ -1219,6 +1248,8 @@ private struct TriggerRuleEditorSheet: View {
                         Picker("截图长边上界", selection: $rule.screenSnapMaxEdgePixels) {
                             Text("768 px").tag(768)
                             Text("1024 px").tag(1024)
+                            Text("1536 px").tag(1536)
+                            Text("2048 px").tag(2048)
                         }
                         HStack {
                             Text("JPEG 质量")
@@ -1232,7 +1263,7 @@ private struct TriggerRuleEditorSheet: View {
                     } footer: {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("冷却下限请使用上方「基本」中的「冷却（秒）」；与「成功旁白最短间隔」取**更长**者作为实际上限。")
-                            Text("自动触发需打开「隐私」中的截屏总开关，并授予屏幕录制。主显示器经 ScreenCaptureKit 抓取后缩放编码，仅在内存中上传至你配置的 API。")
+                            Text("自动触发需打开「隐私」中的截屏总开关，并授予屏幕录制。主显示器经 ScreenCaptureKit 抓取后按「长边上界」缩放再 JPEG 编码（最大 2048px），仅在内存中上传；数值越大越利于认字，但请求体与耗时通常也会增加。")
                             Text("若模型不支持图像，应用会在收到 HTTP 400 时自动改为纯文字再请求一次。")
                         }
                         .font(.caption)

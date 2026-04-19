@@ -103,14 +103,14 @@ struct ConversationChannelDetailView: View {
         case "user":
             HStack {
                 Spacer(minLength: 40)
-                Text(m.content)
+                Text(InlineMarkdownBubble.attributedDisplayString(m.content))
                     .font(.body)
                     .padding(10)
                     .background(Color.accentColor.opacity(0.2), in: RoundedRectangle(cornerRadius: 10))
             }
         default:
             HStack {
-                Text(m.content)
+                Text(InlineMarkdownBubble.attributedDisplayString(m.content))
                     .font(.body)
                     .padding(10)
                     .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
@@ -188,7 +188,7 @@ struct TriggerSpeechHistoryListSheet: View {
                                     .textSelection(.enabled)
                                     .lineLimit(4)
                             }
-                            Text(r.text)
+                            Text(InlineMarkdownBubble.attributedDisplayString(r.text))
                                 .font(.body)
                                 .textSelection(.enabled)
                         }
@@ -259,7 +259,7 @@ struct TriggerUserPromptHistorySheet: View {
                             Text("模型返回的旁白（同一条记录）")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
-                            Text(r.text)
+                            Text(InlineMarkdownBubble.attributedDisplayString(r.text))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .textSelection(.enabled)

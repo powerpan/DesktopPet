@@ -326,9 +326,9 @@ final class AgentTriggerEngine: ObservableObject {
         )
     }
 
+    /// 与 `ScreenCaptureService.captureMainDisplayJPEG` 的上界（2048）对齐；下界 768 避免过小图难以认字。
     private static func clampedScreenSnapMaxEdge(_ v: Int) -> Int {
-        if v <= 896 { return 768 }
-        return 1024
+        min(2048, max(768, v))
     }
 
     private static func clampedJPEGQuality(_ v: Double) -> Double {
@@ -352,7 +352,7 @@ final class AgentTriggerEngine: ObservableObject {
     ) async {
         session.setSending(true)
         session.lastError = nil
-        let key = KeychainStore.readAPIKey()
+        let key = KeychainStore.readAPIKey(forProvider: settings.activeAPIProvider)
         var extra = "（系统触发：\(trigger.kind.displayName)）"
         var keySummaryLine = ""
         if settings.attachKeySummary {
@@ -624,7 +624,7 @@ final class AgentTriggerEngine: ObservableObject {
     ) async {
         session.setSending(true)
         session.lastError = nil
-        let key = KeychainStore.readAPIKey()
+        let key = KeychainStore.readAPIKey(forProvider: settings.activeAPIProvider)
         var extra = "（系统触发：\(trigger.kind.displayName)）"
         var keySummaryLine = ""
         if settings.attachKeySummary {

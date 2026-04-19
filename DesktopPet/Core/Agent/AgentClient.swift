@@ -15,7 +15,7 @@ enum AgentClientError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .missingAPIKey: return "未配置 API Key（请在智能体设置中填写并保存）。"
+        case .missingAPIKey: return "未配置 API Key（请在智能体设置「连接」里为当前服务商粘贴并保存到钥匙串）。"
         case .invalidURL: return "Base URL 无效。"
         case let .http(code, body): return "HTTP \(code): \(body.prefix(200))"
         case .decode: return "响应解析失败。"

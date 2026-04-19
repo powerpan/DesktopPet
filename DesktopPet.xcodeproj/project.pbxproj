@@ -26,6 +26,7 @@
 		C10000000000000000000012 /* SettingsPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000012 /* SettingsPanelView.swift */; };
 		C10000000000000000000013 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000013 /* SettingsViewModel.swift */; };
 		C10000000000000000000014 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000014 /* Logger.swift */; };
+		C1000000000000000000003D /* InlineMarkdownBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003D /* InlineMarkdownBubble.swift */; };
 		C10000000000000000000015 /* ScreenGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000015 /* ScreenGeometry.swift */; };
 		C10000000000000000000016 /* GlobalInputMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000016 /* GlobalInputMonitor.swift */; };
 		C10000000000000000000017 /* PetRootContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000017 /* PetRootContainerView.swift */; };
@@ -83,6 +84,7 @@
 		B100000000000000000000012 /* SettingsPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPanelView.swift; sourceTree = "<group>"; };
 		B100000000000000000000013 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
 		B100000000000000000000014 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
+		B10000000000000000000003D /* InlineMarkdownBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineMarkdownBubble.swift; sourceTree = "<group>"; };
 		B100000000000000000000015 /* ScreenGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenGeometry.swift; sourceTree = "<group>"; };
 		B100000000000000000000016 /* GlobalInputMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalInputMonitor.swift; sourceTree = "<group>"; };
 		B100000000000000000000017 /* PetRootContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetRootContainerView.swift; sourceTree = "<group>"; };
@@ -212,6 +214,7 @@
 			children = (
 				B100000000000000000000014 /* Logger.swift */,
 				B100000000000000000000015 /* ScreenGeometry.swift */,
+				B10000000000000000000003D /* InlineMarkdownBubble.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -449,6 +452,7 @@
 				C10000000000000000000012 /* SettingsPanelView.swift in Sources */,
 				C10000000000000000000013 /* SettingsViewModel.swift in Sources */,
 				C10000000000000000000014 /* Logger.swift in Sources */,
+				C1000000000000000000003D /* InlineMarkdownBubble.swift in Sources */,
 				C10000000000000000000015 /* ScreenGeometry.swift in Sources */,
 				C10000000000000000000017 /* PetRootContainerView.swift in Sources */,
 				C10000000000000000000018 /* AnimationDriver.swift in Sources */,

@@ -58,17 +58,17 @@
 
 ---
 
-## 3. 智能体对话（DeepSeek 与设定）
+## 3. 智能体对话（OpenAI 兼容后端与设定）
 
 ### 3.1 能力范围
 
-- **后端**：HTTP(S) 调用 **DeepSeek** 兼容 API（Base URL、Model 名、Key 可配置）。
+- **后端**：HTTP(S) 调用 **OpenAI Chat Completions 兼容** API（`POST …/v1/chat/completions`）；在设置中可选 **当前服务商**（DeepSeek、通义千问 DashScope **兼容模式**、自定义），每套独立 **Base URL、模型 id、钥匙串 Key**（`KeychainStore` 分账户；旧版单一 Key 仍可读作 DeepSeek）。
 - **设定**：独立「系统提示词 / 猫格设定」编辑器（多预设 + 自定义）；可选「用户昵称」「禁止话题」等短字段。
 - **上下文**：滑动窗口条数 / Token 上限；**可选**「是否附带当前键盘摘要」——默认关闭，避免隐私风险。
 
 ### 3.2 安全
 
-- API Key：**Keychain**（`kSecClassGenericPassword`，按服务名区分环境）。
+- API Key：**Keychain**（`kSecClassGenericPassword`；新版按服务商 `rawValue` 分账户，与 `AgentAPIProvider` 对齐）。
 - 传输：TLS；日志中**脱敏**请求体。
 - 退出应用或隐藏面板时：可选清空内存中的最近一轮 user 消息（配置项）。
 

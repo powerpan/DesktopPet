@@ -1,20 +1,30 @@
 //
 // KeychainStore.swift
-// DeepSeek API Key 存取（不落 UserDefaults）。
+// 各服务商 API Key 分账户存于钥匙串（不落 UserDefaults）；兼容旧版单一 DeepSeek 条目。
 //
 
 import Foundation
 import Security
 
 enum KeychainStore {
-    private static let service = "io.github.powerpan.DesktopPet.deepseek.apiKey"
-    private static let account = "default"
+    /// 新版：按 `AgentAPIProvider.rawValue` 作为 account。
+    private static let unifiedService = "io.github.powerpan.DesktopPet.agent.apiKey"
+    /// 旧版 DeepSeek 单 Key。
+    private static let legacyService = "io.github.powerpan.DesktopPet.deepseek.apiKey"
+    private static let legacyAccount = "default"
 
-    static func saveAPIKey(_ value: String) throws {
+    static func keychainAccount(for provider: AgentAPIProvider) -> String {
+        provider.rawValue
+    }
+
+    // MARK: - 读写
+
+    static func saveAPIKey(_ value: String, forProvider provider: AgentAPIProvider) throws {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let account = keychainAccount(for: provider)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
+            kSecAttrService as String: unifiedService,
             kSecAttrAccount as String: account,
         ]
         SecItemDelete(query as CFDictionary)
@@ -36,7 +46,53 @@ enum KeychainStore {
         NotificationCenter.default.post(name: .desktopPetAPIKeyDidChange, object: nil)
     }
 
+    static func readAPIKey(forProvider provider: AgentAPIProvider) -> String? {
+        let account = keychainAccount(for: provider)
+        if let s = readPassword(service: unifiedService, account: account), !s.isEmpty {
+            return s
+        }
+        if provider == .deepseek, let legacy = readPassword(service: legacyService, account: legacyAccount), !legacy.isEmpty {
+            return legacy
+        }
+        return nil
+    }
+
+    static func deleteAPIKey(forProvider provider: AgentAPIProvider) {
+        let account = keychainAccount(for: provider)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: unifiedService,
+            kSecAttrAccount as String: account,
+        ]
+        SecItemDelete(query as CFDictionary)
+        if provider == .deepseek {
+            let legacy: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: legacyService,
+                kSecAttrAccount as String: legacyAccount,
+            ]
+            SecItemDelete(legacy as CFDictionary)
+        }
+        NotificationCenter.default.post(name: .desktopPetAPIKeyDidChange, object: nil)
+    }
+
+    // MARK: - 兼容旧调用（仅 DeepSeek / 旧 default）
+
     static func readAPIKey() -> String? {
+        readAPIKey(forProvider: .deepseek)
+    }
+
+    static func saveAPIKey(_ value: String) throws {
+        try saveAPIKey(value, forProvider: .deepseek)
+    }
+
+    static func deleteAPIKey() {
+        deleteAPIKey(forProvider: .deepseek)
+    }
+
+    // MARK: - Private
+
+    private static func readPassword(service: String, account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -51,15 +107,5 @@ enum KeychainStore {
         }
         let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
-    }
-
-    static func deleteAPIKey() {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-        ]
-        SecItemDelete(query as CFDictionary)
-        NotificationCenter.default.post(name: .desktopPetAPIKeyDidChange, object: nil)
     }
 }

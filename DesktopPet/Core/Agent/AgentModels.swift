@@ -459,3 +459,40 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         )
     }
 }
+
+// MARK: - 多服务商连接（与 Keychain 分账户、与 Settings 分槽对应；放在本文件避免独立文件未加入 Target 时编译失败）
+
+/// 与 `AgentSettingsStore` 分槽存储、`KeychainStore` 分账户一一对应。
+enum AgentAPIProvider: String, CaseIterable, Identifiable, Hashable, Equatable {
+    case deepseek = "deepseek"
+    /// 阿里云 DashScope OpenAI 兼容模式（Base 勿含 `/v1`，应用会自动拼 `/v1/chat/completions`）。
+    case qwenCompatible = "qwen_compatible"
+    case custom = "custom"
+
+    var id: String { rawValue }
+
+    var pickerLabel: String {
+        switch self {
+        case .deepseek: return "DeepSeek"
+        case .qwenCompatible: return "通义千问（兼容模式）"
+        case .custom: return "自定义"
+        }
+    }
+
+    var defaultBaseURL: String {
+        switch self {
+        case .deepseek: return "https://api.deepseek.com"
+        case .qwenCompatible: return "https://dashscope.aliyuncs.com/compatible-mode"
+        case .custom: return "https://api.openai.com"
+        }
+    }
+
+    /// 各预设的推荐模型 id（截屏多模态在千问侧需视觉模型，如 `qwen-vl-plus`）。
+    var defaultModel: String {
+        switch self {
+        case .deepseek: return "deepseek-chat"
+        case .qwenCompatible: return "qwen-vl-plus"
+        case .custom: return "gpt-4o-mini"
+        }
+    }
+}
