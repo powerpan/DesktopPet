@@ -9,7 +9,8 @@ struct ChatOverlayView: View {
     @EnvironmentObject private var session: AgentSessionStore
     @EnvironmentObject private var agentSettings: AgentSettingsStore
     @EnvironmentObject private var deskMirror: DeskMirrorModel
-    private let client = AgentClient()
+    @EnvironmentObject private var routeBus: AppRouteBus
+    @Environment(\.desktopPetAgentClient) private var agentClient: AgentClient?
 
     @State private var draft: String = ""
     @State private var keychainConfigured: Bool = false
@@ -23,7 +24,7 @@ struct ChatOverlayView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("七七猫 · 对话")
                         .font(.headline)
-                    Text(keychainConfigured ? "钥匙串：已检测到 API Key" : "钥匙串：未检测到 API Key（请在智能体设置中保存）")
+                    Text(keychainConfigured ? "钥匙串：已检测到 API Key" : "钥匙串：未检测到 API Key（请在智能体工作台 → 连接中保存）")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     channelToolbar
@@ -38,7 +39,7 @@ struct ChatOverlayView: View {
                 }
                 Spacer(minLength: 0)
                 Button {
-                    NotificationCenter.default.post(name: .desktopPetCloseChatOverlay, object: nil)
+                    routeBus.closeChatOverlay()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .symbolRenderingMode(.hierarchical)
@@ -155,6 +156,13 @@ struct ChatOverlayView: View {
             }
             .help("删除当前会话")
             .disabled(session.channels.count <= 1)
+
+            Button {
+                routeBus.presentAgentSettingsTab(index: AgentSettingsWorkspaceTab.conversation.rawValue)
+            } label: {
+                Image(systemName: "clock.arrow.circlepath")
+            }
+            .help("会话与历史、旁白与清理…")
         }
     }
 
@@ -210,6 +218,11 @@ struct ChatOverlayView: View {
         session.appendUser(t)
         session.setSending(true)
         session.lastError = nil
+        guard let client = agentClient else {
+            session.lastError = "未注入 AgentClient。"
+            session.setSending(false)
+            return
+        }
         let key = KeychainStore.readAPIKey(forProvider: agentSettings.activeAPIProvider)
 
         var systemPrompt = agentSettings.systemPrompt

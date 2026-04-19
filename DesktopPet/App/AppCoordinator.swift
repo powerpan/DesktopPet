@@ -25,8 +25,19 @@ final class AppCoordinator: ObservableObject {
     let screenWatchEventStore = ScreenWatchEventStore()
     private lazy var screenWatchRunner = ScreenWatchRunner(tasks: screenWatchTaskStore, events: screenWatchEventStore)
     private let frontmostAppWatcher = FrontmostAppWatcher()
-    private let extensionOverlay = ExtensionOverlayController()
+    private let overlayHostController = ExtensionOverlayController()
+    private lazy var appRouter = DesktopPetAppRouter(overlay: overlayHostController)
+    let routeBus = AppRouteBus()
     private let agentClient = AgentClient()
+    private lazy var screenWatchHitFeedback = ScreenWatchHitFeedbackService(
+        agentSessionStore: agentSessionStore,
+        agentSettingsStore: agentSettingsStore,
+        agentClient: agentClient,
+        slackSyncController: slackSyncController,
+        deliverTriggerSpeech: { [weak self] payload in
+            self?.deliverTriggerSpeech(payload)
+        }
+    )
 
     private lazy var triggerEngine = AgentTriggerEngine(
         settings: agentSettingsStore,
@@ -58,13 +69,9 @@ final class AppCoordinator: ObservableObject {
         wirePatrol()
         wireMouse()
         wireActivationRefresh()
-        wireAccessibilityRecheck()
         wirePetWindowOverlayNotifications()
-        wirePresentChatContinuingChannelFromSettings()
-        wireCloseChatOverlayFromPanel()
-        wireForceFireTriggerFromSettings()
-        wireCareInteractionFromPetPanel()
-        wirePresentAgentSettingsTabFromNotification()
+        wireRouteBus()
+        wirePresentAgentSettingsTabNotificationBridge()
         wireSlackInboundAutoReply()
 
         petCareModel.configureGrowthEngine(client: agentClient, settings: agentSettingsStore)
@@ -77,8 +84,8 @@ final class AppCoordinator: ObservableObject {
             agentClient: agentClient,
             agentSettings: agentSettingsStore
         )
-        screenWatchRunner.start(agentClient: agentClient, agentSettings: agentSettingsStore) { [weak self] task, detail, kind in
-            self?.notifyScreenWatchHit(task: task, detail: detail, narrativeKind: kind)
+        screenWatchRunner.start(agentClient: agentClient, agentSettings: agentSettingsStore) { [weak self] task, _, kind in
+            self?.screenWatchHitFeedback.notifyHit(task: task, narrativeKind: kind)
         }
 
         permissionManager.refreshStatus(prompt: false)
@@ -104,7 +111,7 @@ final class AppCoordinator: ObservableObject {
     }
 
     func stop() {
-        extensionOverlay.dismissTriggerBubble()
+        appRouter.dismissTriggerBubble()
         patrolScheduler.stop()
         mouseTracker.stop()
         globalInput.stop()
@@ -122,22 +129,24 @@ final class AppCoordinator: ObservableObject {
         mouseTracker.interactionSamplingEnabled = isPetVisible
         if !isPetVisible {
             deskMirrorModel.resetMouseMirror()
-            extensionOverlay.dismissTriggerBubble()
+            appRouter.dismissTriggerBubble()
         }
     }
 
     func toggleCareOverlay() {
-        extensionOverlay.toggleCarePanel(root: AnyView(
+        appRouter.toggleCarePanel(root: AnyView(
             CareOverlayView()
                 .environmentObject(petCareModel)
+                .environmentObject(agentSettingsStore)
+                .environmentObject(routeBus)
         ))
     }
 
     func toggleChatOverlay() {
-        let wasVisible = extensionOverlay.isChatVisible()
-        extensionOverlay.toggleChatPanel(root: chatOverlayRoot())
+        let wasVisible = appRouter.isChatVisible()
+        appRouter.toggleChatPanel(root: chatOverlayRoot())
         // 从隐藏变为显示时清掉旧错误，避免「已保存 Key 却仍显示未配置」的误导（lastError 来自上次发送失败）。
-        if extensionOverlay.isChatVisible(), !wasVisible {
+        if appRouter.isChatVisible(), !wasVisible {
             agentSessionStore.lastError = nil
         }
     }
@@ -145,7 +154,7 @@ final class AppCoordinator: ObservableObject {
     /// 打开或前置对话面板（不切换关闭）；用于触发气泡点击后续聊。
     /// - Parameter clearLastError: 为 `false` 时保留 `lastError`（例如菜单截屏失败后需要展示原因）。
     func presentChatOverlay(clearLastError: Bool = true) {
-        extensionOverlay.presentChatPanel(root: chatOverlayRoot())
+        appRouter.presentChatPanel(root: chatOverlayRoot())
         if clearLastError {
             agentSessionStore.lastError = nil
         }
@@ -157,11 +166,13 @@ final class AppCoordinator: ObservableObject {
                 .environmentObject(agentSessionStore)
                 .environmentObject(agentSettingsStore)
                 .environmentObject(deskMirrorModel)
+                .environmentObject(routeBus)
+                .environment(\.desktopPetAgentClient, agentClient)
         )
     }
 
     func presentAgentSettingsWindow() {
-        extensionOverlay.presentAgentSettings(root: AnyView(
+        appRouter.presentAgentSettings(root: AnyView(
             AgentSettingsView()
                 .environmentObject(agentSettingsStore)
                 .environmentObject(agentSessionStore)
@@ -169,6 +180,7 @@ final class AppCoordinator: ObservableObject {
                 .environmentObject(slackSyncController)
                 .environmentObject(screenWatchTaskStore)
                 .environmentObject(screenWatchEventStore)
+                .environmentObject(routeBus)
                 .environment(\.desktopPetAgentClient, agentClient)
         ))
     }
@@ -176,6 +188,7 @@ final class AppCoordinator: ObservableObject {
     func presentOnboardingWindow() {
         if onboardingWindow == nil {
             let view = AccessibilityOnboardingView(permissionManager: permissionManager)
+                .environmentObject(routeBus)
             let hosting = NSHostingView(rootView: view)
             let rect = NSRect(x: 0, y: 0, width: 500, height: 360)
             let window = NSWindow(
@@ -215,7 +228,7 @@ final class AppCoordinator: ObservableObject {
         )
         controller.showWindow(nil)
         petWindowController = controller
-        extensionOverlay.attachPetWindow(controller.window)
+        appRouter.attachPetWindow(controller.window)
     }
 
     private func wirePetWindowOverlayNotifications() {
@@ -226,47 +239,55 @@ final class AppCoordinator: ObservableObject {
         )
         .receive(on: DispatchQueue.main)
         .sink { [weak self] _ in
-            self?.extensionOverlay.repositionIfNeeded()
+            self?.appRouter.repositionOverlaysIfNeeded()
         }
         .store(in: &cancellables)
     }
 
-    private func wirePresentChatContinuingChannelFromSettings() {
-        NotificationCenter.default.publisher(for: .desktopPetPresentChatContinuingChannel)
+    /// 兼容仍通过 `NotificationCenter` 投递的「打开设置并切 Tab」路径，统一走 `AppRouteBus`。
+    private func wirePresentAgentSettingsTabNotificationBridge() {
+        NotificationCenter.default.publisher(for: .desktopPetPresentAgentSettingsTab)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] note in
                 guard let self else { return }
-                guard let idString = note.userInfo?[DesktopPetNotificationUserInfoKey.channelId] as? String,
-                      let id = UUID(uuidString: idString) else { return }
-                self.agentSessionStore.selectChannel(id: id)
-                self.presentChatOverlay()
+                let raw = note.userInfo?[DesktopPetNotificationUserInfoKey.agentSettingsTabIndex] as? Int ?? 0
+                let workspace = AgentSettingsWorkspaceTab.workspaceIndex(fromLegacySevenTabIndex: raw)
+                self.routeBus.presentAgentSettingsTab(index: workspace)
             }
             .store(in: &cancellables)
     }
 
-    private func wireCloseChatOverlayFromPanel() {
-        NotificationCenter.default.publisher(for: .desktopPetCloseChatOverlay)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.extensionOverlay.dismissChatPanel()
+    private func wireRouteBus() {
+        routeBus.onCloseChatOverlay = { [weak self] in
+            self?.appRouter.dismissChatPanel()
+        }
+        routeBus.onPresentChatContinuingChannel = { [weak self] id in
+            guard let self else { return }
+            self.agentSessionStore.selectChannel(id: id)
+            self.presentChatOverlay()
+        }
+        routeBus.onPresentAgentSettingsTab = { [weak self] tab in
+            guard let self else { return }
+            UserDefaults.standard.set(tab, forKey: "DesktopPet.ui.pendingAgentSettingsTab.v2")
+            self.presentAgentSettingsWindow()
+        }
+        routeBus.onForceFireTriggerRuleJSON = { [weak self] json in
+            guard let self else { return }
+            guard let data = json.data(using: .utf8),
+                  let rule = try? JSONDecoder().decode(AgentTriggerRule.self, from: data) else { return }
+            Task { @MainActor in
+                await self.triggerEngine.forceFireTrigger(ruleSnapshot: rule)
             }
-            .store(in: &cancellables)
-    }
-
-    private func wireForceFireTriggerFromSettings() {
-        NotificationCenter.default.publisher(for: .desktopPetForceFireTriggerRule)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] note in
-                guard let self else { return }
-                guard let json = note.userInfo?[DesktopPetNotificationUserInfoKey.triggerRuleJSON] as? String,
-                      let data = json.data(using: .utf8),
-                      let rule = try? JSONDecoder().decode(AgentTriggerRule.self, from: data)
-                else { return }
-                Task { @MainActor in
-                    await self.triggerEngine.forceFireTrigger(ruleSnapshot: rule)
-                }
+        }
+        routeBus.onCareInteractionNarrative = { [weak self] line in
+            guard let self else { return }
+            Task { @MainActor in
+                await self.triggerEngine.fireCareInteractionNarrative(contextLine: line)
             }
-            .store(in: &cancellables)
+        }
+        routeBus.onAccessibilityRecheck = { [weak self] in
+            self?.recheckAccessibilityAndRestartInput()
+        }
     }
 
     /// 菜单栏：对截屏规则执行一次旁白（需隐私总开关 + 屏幕录制权限）；失败时打开对话面板以展示 `lastError`。
@@ -277,32 +298,6 @@ final class AppCoordinator: ObservableObject {
                 self.presentChatOverlay(clearLastError: false)
             }
         }
-    }
-
-    private func wireCareInteractionFromPetPanel() {
-        NotificationCenter.default.publisher(for: .desktopPetCareInteractionForNarrative)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] note in
-                guard let self else { return }
-                guard let line = note.userInfo?[DesktopPetNotificationUserInfoKey.careContext] as? String else { return }
-                Task { @MainActor in
-                    await self.triggerEngine.fireCareInteractionNarrative(contextLine: line)
-                }
-            }
-            .store(in: &cancellables)
-    }
-
-    private func wirePresentAgentSettingsTabFromNotification() {
-        NotificationCenter.default.publisher(for: .desktopPetPresentAgentSettingsTab)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] note in
-                guard let self else { return }
-                let tab = note.userInfo?[DesktopPetNotificationUserInfoKey.agentSettingsTabIndex] as? Int ?? 0
-                let clamped = min(6, max(0, tab))
-                UserDefaults.standard.set(clamped, forKey: "DesktopPet.ui.pendingAgentSettingsTab.v2")
-                self.presentAgentSettingsWindow()
-            }
-            .store(in: &cancellables)
     }
 
     /// Slack 入站写入 `user` 后，用当前「连接」里的模型对该**频道**自动续写一条 `assistant`（与对话面板逻辑一致，并会经出站同步回 Slack）。
@@ -321,171 +316,17 @@ final class AppCoordinator: ObservableObject {
                 self.slackAutoReplyChain = Task { @MainActor [weak self] in
                     await previous?.value
                     guard let self else { return }
-                    await self.performSlackInboundAutoReply(channelId: channelId)
+                    let svc = SlackInboundAutoReplyService(
+                        slackSync: self.slackSyncController,
+                        session: self.agentSessionStore,
+                        settings: self.agentSettingsStore,
+                        deskMirror: self.deskMirrorModel,
+                        client: self.agentClient
+                    )
+                    await svc.performAutoReplyIfPossible(channelId: channelId)
                 }
             }
             .store(in: &cancellables)
-    }
-
-    private func performSlackInboundAutoReply(channelId: UUID) async {
-        guard slackSyncController.integrationConfig.enabled else { return }
-        if agentSessionStore.isSending { return }
-        guard let channel = agentSessionStore.conversation.channel(id: channelId) else { return }
-
-        let key = KeychainStore.readAPIKey(forProvider: agentSettingsStore.activeAPIProvider)
-        var systemPrompt = agentSettingsStore.systemPrompt
-        systemPrompt += "\n\n（本条或本轮上下文中的部分 user 消息可能来自 Slack；请像平常一样以桌宠身份自然回复。）"
-        if agentSettingsStore.attachKeySummary {
-            let s = deskMirrorModel.recentKeyLabelsSummary.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !s.isEmpty {
-                systemPrompt += "\n\n（可选上下文）用户近期键入标签摘要：\(s.prefix(200))"
-            }
-        }
-
-        let apiMessages: [[String: String]] = channel.messages.compactMap { m in
-            if m.role == "user" || m.role == "assistant" {
-                return ["role": m.role, "content": m.content]
-            }
-            return nil
-        }
-        guard apiMessages.contains(where: { $0["role"] == "user" }) else { return }
-
-        agentSessionStore.setSending(true)
-        agentSessionStore.lastError = nil
-        defer { agentSessionStore.setSending(false) }
-
-        do {
-            let reply = try await agentClient.completeChat(
-                baseURL: agentSettingsStore.baseURL,
-                model: agentSettingsStore.model,
-                apiKey: key,
-                systemPrompt: systemPrompt,
-                messages: apiMessages,
-                temperature: agentSettingsStore.temperature,
-                maxTokens: agentSettingsStore.maxTokens
-            )
-            agentSessionStore.appendAssistantInChannel(channelId: channelId, text: reply)
-        } catch {
-            agentSessionStore.lastError = error.localizedDescription
-        }
-    }
-
-    private func notifyScreenWatchHit(task: ScreenWatchTask, detail _: String, narrativeKind: ScreenWatchHitNarrativeKind) {
-        switch narrativeKind {
-        case .visionFallback:
-            // 不向用户展示「模型兜底判定：YES」等技术摘要；与本地命中一致，走短旁白（可再调同一连接模型）。
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                let line = await self.narrateScreenWatchVisionFallbackHit(task: task)
-                let text = "【盯屏】\(task.title)\n\(line)"
-                self.deliverTriggerSpeech(TriggerSpeechPayload(
-                    text: text,
-                    triggerKind: .screenWatch,
-                    userPrompt: nil,
-                    requestSnapshotJPEG: nil
-                ))
-                self.postSlackScreenWatchHitIfNeeded(task: task, body: text)
-            }
-        case .localHeuristic:
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                let line = await self.narrateScreenWatchLocalHeuristicHit(taskTitle: task.title)
-                let text = "【盯屏】\(task.title)\n\(line)"
-                self.deliverTriggerSpeech(TriggerSpeechPayload(
-                    text: text,
-                    triggerKind: .screenWatch,
-                    userPrompt: nil,
-                    requestSnapshotJPEG: nil
-                ))
-                self.postSlackScreenWatchHitIfNeeded(task: task, body: text)
-            }
-        }
-    }
-
-    /// Slack 自动建任务：在原帖线程汇报命中（与本地气泡文案一致）。
-    private func postSlackScreenWatchHitIfNeeded(task: ScreenWatchTask, body: String) {
-        guard task.creationSource == .slackAutomated else { return }
-        let ch = task.slackReportChannelId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !ch.isEmpty else { return }
-        let thread = task.slackReportThreadTs?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let threadArg: String? = (thread?.isEmpty == false) ? thread : nil
-        Task { await slackSyncController.postSlackThreadReply(channelId: ch, threadTs: threadArg, text: body) }
-    }
-
-    /// 模型看图兜底命中后的用户文案：与本地命中同一策略——再调模型写口语旁白，不复述 YES/技术 detail。
-    private func narrateScreenWatchVisionFallbackHit(task: ScreenWatchTask) async -> String {
-        let key = KeychainStore.readAPIKey(forProvider: agentSettingsStore.activeAPIProvider)
-        guard let key, !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return Self.screenWatchVisionFallbackUserFallbackNarrative()
-        }
-        let hint = task.visionUserHint.trimmingCharacters(in: .whitespacesAndNewlines)
-        let hintLine = hint.isEmpty ? "（用户未单独写看图说明，仅依据任务标题理解。）" : "用户当初让你看图判断的要点：\(hint.prefix(200))"
-        do {
-            var sys = agentSettingsStore.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !sys.isEmpty { sys += "\n\n" }
-            sys += """
-            （本轮附加指示）用户配置的「盯屏任务」已在本机通过截图、由多模态模型判定为「条件已满足」。
-            请你以桌宠身份写 1～2 句简短、口语化的中文，温柔地告诉用户「可以过来看一眼啦」或类似陪伴感；可轻轻呼应任务主题，不必照抄标题全文。
-            禁止：出现「YES」「NO」「OCR」「多模态」「截图模型」「兜底」「API」「置信度」等技术词；不要复述模型原始输出；不要分点列举；不要「作为人工智能」式套话。总字数 60 字以内。
-            只输出旁白正文，不要加引号，不要加「旁白：」等前缀。
-            """
-            let user = "任务标题（供你把握语气，不必照抄）：\(task.title)\n\(hintLine)"
-            let reply = try await agentClient.completeChat(
-                baseURL: agentSettingsStore.baseURL,
-                model: agentSettingsStore.model,
-                apiKey: key,
-                systemPrompt: sys,
-                messages: [["role": "user", "content": user]],
-                temperature: min(1.0, agentSettingsStore.temperature + 0.15),
-                maxTokens: 120
-            )
-            let line = reply.trimmingCharacters(in: .whitespacesAndNewlines)
-            if line.isEmpty { return Self.screenWatchVisionFallbackUserFallbackNarrative() }
-            return line
-        } catch {
-            return Self.screenWatchVisionFallbackUserFallbackNarrative()
-        }
-    }
-
-    private static func screenWatchVisionFallbackUserFallbackNarrative() -> String {
-        "图上那边已经对上你要的状态啦，快来看一眼，我在这儿陪你～"
-    }
-
-    /// 本地 OCR/亮度命中后的气泡：优先用当前连接模型写一两句自然旁白；无 Key 或请求失败时用柔和兜底（事件列表里仍是技术向 `detail`）。
-    private func narrateScreenWatchLocalHeuristicHit(taskTitle: String) async -> String {
-        let key = KeychainStore.readAPIKey(forProvider: agentSettingsStore.activeAPIProvider)
-        guard let key, !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return Self.screenWatchLocalHeuristicFallbackNarrative()
-        }
-        do {
-            var sys = agentSettingsStore.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !sys.isEmpty { sys += "\n\n" }
-            sys += """
-            （本轮附加指示）用户给你配置派遣的「盯屏任务」（帮用户盯着屏幕进度）刚刚在本机判定为条件已满足（依据屏幕上的文字或进度区域变化，未使用截图问答模型）。
-            请你以桌宠身份写 1～2 句简短、口语化的中文，让用户感到被陪伴；可以轻轻呼应任务主题，不必机械重复标题全文。
-            禁止：出现「OCR」「亮度」「像素」「启发式」「规则」「模型」「API」等技术词；不要分点列举；不要「作为人工智能」式套话。总字数 60 字以内。
-            只输出旁白正文，不要加引号，不要加「旁白：」等前缀。
-            """
-            let user = "任务标题（供你把握语气，不必照抄）：\(taskTitle)"
-            let reply = try await agentClient.completeChat(
-                baseURL: agentSettingsStore.baseURL,
-                model: agentSettingsStore.model,
-                apiKey: key,
-                systemPrompt: sys,
-                messages: [["role": "user", "content": user]],
-                temperature: min(1.0, agentSettingsStore.temperature + 0.15),
-                maxTokens: 120
-            )
-            let line = reply.trimmingCharacters(in: .whitespacesAndNewlines)
-            if line.isEmpty { return Self.screenWatchLocalHeuristicFallbackNarrative() }
-            return line
-        } catch {
-            return Self.screenWatchLocalHeuristicFallbackNarrative()
-        }
-    }
-
-    private static func screenWatchLocalHeuristicFallbackNarrative() -> String {
-        "好啦，你盯的那件事看起来已经满足条件了，我来喊你一声～"
     }
 
     /// 条件触发或测试气泡：写入旁白历史并展示云朵（点气泡可续聊）。
@@ -496,7 +337,7 @@ final class AppCoordinator: ObservableObject {
             userPrompt: payload.userPrompt,
             snapshotJPEG: payload.requestSnapshotJPEG
         )
-        extensionOverlay.showTriggerBubble(text: payload.text) { [weak self] in
+        appRouter.showTriggerBubble(text: payload.text) { [weak self] in
             guard let self else { return }
             self.agentSessionStore.startSessionFromTrigger(text: payload.text)
             self.presentChatOverlay()
@@ -517,15 +358,6 @@ final class AppCoordinator: ObservableObject {
                 } else {
                     self.globalInput.stop()
                 }
-            }
-            .store(in: &cancellables)
-    }
-
-    private func wireAccessibilityRecheck() {
-        NotificationCenter.default.publisher(for: .desktopPetAccessibilityRecheck)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.recheckAccessibilityAndRestartInput()
             }
             .store(in: &cancellables)
     }

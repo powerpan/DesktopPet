@@ -75,7 +75,7 @@ final class ExtensionOverlayController {
             backing: .buffered,
             defer: false
         )
-        w.title = "智能体设置"
+        w.title = "智能体工作台"
         w.isReleasedWhenClosed = false
         w.isRestorable = false
         w.contentView = NSHostingView(rootView: root)

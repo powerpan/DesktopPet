@@ -175,7 +175,7 @@ final class AgentTriggerEngine: ObservableObject {
         let rule = settings.triggers.first(where: { $0.enabled && $0.kind == .screenSnap })
             ?? settings.triggers.first(where: { $0.kind == .screenSnap })
         guard let rule else {
-            session.lastError = "请先在「智能体设置 → 触发器」中添加一条「截屏」规则。"
+            session.lastError = "请先在「智能体工作台 → 自动化」中添加一条「截屏」规则。"
             return
         }
         guard screenSnapPipelineTask == nil, !session.isSending else {

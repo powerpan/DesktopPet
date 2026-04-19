@@ -16,6 +16,7 @@ enum TriggerSendKindListFilter: Hashable {
 
 struct ConversationChannelsManagerSheet: View {
     @EnvironmentObject private var session: AgentSessionStore
+    @EnvironmentObject private var routeBus: AppRouteBus
     @Binding var isPresented: Bool
 
     var body: some View {
@@ -24,6 +25,7 @@ struct ConversationChannelsManagerSheet: View {
                 NavigationLink {
                     ConversationChannelDetailView(channelId: ch.id, isPresented: $isPresented)
                         .environmentObject(session)
+                        .environmentObject(routeBus)
                 } label: {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(ch.title)
@@ -58,6 +60,7 @@ struct ConversationChannelDetailView: View {
     let channelId: UUID
     @Binding var isPresented: Bool
     @EnvironmentObject private var session: AgentSessionStore
+    @EnvironmentObject private var routeBus: AppRouteBus
 
     private var channel: ChatChannel? {
         session.channels.first { $0.id == channelId }
@@ -76,11 +79,7 @@ struct ConversationChannelDetailView: View {
                 }
                 .safeAreaInset(edge: .bottom) {
                     Button {
-                        NotificationCenter.default.post(
-                            name: .desktopPetPresentChatContinuingChannel,
-                            object: nil,
-                            userInfo: [DesktopPetNotificationUserInfoKey.channelId: channelId.uuidString]
-                        )
+                        routeBus.presentChatContinuingChannel(id: channelId)
                         isPresented = false
                     } label: {
                         Label("在此频道继续聊天", systemImage: "bubble.left.and.bubble.right")
@@ -344,7 +343,7 @@ enum DesktopPetNotificationUserInfoKey {
     static let triggerRuleJSON = "triggerRuleJSON"
     /// 饲养互动旁白：由应用拼好的多行说明，替换模板中的 `{careContext}`。
     static let careContext = "careContext"
-    /// 打开智能体设置时要选中的 Tab 索引（Int）：0=连接，1=会话与历史，2=人格，3=触发器，4=隐私，5=成长，6=集成。
+    /// 打开智能体工作台时要选中的分区索引（Int）：兼容 **旧版 7 Tab**（0=连接…6=集成）；经 `AppCoordinator` 桥接映射为当前五分区（连接/对话/陪伴/自动化/集成）。
     static let agentSettingsTabIndex = "agentSettingsTabIndex"
     static let conversationAppendChannelId = "conversationAppendChannelId"
     static let conversationAppendMessageId = "conversationAppendMessageId"

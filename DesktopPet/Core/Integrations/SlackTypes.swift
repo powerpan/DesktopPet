@@ -56,7 +56,7 @@ enum ScreenWatchCondition: Codable, Equatable {
 
 /// 盯屏任务创建来源（持久化）。
 enum ScreenWatchTaskCreationSource: String, Codable, Equatable {
-    /// 用户在「集成」里手动创建/编辑。
+    /// 用户在「连接」或盯屏相关界面里手动创建/编辑。
     case userManual = "userManual"
     /// 猫猫在 Slack 根据用户话自动创建。
     case slackAutomated = "slackAutomated"

@@ -299,7 +299,7 @@ final class SlackSyncController: ObservableObject {
         }
 
         guard let binding = bindings.first(where: { $0.slackChannelId == slackChannelId }) else {
-            statusMessage = "收到 Slack 消息但未绑定本地频道，请在「集成」中绑定或使用 `!pet new 标题`。"
+            statusMessage = "收到 Slack 消息但未绑定本地频道，请在「连接」中绑定或使用 `!pet new 标题`。"
             return
         }
         session.appendSlackInboundUser(channelId: binding.localChannelId, text: raw, slackTs: slackTs, slackChannelId: slackChannelId)

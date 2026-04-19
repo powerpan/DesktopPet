@@ -12,29 +12,37 @@ struct DesktopPetApp: App {
 
     var body: some Scene {
         MenuBarExtra("DesktopPet", systemImage: "pawprint") {
-            Button("显示/隐藏宠物（⌘K）") {
-                appDelegate.coordinator.togglePetVisibility()
+            Section("显示与面板") {
+                Button("显示/隐藏宠物（⌘K）") {
+                    appDelegate.coordinator.togglePetVisibility()
+                }
+                Button("显示/隐藏饲养面板") {
+                    appDelegate.coordinator.toggleCareOverlay()
+                }
+                Button("显示/隐藏对话面板") {
+                    appDelegate.coordinator.toggleChatOverlay()
+                }
             }
-            Button("显示/隐藏饲养面板") {
-                appDelegate.coordinator.toggleCareOverlay()
+            Section("智能体工作台") {
+                Button("打开智能体工作台…") {
+                    appDelegate.coordinator.presentAgentSettingsWindow()
+                }
+                Button("截屏并旁白一次…") {
+                    appDelegate.coordinator.requestScreenSnapNarrativeFromMenu()
+                }
             }
-            Button("显示/隐藏对话面板") {
-                appDelegate.coordinator.toggleChatOverlay()
+            Section("权限与帮助") {
+                Button("辅助功能与权限说明…") {
+                    appDelegate.coordinator.presentOnboardingWindow()
+                }
             }
-            Button("智能体设置…") {
-                appDelegate.coordinator.presentAgentSettingsWindow()
-            }
-            Button("截屏并旁白一次…") {
-                appDelegate.coordinator.requestScreenSnapNarrativeFromMenu()
-            }
-            Button("辅助功能与权限说明…") {
-                appDelegate.coordinator.presentOnboardingWindow()
-            }
-            // 系统标准设置入口，与下方 Settings { } 成对
-            SettingsLink()
-            Divider()
-            Button("退出 DesktopPet") {
-                NSApp.terminate(nil)
+            Section("应用") {
+                // 系统标准设置入口：仅桌宠外观与行为（穿透、巡逻、缩放等）
+                SettingsLink()
+                Divider()
+                Button("退出 DesktopPet") {
+                    NSApp.terminate(nil)
+                }
             }
         }
 

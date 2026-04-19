@@ -8,6 +8,7 @@ import SwiftUI
 
 struct AccessibilityOnboardingView: View {
     @ObservedObject var permissionManager: AccessibilityPermissionManager
+    @EnvironmentObject private var routeBus: AppRouteBus
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -39,7 +40,7 @@ struct AccessibilityOnboardingView: View {
                 }
 
                 Button("重新检测") {
-                    NotificationCenter.default.post(name: .desktopPetAccessibilityRecheck, object: nil)
+                    routeBus.requestAccessibilityRecheck()
                 }
             }
 

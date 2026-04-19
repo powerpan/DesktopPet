@@ -7,7 +7,13 @@ import SwiftUI
 
 struct CareOverlayView: View {
     @EnvironmentObject private var care: PetCareModel
+    @EnvironmentObject private var settings: AgentSettingsStore
+    @EnvironmentObject private var routeBus: AppRouteBus
     @State private var toast: String?
+
+    private var careNarrativeEnabled: Bool {
+        settings.triggers.contains { $0.kind == .careInteraction && $0.enabled }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -18,16 +24,32 @@ struct CareOverlayView: View {
             Text("今日陪伴 \(care.state.todayCompanionSeconds / 60) 分钟")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Button("成长详情…") {
-                NotificationCenter.default.post(
-                    name: .desktopPetPresentAgentSettingsTab,
-                    object: nil,
-                    userInfo: [DesktopPetNotificationUserInfoKey.agentSettingsTabIndex: 5]
-                )
+
+            GroupBox {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("相关配置")
+                        .font(.subheadline.weight(.semibold))
+                    HStack(spacing: 10) {
+                        Button("成长与冷却…") {
+                            routeBus.presentAgentSettingsTab(index: AgentSettingsWorkspaceTab.companion.rawValue)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        Button("旁白与自动化…") {
+                            routeBus.presentAgentSettingsTab(index: AgentSettingsWorkspaceTab.automation.rawValue)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                    Text(careNarrativeEnabled
+                        ? "「饲养互动」旁白规则已启用（在自动化分区可编辑）。"
+                        : "未检测到已启用的「饲养互动」旁白规则；可在自动化分区添加或打开。")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            Text("互动成功时的猫猫反应由「智能体设置 → 触发器 → 饲养互动」旁白请求模型生成（若已启用该规则）；此处仅在操作失败时提示。")
+
+            Text("互动成功时的猫猫反应由「饲养互动」触发器旁白请求模型生成；此处仅在操作失败时提示。")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
             HStack(spacing: 12) {
@@ -35,11 +57,7 @@ struct CareOverlayView: View {
                     let before = care.state
                     if care.feedIfAllowed() {
                         let line = PetCareNarrativeContext.summaryLine(isFeed: true, before: before, after: care.state)
-                        NotificationCenter.default.post(
-                            name: .desktopPetCareInteractionForNarrative,
-                            object: nil,
-                            userInfo: [DesktopPetNotificationUserInfoKey.careContext: line]
-                        )
+                        routeBus.careInteractionForNarrative(contextLine: line)
                         toast = nil
                     } else {
                         toast = "还在冷却哦"
@@ -49,11 +67,7 @@ struct CareOverlayView: View {
                     let before = care.state
                     if care.petIfAllowed() {
                         let line = PetCareNarrativeContext.summaryLine(isFeed: false, before: before, after: care.state)
-                        NotificationCenter.default.post(
-                            name: .desktopPetCareInteractionForNarrative,
-                            object: nil,
-                            userInfo: [DesktopPetNotificationUserInfoKey.careContext: line]
-                        )
+                        routeBus.careInteractionForNarrative(contextLine: line)
                         toast = nil
                     } else {
                         toast = "稍后再戳嘛"

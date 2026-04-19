@@ -50,6 +50,7 @@
 		C1000000000000000000002F /* CareOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002F /* CareOverlayView.swift */; };
 		C10000000000000000000030 /* ChatOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000030 /* ChatOverlayView.swift */; };
 		C10000000000000000000031 /* AgentSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000031 /* AgentSettingsView.swift */; };
+		C1000000000000000000004E /* AgentSettingsTriggerComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004E /* AgentSettingsTriggerComponents.swift */; };
 		C10000000000000000000032 /* TriggerSpeechBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000032 /* TriggerSpeechBubbleView.swift */; };
 		C10000000000000000000033 /* AgentConversationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000033 /* AgentConversationStore.swift */; };
 		C10000000000000000000034 /* TriggerSpeechHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000034 /* TriggerSpeechHistoryStore.swift */; };
@@ -68,6 +69,21 @@
 		C10000000000000000000043 /* ScreenWatchPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000043 /* ScreenWatchPersistence.swift */; };
 		C10000000000000000000044 /* ScreenWatchDetectors.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000044 /* ScreenWatchDetectors.swift */; };
 		C10000000000000000000045 /* ScreenWatchRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000045 /* ScreenWatchRunner.swift */; };
+		C10000000000000000000049 /* OverlayPresenting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000049 /* OverlayPresenting.swift */; };
+		C1000000000000000000004A /* DesktopPetAppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004A /* DesktopPetAppRouter.swift */; };
+		C1000000000000000000004B /* AppRouteBus.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004B /* AppRouteBus.swift */; };
+		C1000000000000000000004C /* SlackInboundAutoReplyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004C /* SlackInboundAutoReplyService.swift */; };
+		C1000000000000000000004D /* ScreenWatchHitFeedbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004D /* ScreenWatchHitFeedbackService.swift */; };
+		C10000000000000000000051 /* ConnectionTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000051 /* ConnectionTabView.swift */; };
+		C10000000000000000000052 /* SessionHistoryTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000052 /* SessionHistoryTabView.swift */; };
+		C10000000000000000000053 /* PersonaTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000053 /* PersonaTabView.swift */; };
+		C10000000000000000000054 /* TriggersTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000054 /* TriggersTabView.swift */; };
+		C10000000000000000000055 /* PrivacyTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000055 /* PrivacyTabView.swift */; };
+		C10000000000000000000056 /* GrowthTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000056 /* GrowthTabView.swift */; };
+		C10000000000000000000057 /* IntegrationsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000057 /* IntegrationsTabView.swift */; };
+		C10000000000000000000059 /* AgentSettingsWorkspaceTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000059 /* AgentSettingsWorkspaceTab.swift */; };
+		C1000000000000000000005A /* ConversationCenterTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005A /* ConversationCenterTabView.swift */; };
+		C1000000000000000000005B /* AutomationCenterTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005B /* AutomationCenterTabView.swift */; };
 		C3D4E5F60718293A4B5C6D7E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8F /* ContentView.swift */; };
 		E5F60718293A4B5C6D7E8F90 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F60718293A4B5C6D7E8F90AB /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -76,6 +92,21 @@
 		0718293A4B5C6D7E8F90AB12 /* DesktopPet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DesktopPet.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B100000000000000000000001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		B100000000000000000000002 /* AppCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCoordinator.swift; sourceTree = "<group>"; };
+		B100000000000000000000049 /* OverlayPresenting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayPresenting.swift; sourceTree = "<group>"; };
+		B10000000000000000000004A /* DesktopPetAppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPetAppRouter.swift; sourceTree = "<group>"; };
+		B10000000000000000000004B /* AppRouteBus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouteBus.swift; sourceTree = "<group>"; };
+		B10000000000000000000004C /* SlackInboundAutoReplyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackInboundAutoReplyService.swift; sourceTree = "<group>"; };
+		B10000000000000000000004D /* ScreenWatchHitFeedbackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenWatchHitFeedbackService.swift; sourceTree = "<group>"; };
+		B100000000000000000000051 /* ConnectionTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionTabView.swift; sourceTree = "<group>"; };
+		B100000000000000000000052 /* SessionHistoryTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionHistoryTabView.swift; sourceTree = "<group>"; };
+		B100000000000000000000053 /* PersonaTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaTabView.swift; sourceTree = "<group>"; };
+		B100000000000000000000054 /* TriggersTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriggersTabView.swift; sourceTree = "<group>"; };
+		B100000000000000000000055 /* PrivacyTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyTabView.swift; sourceTree = "<group>"; };
+		B100000000000000000000056 /* GrowthTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrowthTabView.swift; sourceTree = "<group>"; };
+		B100000000000000000000057 /* IntegrationsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationsTabView.swift; sourceTree = "<group>"; };
+		B100000000000000000000059 /* AgentSettingsWorkspaceTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSettingsWorkspaceTab.swift; sourceTree = "<group>"; };
+		B10000000000000000000005A /* ConversationCenterTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationCenterTabView.swift; sourceTree = "<group>"; };
+		B10000000000000000000005B /* AutomationCenterTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationCenterTabView.swift; sourceTree = "<group>"; };
 		B100000000000000000000005 /* MouseTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseTracker.swift; sourceTree = "<group>"; };
 		B100000000000000000000006 /* InteractionEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractionEvent.swift; sourceTree = "<group>"; };
 		B100000000000000000000007 /* PetConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetConfig.swift; sourceTree = "<group>"; };
@@ -115,6 +146,7 @@
 		B10000000000000000000002F /* CareOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CareOverlayView.swift; sourceTree = "<group>"; };
 		B100000000000000000000030 /* ChatOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatOverlayView.swift; sourceTree = "<group>"; };
 		B100000000000000000000031 /* AgentSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSettingsView.swift; sourceTree = "<group>"; };
+		B10000000000000000000004E /* AgentSettingsTriggerComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSettingsTriggerComponents.swift; sourceTree = "<group>"; };
 		B100000000000000000000032 /* TriggerSpeechBubbleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriggerSpeechBubbleView.swift; sourceTree = "<group>"; };
 		B100000000000000000000033 /* AgentConversationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentConversationStore.swift; sourceTree = "<group>"; };
 		B100000000000000000000034 /* TriggerSpeechHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriggerSpeechHistoryStore.swift; sourceTree = "<group>"; };
@@ -186,6 +218,11 @@
 			children = (
 				B100000000000000000000001 /* AppDelegate.swift */,
 				B100000000000000000000002 /* AppCoordinator.swift */,
+				B100000000000000000000049 /* OverlayPresenting.swift */,
+				B10000000000000000000004A /* DesktopPetAppRouter.swift */,
+				B10000000000000000000004B /* AppRouteBus.swift */,
+				B10000000000000000000004C /* SlackInboundAutoReplyService.swift */,
+				B10000000000000000000004D /* ScreenWatchHitFeedbackService.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -382,12 +419,31 @@
 			path = Care;
 			sourceTree = "<group>";
 		};
+		A10000000000000000000058 /* AgentSettings */ = {
+			isa = PBXGroup;
+			children = (
+				B100000000000000000000059 /* AgentSettingsWorkspaceTab.swift */,
+				B10000000000000000000005A /* ConversationCenterTabView.swift */,
+				B10000000000000000000005B /* AutomationCenterTabView.swift */,
+				B100000000000000000000051 /* ConnectionTabView.swift */,
+				B100000000000000000000052 /* SessionHistoryTabView.swift */,
+				B100000000000000000000053 /* PersonaTabView.swift */,
+				B100000000000000000000054 /* TriggersTabView.swift */,
+				B100000000000000000000055 /* PrivacyTabView.swift */,
+				B100000000000000000000056 /* GrowthTabView.swift */,
+				B100000000000000000000057 /* IntegrationsTabView.swift */,
+			);
+			path = AgentSettings;
+			sourceTree = "<group>";
+		};
 		A10000000000000000000012 /* Overlay */ = {
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000002F /* CareOverlayView.swift */,
 				B100000000000000000000030 /* ChatOverlayView.swift */,
 				B100000000000000000000031 /* AgentSettingsView.swift */,
+				A10000000000000000000058 /* AgentSettings */,
+				B10000000000000000000004E /* AgentSettingsTriggerComponents.swift */,
 				B100000000000000000000035 /* AgentSessionHistoryViews.swift */,
 				B100000000000000000000046 /* MainScreenRegionPicker.swift */,
 				B100000000000000000000047 /* ScreenWatchTaskEditorSheet.swift */,
@@ -471,6 +527,11 @@
 				C3D4E5F60718293A4B5C6D7E /* ContentView.swift in Sources */,
 				C10000000000000000000001 /* AppDelegate.swift in Sources */,
 				C10000000000000000000002 /* AppCoordinator.swift in Sources */,
+				C10000000000000000000049 /* OverlayPresenting.swift in Sources */,
+				C1000000000000000000004A /* DesktopPetAppRouter.swift in Sources */,
+				C1000000000000000000004B /* AppRouteBus.swift in Sources */,
+				C1000000000000000000004C /* SlackInboundAutoReplyService.swift in Sources */,
+				C1000000000000000000004D /* ScreenWatchHitFeedbackService.swift in Sources */,
 				C10000000000000000000016 /* GlobalInputMonitor.swift in Sources */,
 				C10000000000000000000005 /* MouseTracker.swift in Sources */,
 				C10000000000000000000006 /* InteractionEvent.swift in Sources */,
@@ -510,6 +571,17 @@
 				C1000000000000000000002F /* CareOverlayView.swift in Sources */,
 				C10000000000000000000030 /* ChatOverlayView.swift in Sources */,
 				C10000000000000000000031 /* AgentSettingsView.swift in Sources */,
+				C10000000000000000000059 /* AgentSettingsWorkspaceTab.swift in Sources */,
+				C1000000000000000000005A /* ConversationCenterTabView.swift in Sources */,
+				C1000000000000000000005B /* AutomationCenterTabView.swift in Sources */,
+				C10000000000000000000051 /* ConnectionTabView.swift in Sources */,
+				C10000000000000000000052 /* SessionHistoryTabView.swift in Sources */,
+				C10000000000000000000053 /* PersonaTabView.swift in Sources */,
+				C10000000000000000000054 /* TriggersTabView.swift in Sources */,
+				C10000000000000000000055 /* PrivacyTabView.swift in Sources */,
+				C10000000000000000000056 /* GrowthTabView.swift in Sources */,
+				C10000000000000000000057 /* IntegrationsTabView.swift in Sources */,
+				C1000000000000000000004E /* AgentSettingsTriggerComponents.swift in Sources */,
 				C10000000000000000000032 /* TriggerSpeechBubbleView.swift in Sources */,
 				C10000000000000000000033 /* AgentConversationStore.swift in Sources */,
 				C10000000000000000000034 /* TriggerSpeechHistoryStore.swift in Sources */,
