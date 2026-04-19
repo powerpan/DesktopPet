@@ -22,18 +22,27 @@ enum RemoteClickOverlayRenderer {
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
             ctx.saveGState()
             ctx.interpolationQuality = .none
-            ctx.draw(cg, in: bounds)
-
             let bw = bounds.width
             let bh = bounds.height
-            let lineW = max(1, min(bw, bh) / 400)
-            ctx.setLineWidth(lineW)
+            // SCK 截屏与主屏对齐：先前双轴翻转后「上下」已对、「左右」仍反；改为仅垂直翻转（等价于去掉水平镜像），标尺仍在未翻转的左上坐标系中。
+            ctx.saveGState()
+            ctx.translateBy(x: 0, y: bh)
+            ctx.scaleBy(x: 1, y: -1)
+            ctx.draw(cg, in: bounds)
+            ctx.restoreGState()
+            let lineWThin = max(0.5, min(bw, bh) / 500)
+            let lineWMed = max(1, min(bw, bh) / 400)
+            let lineWThick = max(1.2, min(bw, bh) / 320)
 
-            for step in stride(from: 0, through: 100, by: 10) {
+            // 每 2 个标尺单位一条线（0,2,4,…,100）；10 的倍数略强，50 的倍数再强，外框最亮。
+            for step in stride(from: 0, through: 100, by: 2) {
                 let t = CGFloat(step) / 100
-                let isMajor = step % 50 == 0
-                let c = (isMajor ? NSColor.white.withAlphaComponent(0.55) : NSColor.white.withAlphaComponent(0.35)).cgColor
-                ctx.setStrokeColor(c)
+                let is50 = step % 50 == 0
+                let is10 = step % 10 == 0
+                let alpha: CGFloat = is50 ? 0.62 : (is10 ? 0.42 : 0.2)
+                let lw = is50 ? lineWThick : (is10 ? lineWMed : lineWThin)
+                ctx.setLineWidth(lw)
+                ctx.setStrokeColor(NSColor.white.withAlphaComponent(alpha).cgColor)
                 let vx = t * bw
                 let vy = t * bh
                 ctx.move(to: CGPoint(x: vx, y: 0))
@@ -44,7 +53,8 @@ enum RemoteClickOverlayRenderer {
                 ctx.strokePath()
             }
 
-            ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.85).cgColor)
+            ctx.setLineWidth(lineWThick)
+            ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.88).cgColor)
             ctx.stroke(CGRect(x: 0.5, y: 0.5, width: bw - 1, height: bh - 1))
 
             let fontSize = max(10, min(bw, bh) * 0.028)
