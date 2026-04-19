@@ -37,10 +37,8 @@ struct AgentSettingsView: View {
     @State private var watchVisionHint: String = ""
     @State private var watchUseVision = false
     @State private var watchEnableProgress = false
-    @State private var watchRectX: String = "0.25"
-    @State private var watchRectY: String = "0.55"
-    @State private var watchRectW: String = "0.5"
-    @State private var watchRectH: String = "0.08"
+    /// 进度条启发式在主屏上框选的区域（内部存为相对主屏的归一化矩形，与截屏 UV 一致）。
+    @State private var watchPickedProgressRect: NormalizedRect?
     @State private var watchDelta: String = "0.08"
 
     /// 待打开设置窗口时选中的 Tab（0=连接 … 6=集成）；与通知 `agentSettingsTabIndex` 一致。
@@ -785,10 +783,22 @@ struct AgentSettingsView: View {
                     .lineLimit(2 ... 6)
                 Toggle("附加：进度条区域亮度启发式", isOn: $watchEnableProgress)
                 if watchEnableProgress {
-                    TextField("归一化 x", text: $watchRectX)
-                    TextField("归一化 y", text: $watchRectY)
-                    TextField("归一化 width", text: $watchRectW)
-                    TextField("归一化 height", text: $watchRectH)
+                    HStack {
+                        Button("在主屏框选进度条区域…") {
+                            MainScreenRegionPicker.pickNormalizedRect { rect in
+                                watchPickedProgressRect = rect
+                            }
+                        }
+                        if let r = watchPickedProgressRect {
+                            Text(String(format: "已选：x=%.2f y=%.2f w=%.2f h=%.2f", r.x, r.y, r.width, r.height))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("尚未框选")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
                     TextField("左右亮度差阈值（0…1）", text: $watchDelta)
                 }
                 Button("添加盯屏任务") {
@@ -812,6 +822,11 @@ struct AgentSettingsView: View {
                 }
             } header: {
                 Text("盯屏任务")
+            } footer: {
+                Text("启用进度条启发式时，请在主屏拖拽框选区域（Esc 取消）；无需手填数字。模型兜底在本地未命中时才会调用，且额外有约 15 秒冷却，避免频繁消耗 API。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Section {
@@ -867,12 +882,7 @@ struct AgentSettingsView: View {
             conditions.append(.ocrContains(text: ocr, caseInsensitive: true))
         }
         if watchEnableProgress {
-            let rect = NormalizedRect(
-                x: Double(watchRectX) ?? 0.25,
-                y: Double(watchRectY) ?? 0.55,
-                width: Double(watchRectW) ?? 0.5,
-                height: Double(watchRectH) ?? 0.08
-            )
+            guard let rect = watchPickedProgressRect else { return }
             let delta = Double(watchDelta) ?? 0.08
             conditions.append(.progressBarFilled(rect: rect, deltaThreshold: delta))
         }
@@ -895,6 +905,7 @@ struct AgentSettingsView: View {
         screenWatchTasks.upsert(task)
         watchNewTitle = ""
         watchOCRText = ""
+        watchPickedProgressRect = nil
     }
 
     private func runGrowthDebugRandomTest() {
