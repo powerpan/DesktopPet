@@ -119,6 +119,10 @@ final class AgentTriggerEngine: ObservableObject {
 
     /// 设置页「立即触发」：用当前表单快照走与自动触发相同的模型请求与旁白链路；不经过各 kind 的自动门槛判断。
     func forceFireTrigger(ruleSnapshot: AgentTriggerRule) async {
+        if ruleSnapshot.kind == .screenWatch {
+            session.lastError = "「盯屏」由「集成」Tab 的任务触发，不能在此试跑。"
+            return
+        }
         if ruleSnapshot.kind == .screenSnap {
             guard let idx = settings.triggers.firstIndex(where: { $0.id == ruleSnapshot.id }) else { return }
             guard settings.screenSnapTriggerMasterEnabled else {
@@ -247,6 +251,8 @@ final class AgentTriggerEngine: ObservableObject {
                 }
                 fired = false
             case .careInteraction:
+                fired = false
+            case .screenWatch:
                 fired = false
             }
             if fired {

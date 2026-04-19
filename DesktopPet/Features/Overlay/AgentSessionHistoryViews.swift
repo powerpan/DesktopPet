@@ -6,6 +6,12 @@
 import AppKit
 import SwiftUI
 
+/// 旁白历史 / 模型请求列表中按「发送类型」（触发器种类）筛选。
+enum TriggerSendKindListFilter: Hashable {
+    case all
+    case kind(AgentTriggerKind)
+}
+
 // MARK: - 正式会话频道
 
 struct ConversationChannelsManagerSheet: View {
@@ -156,6 +162,16 @@ private struct TriggerSpeechSnapshotThumbnail: View {
 struct TriggerSpeechHistoryListSheet: View {
     @EnvironmentObject private var session: AgentSessionStore
     @Binding var isPresented: Bool
+    @State private var sendKindFilter: TriggerSendKindListFilter = .all
+
+    private var filteredRecords: [TriggerSpeechRecord] {
+        switch sendKindFilter {
+        case .all:
+            return session.triggerHistory.records
+        case .kind(let k):
+            return session.triggerHistory.records.filter { $0.triggerKind == k }
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -163,8 +179,15 @@ struct TriggerSpeechHistoryListSheet: View {
                 if session.triggerHistory.records.isEmpty {
                     ContentUnavailableView("暂无记录", systemImage: "text.bubble")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if filteredRecords.isEmpty {
+                    ContentUnavailableView(
+                        "该发送类型下暂无记录",
+                        systemImage: "line.3.horizontal.decrease.circle",
+                        description: Text("请切换筛选或选择「全部」。")
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List(session.triggerHistory.records) { r in
+                    List(filteredRecords) { r in
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
                                 Text(r.triggerKind.displayName)
@@ -201,6 +224,15 @@ struct TriggerSpeechHistoryListSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("关闭") { isPresented = false }
                 }
+                ToolbarItem(placement: .primaryAction) {
+                    Picker("发送类型", selection: $sendKindFilter) {
+                        Text("全部").tag(TriggerSendKindListFilter.all)
+                        ForEach(AgentTriggerKind.allCases) { kind in
+                            Text(kind.displayName).tag(TriggerSendKindListFilter.kind(kind))
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
             }
         }
         .frame(minWidth: 440, minHeight: 480)
@@ -220,19 +252,36 @@ struct TriggerSpeechHistoryListSheet: View {
 struct TriggerUserPromptHistorySheet: View {
     @EnvironmentObject private var session: AgentSessionStore
     @Binding var isPresented: Bool
+    @State private var sendKindFilter: TriggerSendKindListFilter = .all
+
+    private var allPromptEntries: [TriggerSpeechRecord] {
+        session.triggerHistory.records.filter { ($0.userPromptSent?.isEmpty == false) }
+    }
 
     private var entries: [TriggerSpeechRecord] {
-        session.triggerHistory.records.filter { ($0.userPromptSent?.isEmpty == false) }
+        switch sendKindFilter {
+        case .all:
+            return allPromptEntries
+        case .kind(let k):
+            return allPromptEntries.filter { $0.triggerKind == k }
+        }
     }
 
     var body: some View {
         NavigationStack {
             Group {
-                if entries.isEmpty {
+                if allPromptEntries.isEmpty {
                     ContentUnavailableView(
                         "暂无请求记录",
                         systemImage: "text.document",
                         description: Text("仅「经过大模型」的条件旁白会保存本条。气泡测试不请求模型；若升级前产生的旧旁白历史也可能没有请求正文。")
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if entries.isEmpty {
+                    ContentUnavailableView(
+                        "该发送类型下暂无请求",
+                        systemImage: "line.3.horizontal.decrease.circle",
+                        description: Text("请切换筛选或选择「全部」。")
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -274,6 +323,15 @@ struct TriggerUserPromptHistorySheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("关闭") { isPresented = false }
                 }
+                ToolbarItem(placement: .primaryAction) {
+                    Picker("发送类型", selection: $sendKindFilter) {
+                        Text("全部").tag(TriggerSendKindListFilter.all)
+                        ForEach(AgentTriggerKind.allCases) { kind in
+                            Text(kind.displayName).tag(TriggerSendKindListFilter.kind(kind))
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
             }
         }
         .frame(minWidth: 440, minHeight: 480)
@@ -286,6 +344,14 @@ enum DesktopPetNotificationUserInfoKey {
     static let triggerRuleJSON = "triggerRuleJSON"
     /// 饲养互动旁白：由应用拼好的多行说明，替换模板中的 `{careContext}`。
     static let careContext = "careContext"
-    /// 打开智能体设置时要选中的 Tab 索引（Int）。
+    /// 打开智能体设置时要选中的 Tab 索引（Int）：0=连接，1=会话与历史，2=人格，3=触发器，4=隐私，5=成长，6=集成。
     static let agentSettingsTabIndex = "agentSettingsTabIndex"
+    static let conversationAppendChannelId = "conversationAppendChannelId"
+    static let conversationAppendMessageId = "conversationAppendMessageId"
+    static let conversationAppendRole = "conversationAppendRole"
+    static let conversationAppendContent = "conversationAppendContent"
+    /// `"local"` 或 `"slack"`。
+    static let conversationAppendOrigin = "conversationAppendOrigin"
+    static let conversationAppendSlackTs = "conversationAppendSlackTs"
+    static let conversationAppendSlackChannelId = "conversationAppendSlackChannelId"
 }

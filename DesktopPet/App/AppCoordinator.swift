@@ -20,6 +20,10 @@ final class AppCoordinator: ObservableObject {
     let petCareModel = PetCareModel()
     let agentSettingsStore = AgentSettingsStore()
     let agentSessionStore = AgentSessionStore()
+    let slackSyncController = SlackSyncController()
+    let screenWatchTaskStore = ScreenWatchTaskStore()
+    let screenWatchEventStore = ScreenWatchEventStore()
+    private lazy var screenWatchRunner = ScreenWatchRunner(tasks: screenWatchTaskStore, events: screenWatchEventStore)
     private let frontmostAppWatcher = FrontmostAppWatcher()
     private let extensionOverlay = ExtensionOverlayController()
     private let agentClient = AgentClient()
@@ -64,6 +68,11 @@ final class AppCoordinator: ObservableObject {
         petCareModel.startCompanionTicking { [weak self] in self?.isPetVisible ?? false }
         triggerEngine.start()
 
+        slackSyncController.start(session: agentSessionStore)
+        screenWatchRunner.start(agentClient: agentClient, agentSettings: agentSettingsStore) { [weak self] title, detail in
+            self?.notifyScreenWatchHit(taskTitle: title, detail: detail)
+        }
+
         permissionManager.refreshStatus(prompt: false)
         deskMirrorModel.setAccessibilityKeyboardMirrorGranted(permissionManager.isGranted)
         // 隐藏宠物时不应因屏外鼠标产生悬停/唤醒
@@ -92,6 +101,8 @@ final class AppCoordinator: ObservableObject {
         mouseTracker.stop()
         globalInput.stop()
         triggerEngine.stop()
+        slackSyncController.stop()
+        screenWatchRunner.stop()
         petCareModel.stopCompanionTicking()
         idleSleepTimer?.invalidate()
         idleSleepTimer = nil
@@ -147,6 +158,9 @@ final class AppCoordinator: ObservableObject {
                 .environmentObject(agentSettingsStore)
                 .environmentObject(agentSessionStore)
                 .environmentObject(petCareModel)
+                .environmentObject(slackSyncController)
+                .environmentObject(screenWatchTaskStore)
+                .environmentObject(screenWatchEventStore)
                 .environment(\.desktopPetAgentClient, agentClient)
         ))
     }
@@ -276,11 +290,21 @@ final class AppCoordinator: ObservableObject {
             .sink { [weak self] note in
                 guard let self else { return }
                 let tab = note.userInfo?[DesktopPetNotificationUserInfoKey.agentSettingsTabIndex] as? Int ?? 0
-                let clamped = min(4, max(0, tab))
-                UserDefaults.standard.set(clamped, forKey: "DesktopPet.ui.pendingAgentSettingsTab")
+                let clamped = min(6, max(0, tab))
+                UserDefaults.standard.set(clamped, forKey: "DesktopPet.ui.pendingAgentSettingsTab.v2")
                 self.presentAgentSettingsWindow()
             }
             .store(in: &cancellables)
+    }
+
+    private func notifyScreenWatchHit(taskTitle: String, detail: String) {
+        let text = "【盯屏】\(taskTitle)\n\(detail)"
+        deliverTriggerSpeech(TriggerSpeechPayload(
+            text: text,
+            triggerKind: .screenWatch,
+            userPrompt: nil,
+            requestSnapshotJPEG: nil
+        ))
     }
 
     /// 条件触发或测试气泡：写入旁白历史并展示云朵（点气泡可续聊）。

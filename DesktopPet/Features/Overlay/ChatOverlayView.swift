@@ -184,10 +184,19 @@ struct ChatOverlayView: View {
             let isUser = m.role == "user"
             HStack {
                 if isUser { Spacer(minLength: 24) }
-                Text(InlineMarkdownBubble.attributedDisplayString(m.content))
-                    .font(.callout)
-                    .padding(10)
-                    .background(isUser ? Color.accentColor.opacity(0.25) : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
+                    if m.slackMessageTs != nil {
+                        Text("Slack")
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.purple.opacity(0.2), in: Capsule())
+                    }
+                    Text(InlineMarkdownBubble.attributedDisplayString(m.content))
+                        .font(.callout)
+                        .padding(10)
+                        .background(isUser ? Color.accentColor.opacity(0.25) : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                }
                 if !isUser { Spacer(minLength: 24) }
             }
         }

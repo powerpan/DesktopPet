@@ -1,6 +1,6 @@
 //
 // AgentSettingsView.swift
-// 模型连接（多套 Base URL / 模型 / Key）、人格、触发器与隐私相关开关（API Key 仅钥匙串）。
+// 模型连接（多套 Base URL / 模型 / Key）、会话与历史、人格、触发器与隐私相关开关（API Key 仅钥匙串）。
 //
 
 import AppKit
@@ -10,6 +10,9 @@ struct AgentSettingsView: View {
     @EnvironmentObject private var settings: AgentSettingsStore
     @EnvironmentObject private var session: AgentSessionStore
     @EnvironmentObject private var petCare: PetCareModel
+    @EnvironmentObject private var slackSync: SlackSyncController
+    @EnvironmentObject private var screenWatchTasks: ScreenWatchTaskStore
+    @EnvironmentObject private var screenWatchEvents: ScreenWatchEventStore
     @Environment(\.desktopPetAgentClient) private var desktopPetAgentClient: AgentClient?
 
     @State private var apiKeyDraft: String = ""
@@ -21,45 +24,86 @@ struct AgentSettingsView: View {
     @State private var showTriggerSpeechHistorySheet = false
     @State private var showTriggerUserPromptHistorySheet = false
     @State private var showNewKeyboardTriggerPrivacyHint = false
-    @State private var selectedSettingsTab = 0
+    /// 上次停留的智能体设置 Tab（0…6），跨重启保留；深链/通知的待选 Tab 仍会在 `onAppear` 里优先覆盖一次。
+    @AppStorage("DesktopPet.ui.agentSettingsSelectedTab") private var selectedSettingsTab = 0
     @State private var growthDebugRandomPreview: String?
     @State private var growthDebugRandomTestUseAI = true
     @State private var growthDebugRandomTestBusy = false
 
-    private static let pendingAgentSettingsTabKey = "DesktopPet.ui.pendingAgentSettingsTab"
+    @State private var slackTokenDraft: String = ""
+    @State private var slackTokenMessage: String?
+    @State private var watchNewTitle: String = ""
+    @State private var watchOCRText: String = ""
+    @State private var watchVisionHint: String = ""
+    @State private var watchUseVision = false
+    @State private var watchEnableProgress = false
+    @State private var watchRectX: String = "0.25"
+    @State private var watchRectY: String = "0.55"
+    @State private var watchRectW: String = "0.5"
+    @State private var watchRectH: String = "0.08"
+    @State private var watchDelta: String = "0.08"
+
+    /// 待打开设置窗口时选中的 Tab（0=连接 … 6=集成）；与通知 `agentSettingsTabIndex` 一致。
+    private static let pendingAgentSettingsTabKeyV2 = "DesktopPet.ui.pendingAgentSettingsTab.v2"
+    /// 旧版仅 5 个 Tab 时的待选索引；启动时若存在则迁移为 v2 语义后删除。
+    private static let pendingAgentSettingsTabKeyLegacy = "DesktopPet.ui.pendingAgentSettingsTab"
 
     var body: some View {
         TabView(selection: $selectedSettingsTab) {
             connectionTab
                 .tabItem { Label("连接", systemImage: "link") }
                 .tag(0)
+            sessionAndHistoryTab
+                .tabItem { Label("会话与历史", systemImage: "bubble.left.and.bubble.right") }
+                .tag(1)
             personalityTab
                 .tabItem { Label("人格", systemImage: "theatermasks") }
-                .tag(1)
+                .tag(2)
             triggersTab
                 .tabItem { Label("触发器", systemImage: "bolt.horizontal") }
-                .tag(2)
+                .tag(3)
             privacyTab
                 .tabItem { Label("隐私", systemImage: "hand.raised") }
-                .tag(3)
+                .tag(4)
             growthTab
                 .tabItem { Label("成长", systemImage: "leaf.fill") }
-                .tag(4)
+                .tag(5)
+            integrationsTab
+                .tabItem { Label("集成", systemImage: "puzzlepiece.extension") }
+                .tag(6)
         }
         .frame(minWidth: 480, minHeight: 520)
         .padding(12)
         .onAppear {
             apiKeyDraft = KeychainStore.readAPIKey(forProvider: settings.activeAPIProvider) ?? ""
-            if let v = UserDefaults.standard.object(forKey: Self.pendingAgentSettingsTabKey) as? Int {
-                UserDefaults.standard.removeObject(forKey: Self.pendingAgentSettingsTabKey)
-                if (0 ... 4).contains(v) {
+            if !(0 ... 6).contains(selectedSettingsTab) {
+                selectedSettingsTab = 0
+            }
+            if let v = UserDefaults.standard.object(forKey: Self.pendingAgentSettingsTabKeyV2) as? Int {
+                UserDefaults.standard.removeObject(forKey: Self.pendingAgentSettingsTabKeyV2)
+                if (0 ... 6).contains(v) {
                     selectedSettingsTab = v
                 }
+            } else if let legacy = UserDefaults.standard.object(forKey: Self.pendingAgentSettingsTabKeyLegacy) as? Int {
+                UserDefaults.standard.removeObject(forKey: Self.pendingAgentSettingsTabKeyLegacy)
+                let mapped: Int
+                switch legacy {
+                case 0: mapped = 0
+                case 1: mapped = 2
+                case 2: mapped = 3
+                case 3: mapped = 4
+                case 4: mapped = 5
+                default: mapped = min(6, max(0, legacy))
+                }
+                if (0 ... 6).contains(mapped) {
+                    selectedSettingsTab = mapped
+                }
             }
+            slackTokenDraft = KeychainStore.readSlackBotToken() ?? ""
         }
         .onReceive(NotificationCenter.default.publisher(for: .desktopPetPresentAgentSettingsTab)) { note in
             let tab = note.userInfo?[DesktopPetNotificationUserInfoKey.agentSettingsTabIndex] as? Int ?? 0
-            selectedSettingsTab = min(4, max(0, tab))
+            selectedSettingsTab = min(6, max(0, tab))
         }
         .alert("键盘模式触发", isPresented: $showKeyboardRiskAlert) {
             Button("取消", role: .cancel) {}
@@ -186,7 +230,12 @@ struct AgentSettingsView: View {
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+        }
+        .formStyle(.grouped)
+    }
 
+    private var sessionAndHistoryTab: some View {
+        Form {
             Section {
                 Button("查看正式会话频道…") {
                     showConversationChannelsSheet = true
@@ -209,7 +258,7 @@ struct AgentSettingsView: View {
             } header: {
                 Text("会话与历史")
             } footer: {
-                Text("多会话频道与消息保存在 UserDefaults；「清空当前频道」只影响当前选中会话。「旁白历史」记录模型返回的旁白正文；「发给模型的请求」记录同一次触发里作为 user 发给大模型的全文（占位符已替换，最多约 200 条与旁白历史共用条数）。清空旁白历史会同时清空这两类展示所依赖的数据。重置会话会删除所有频道并恢复为单一空会话。")
+                Text("多会话频道与消息保存在 UserDefaults；「清空当前频道」只影响当前选中会话。「旁白历史」记录模型返回的旁白正文；「发给模型的请求」记录同一次触发里作为 user 发给大模型的全文（占位符已替换，最多约 200 条与旁白历史共用条数）。清空旁白历史会同时清空这两类展示所依赖的数据。重置会话会删除所有频道并恢复为单一空会话。在旁白历史或请求列表中可按「发送类型」（触发器种类）筛选。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -289,7 +338,7 @@ struct AgentSettingsView: View {
                     }
                 }
                 Menu("添加触发器") {
-                    ForEach(AgentTriggerKind.allCases.filter { $0 != .careInteraction }) { k in
+                    ForEach(AgentTriggerKind.allCases.filter { $0 != .careInteraction && $0 != .screenWatch }) { k in
                         Button(k.displayName) {
                             settings.triggers.append(.new(kind: k))
                             if k == .keyboardPattern, !settings.keyboardTriggerMasterEnabled {
@@ -632,6 +681,220 @@ struct AgentSettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var integrationsTab: some View {
+        Form {
+            Section {
+                Toggle("启用 Slack 同步", isOn: Binding(
+                    get: { slackSync.integrationConfig.enabled },
+                    set: { v in
+                        var c = slackSync.integrationConfig
+                        c.enabled = v
+                        slackSync.updateIntegrationConfig(c)
+                    }
+                ))
+                TextField("Slack 频道 ID（C…）", text: Binding(
+                    get: { slackSync.integrationConfig.monitoredChannelId },
+                    set: { v in
+                        var c = slackSync.integrationConfig
+                        c.monitoredChannelId = v
+                        slackSync.updateIntegrationConfig(c)
+                    }
+                ))
+                Stepper(
+                    "轮询间隔：\(Int(slackSync.integrationConfig.pollIntervalSeconds)) 秒",
+                    value: Binding(
+                        get: { slackSync.integrationConfig.pollIntervalSeconds },
+                        set: { v in
+                            var c = slackSync.integrationConfig
+                            c.pollIntervalSeconds = min(120, max(3, v))
+                            slackSync.updateIntegrationConfig(c)
+                        }
+                    ),
+                    in: 3 ... 120,
+                    step: 1
+                )
+                Toggle("入站（Slack → 本地）", isOn: Binding(
+                    get: { slackSync.integrationConfig.syncInbound },
+                    set: { v in
+                        var c = slackSync.integrationConfig
+                        c.syncInbound = v
+                        slackSync.updateIntegrationConfig(c)
+                    }
+                ))
+                Toggle("出站（本地 → Slack）", isOn: Binding(
+                    get: { slackSync.integrationConfig.syncOutbound },
+                    set: { v in
+                        var c = slackSync.integrationConfig
+                        c.syncOutbound = v
+                        slackSync.updateIntegrationConfig(c)
+                    }
+                ))
+                SecureField("Slack Bot Token（xoxb-…，仅钥匙串）", text: $slackTokenDraft)
+                HStack {
+                    Button("保存 Token 到钥匙串") {
+                        do {
+                            try KeychainStore.saveSlackBotToken(slackTokenDraft)
+                            slackTokenMessage = "已保存 Slack Token。"
+                        } catch {
+                            slackTokenMessage = error.localizedDescription
+                        }
+                    }
+                    Button("清除 Token", role: .destructive) {
+                        KeychainStore.deleteSlackBotToken()
+                        slackTokenDraft = ""
+                        slackTokenMessage = "已清除 Slack Token。"
+                    }
+                }
+                if let slackTokenMessage {
+                    Text(slackTokenMessage).font(.caption).foregroundStyle(.secondary)
+                }
+                Button("将监控频道绑定到当前本地会话") {
+                    slackSync.bindMonitoredChannelToActiveSession(session)
+                }
+                Button("重置该频道「跳过历史」标记") {
+                    slackSync.resetChannelInitializationMarker()
+                }
+                Text(slackSync.statusMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if !slackSync.bindings.isEmpty {
+                    Text("已绑定 \(slackSync.bindings.count) 条")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            } header: {
+                Text("Slack")
+            } footer: {
+                Text("在 Slack 频道发送 `!pet new 标题` 可新建本地会话并绑定。首次连接某频道会跳过历史回放，仅同步之后的新消息。出站会同步当前绑定频道内你发送的 user/assistant 消息。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Section {
+                Text("需已授予「屏幕录制」权限。本地 OCR / 进度条亮度启发式优先；可选多模态模型 YES/NO 兜底（消耗 API）。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField("新任务标题", text: $watchNewTitle)
+                TextField("OCR 包含子串（可空）", text: $watchOCRText)
+                Toggle("启用模型兜底（需填写说明）", isOn: $watchUseVision)
+                TextField("兜底条件说明（给模型）", text: $watchVisionHint, axis: .vertical)
+                    .lineLimit(2 ... 6)
+                Toggle("附加：进度条区域亮度启发式", isOn: $watchEnableProgress)
+                if watchEnableProgress {
+                    TextField("归一化 x", text: $watchRectX)
+                    TextField("归一化 y", text: $watchRectY)
+                    TextField("归一化 width", text: $watchRectW)
+                    TextField("归一化 height", text: $watchRectH)
+                    TextField("左右亮度差阈值（0…1）", text: $watchDelta)
+                }
+                Button("添加盯屏任务") {
+                    addScreenWatchTaskFromForm()
+                }
+                ForEach(screenWatchTasks.tasks) { t in
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(t.title).font(.headline)
+                            Text(t.isEnabled ? "运行中" : "已停用/已命中")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Toggle("", isOn: screenWatchEnabledBinding(for: t))
+                            .labelsHidden()
+                        Button("删除", role: .destructive) {
+                            screenWatchTasks.remove(id: t.id)
+                        }
+                    }
+                }
+            } header: {
+                Text("盯屏任务")
+            }
+
+            Section {
+                if screenWatchEvents.events.isEmpty {
+                    Text("暂无盯屏事件")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(screenWatchEvents.events.prefix(40)) { ev in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(ev.kind.rawValue)
+                                    .font(.caption.weight(.semibold))
+                                Spacer()
+                                Text(shortDate(ev.createdAt))
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            Text(ev.taskTitle).font(.caption)
+                            Text(ev.detail)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+                Button("清空盯屏事件列表", role: .destructive) {
+                    screenWatchEvents.clear()
+                }
+            } header: {
+                Text("盯屏事件")
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func screenWatchEnabledBinding(for task: ScreenWatchTask) -> Binding<Bool> {
+        Binding(
+            get: { screenWatchTasks.tasks.first { $0.id == task.id }?.isEnabled ?? false },
+            set: { v in
+                guard var t = screenWatchTasks.tasks.first(where: { $0.id == task.id }) else { return }
+                t.isEnabled = v
+                screenWatchTasks.upsert(t)
+            }
+        )
+    }
+
+    private func addScreenWatchTaskFromForm() {
+        let title = watchNewTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+        let ocr = watchOCRText.trimmingCharacters(in: .whitespacesAndNewlines)
+        var conditions: [ScreenWatchCondition] = []
+        if !ocr.isEmpty {
+            conditions.append(.ocrContains(text: ocr, caseInsensitive: true))
+        }
+        if watchEnableProgress {
+            let rect = NormalizedRect(
+                x: Double(watchRectX) ?? 0.25,
+                y: Double(watchRectY) ?? 0.55,
+                width: Double(watchRectW) ?? 0.5,
+                height: Double(watchRectH) ?? 0.08
+            )
+            let delta = Double(watchDelta) ?? 0.08
+            conditions.append(.progressBarFilled(rect: rect, deltaThreshold: delta))
+        }
+        if conditions.isEmpty, !watchUseVision {
+            return
+        }
+        if watchUseVision {
+            let h = watchVisionHint.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !h.isEmpty else { return }
+        }
+        let hint = watchVisionHint.trimmingCharacters(in: .whitespacesAndNewlines)
+        let task = ScreenWatchTask(
+            title: title,
+            isEnabled: true,
+            sampleIntervalSeconds: 3,
+            conditions: conditions,
+            useVisionFallback: watchUseVision,
+            visionUserHint: hint
+        )
+        screenWatchTasks.upsert(task)
+        watchNewTitle = ""
+        watchOCRText = ""
     }
 
     private func runGrowthDebugRandomTest() {
@@ -998,6 +1261,7 @@ private struct TriggerRuleRow: View {
             let perm = ScreenCaptureService.hasScreenRecordingPermission ? "已授权" : "未授权"
             return "间隔≥\(r.screenSnapIntervalMinutes)分·\(perm)\(routeHint)"
         case .careInteraction: return "饲养面板成功后·旁白\(routeHint)"
+        case .screenWatch: return "盯屏任务命中旁白"
         }
     }
 }
@@ -1027,6 +1291,22 @@ private struct PromptPlaceholderHelp: View {
     }
 }
 
+/// 截屏 JPEG 滑条：与 `NSBitmapImageRep` 的 `compressionFactor` 同源，数值越大压缩越轻、细节越好、同分辨率下字节越大。
+private func screenSnapJPEGQualityLiveCaption(_ quality: Double) -> String {
+    let v = min(0.85, max(0.55, quality))
+    let band: String
+    if v < 0.62 {
+        band = "压缩偏强：上传更快、更省流量，界面小字与细边更容易出现马赛克。"
+    } else if v < 0.72 {
+        band = "折中：体积与清晰度较均衡，多数截屏旁白够用。"
+    } else if v < 0.80 {
+        band = "偏清晰：文字与边缘更利落，请求体与耗时通常增加。"
+    } else {
+        band = "接近上限：尽量保细节，JPEG 与 Base64 请求体会明显变大。"
+    }
+    return "当前 \(String(format: "%.2f", v))（约 \(String(format: "%.0f", v * 100))% 强度）— \(band)"
+}
+
 private struct TriggerRuleEditorSheet: View {
     @State var rule: AgentTriggerRule
     @EnvironmentObject private var settings: AgentSettingsStore
@@ -1040,7 +1320,7 @@ private struct TriggerRuleEditorSheet: View {
             Form {
                 Section {
                     Picker("类型", selection: $rule.kind) {
-                        ForEach(AgentTriggerKind.allCases) { k in
+                        ForEach(AgentTriggerKind.allCases.filter { $0 != .screenWatch }) { k in
                             Text(k.displayName).tag(k)
                         }
                     }
@@ -1130,7 +1410,7 @@ private struct TriggerRuleEditorSheet: View {
                             switch rule.kind {
                             case .keyboardPattern: return [.keyboardContains("")]
                             case .frontApp: return [.frontAppContains("")]
-                            case .timer, .randomIdle, .screenSnap, .careInteraction: return [.always]
+                            case .timer, .randomIdle, .screenSnap, .careInteraction, .screenWatch: return [.always]
                             }
                         }()
                         rule.routes.append(
@@ -1258,12 +1538,17 @@ private struct TriggerRuleEditorSheet: View {
                                 .font(.caption.monospacedDigit())
                                 .frame(width: 40, alignment: .trailing)
                         }
+                        Text(screenSnapJPEGQualityLiveCaption(rule.screenSnapJPEGQuality))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     } header: {
                         Text("截屏")
                     } footer: {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("冷却下限请使用上方「基本」中的「冷却（秒）」；与「成功旁白最短间隔」取**更长**者作为实际上限。")
-                            Text("自动触发需打开「隐私」中的截屏总开关，并授予屏幕录制。主显示器经 ScreenCaptureKit 抓取后按「长边上界」缩放再 JPEG 编码（最大 2048px），仅在内存中上传；数值越大越利于认字，但请求体与耗时通常也会增加。")
+                            Text("JPEG 质量系数（0.55～0.85）：与 macOS 编码 JPEG 时的 compressionFactor 一致，表示有损压缩的轻重，不是分辨率。系数越高，同一截屏下画质越好、文件越大、上传越慢、API 请求体越大；越低则相反。与上方「长边上界」共同影响模型能否看清屏上小字。")
+                            Text("自动触发需打开「隐私」中的截屏总开关，并授予屏幕录制。主显示器经 ScreenCaptureKit 抓取后按「长边上界」缩放再 JPEG 编码（最大 2048px），仅在内存中上传；长边越大越利于认字，但请求体与耗时通常也会增加。")
                             Text("若模型不支持图像，应用会在收到 HTTP 400 时自动改为纯文字再请求一次。")
                         }
                         .font(.caption)
@@ -1285,6 +1570,14 @@ private struct TriggerRuleEditorSheet: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                case .screenWatch:
+                    Section {
+                        Text("「盯屏任务」由「集成」Tab 配置，不在触发器列表中编辑。此处为占位说明。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } header: {
+                        Text("盯屏")
                     }
                 }
 

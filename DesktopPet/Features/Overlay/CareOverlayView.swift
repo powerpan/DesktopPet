@@ -22,7 +22,7 @@ struct CareOverlayView: View {
                 NotificationCenter.default.post(
                     name: .desktopPetPresentAgentSettingsTab,
                     object: nil,
-                    userInfo: [DesktopPetNotificationUserInfoKey.agentSettingsTabIndex: 4]
+                    userInfo: [DesktopPetNotificationUserInfoKey.agentSettingsTabIndex: 5]
                 )
             }
             .buttonStyle(.bordered)

@@ -90,6 +90,51 @@ enum KeychainStore {
         deleteAPIKey(forProvider: .deepseek)
     }
 
+    // MARK: - Slack Bot Token
+
+    private static let slackBotTokenService = "io.github.powerpan.DesktopPet.slack.botToken"
+    private static let slackBotTokenAccount = "default"
+
+    static func saveSlackBotToken(_ value: String) throws {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: slackBotTokenService,
+            kSecAttrAccount as String: slackBotTokenAccount,
+        ]
+        SecItemDelete(query as CFDictionary)
+        guard !trimmed.isEmpty else {
+            throw NSError(
+                domain: "DesktopPet.Keychain",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Slack Bot Token 不能为空。"]
+            )
+        }
+        let data = Data(trimmed.utf8)
+        var attrs = query
+        attrs[kSecValueData as String] = data
+        attrs[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        let status = SecItemAdd(attrs as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status), userInfo: [NSLocalizedDescriptionKey: "Slack Token 写入失败 (\(status))"])
+        }
+    }
+
+    static func readSlackBotToken() -> String? {
+        let s = readPassword(service: slackBotTokenService, account: slackBotTokenAccount)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return s.isEmpty ? nil : s
+    }
+
+    static func deleteSlackBotToken() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: slackBotTokenService,
+            kSecAttrAccount as String: slackBotTokenAccount,
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
+
     // MARK: - Private
 
     private static func readPassword(service: String, account: String) -> String? {

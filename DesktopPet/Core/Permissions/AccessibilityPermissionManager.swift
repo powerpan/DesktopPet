@@ -21,8 +21,10 @@ extension Notification.Name {
     static let desktopPetForceFireTriggerRule = Notification.Name("desktopPetForceFireTriggerRule")
     /// 饲养面板喂食/戳戳成功：`userInfo["careContext"]` 为拼进旁白模板的说明文字。
     static let desktopPetCareInteractionForNarrative = Notification.Name("desktopPetCareInteractionForNarrative")
-    /// 打开智能体设置并选中指定 Tab：`userInfo[DesktopPetNotificationUserInfoKey.agentSettingsTabIndex]` 为 Int（0=连接…4=成长）。
+    /// 打开智能体设置并选中指定 Tab：`userInfo[DesktopPetNotificationUserInfoKey.agentSettingsTabIndex]` 为 Int（0=连接，1=会话与历史，2=人格，3=触发器，4=隐私，5=成长，6=集成）。
     static let desktopPetPresentAgentSettingsTab = Notification.Name("desktopPetPresentAgentSettingsTab")
+    /// 会话频道追加了一条 `user`/`assistant` 消息（供 Slack 等集成同步出站）。
+    static let desktopPetConversationDidAppendMessage = Notification.Name("desktopPetConversationDidAppendMessage")
 }
 
 @MainActor

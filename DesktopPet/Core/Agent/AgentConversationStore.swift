@@ -132,19 +132,23 @@ final class AgentConversationStore: ObservableObject {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty, let i = channels.firstIndex(where: { $0.id == activeChannelId }) else { return }
         var ch = channels[i]
-        ch.messages.append(ChatMessage(role: "user", content: t))
+        let msg = ChatMessage(role: "user", content: t)
+        ch.messages.append(msg)
         ch.updatedAt = Date()
         channels[i] = ch
         persist()
+        postConversationAppend(channelId: activeChannelId, message: msg, origin: "local")
     }
 
     func appendAssistant(_ text: String) {
         guard let i = channels.firstIndex(where: { $0.id == activeChannelId }) else { return }
         var ch = channels[i]
-        ch.messages.append(ChatMessage(role: "assistant", content: text))
+        let msg = ChatMessage(role: "assistant", content: text)
+        ch.messages.append(msg)
         ch.updatedAt = Date()
         channels[i] = ch
         persist()
+        postConversationAppend(channelId: activeChannelId, message: msg, origin: "local")
     }
 
     func appendSystemNotice(_ text: String) {
@@ -154,6 +158,60 @@ final class AgentConversationStore: ObservableObject {
         ch.updatedAt = Date()
         channels[i] = ch
         persist()
+    }
+
+    /// Slack 入站：写入指定本地频道，**不**切换当前选中频道。
+    func appendSlackInboundUser(channelId: UUID, text: String, slackTs: String, slackChannelId: String) {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty, let i = channels.firstIndex(where: { $0.id == channelId }) else { return }
+        var ch = channels[i]
+        let msg = ChatMessage(
+            role: "user",
+            content: t,
+            slackMessageTs: slackTs,
+            slackChannelId: slackChannelId
+        )
+        ch.messages.append(msg)
+        ch.updatedAt = Date()
+        channels[i] = ch
+        persist()
+        postConversationAppend(channelId: channelId, message: msg, origin: "slack")
+    }
+
+    /// Slack 入站：对方频道里出现 assistant 文本（少见，预留）。
+    func appendSlackInboundAssistant(channelId: UUID, text: String, slackTs: String, slackChannelId: String) {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty, let i = channels.firstIndex(where: { $0.id == channelId }) else { return }
+        var ch = channels[i]
+        let msg = ChatMessage(
+            role: "assistant",
+            content: t,
+            slackMessageTs: slackTs,
+            slackChannelId: slackChannelId
+        )
+        ch.messages.append(msg)
+        ch.updatedAt = Date()
+        channels[i] = ch
+        persist()
+        postConversationAppend(channelId: channelId, message: msg, origin: "slack")
+    }
+
+    private func postConversationAppend(channelId: UUID, message: ChatMessage, origin: String) {
+        guard message.role == "user" || message.role == "assistant" else { return }
+        var userInfo: [String: Any] = [
+            DesktopPetNotificationUserInfoKey.conversationAppendChannelId: channelId.uuidString,
+            DesktopPetNotificationUserInfoKey.conversationAppendMessageId: message.id.uuidString,
+            DesktopPetNotificationUserInfoKey.conversationAppendRole: message.role,
+            DesktopPetNotificationUserInfoKey.conversationAppendContent: message.content,
+            DesktopPetNotificationUserInfoKey.conversationAppendOrigin: origin,
+        ]
+        if let ts = message.slackMessageTs {
+            userInfo[DesktopPetNotificationUserInfoKey.conversationAppendSlackTs] = ts
+        }
+        if let ch = message.slackChannelId {
+            userInfo[DesktopPetNotificationUserInfoKey.conversationAppendSlackChannelId] = ch
+        }
+        NotificationCenter.default.post(name: .desktopPetConversationDidAppendMessage, object: nil, userInfo: userInfo)
     }
 
     private func defaultTitleForNewChannel(prefix: String = "新会话") -> String {

@@ -10,12 +10,25 @@ struct ChatMessage: Identifiable, Equatable, Codable {
     let role: String
     let content: String
     let createdAt: Date
+    /// Slack 消息 `ts`（入站同步时写入）；本地消息为 `nil`。
+    var slackMessageTs: String?
+    /// Slack 频道 `C…`（入站时写入）。
+    var slackChannelId: String?
 
-    init(id: UUID = UUID(), role: String, content: String, createdAt: Date = Date()) {
+    init(
+        id: UUID = UUID(),
+        role: String,
+        content: String,
+        createdAt: Date = Date(),
+        slackMessageTs: String? = nil,
+        slackChannelId: String? = nil
+    ) {
         self.id = id
         self.role = role
         self.content = content
         self.createdAt = createdAt
+        self.slackMessageTs = slackMessageTs
+        self.slackChannelId = slackChannelId
     }
 }
 
@@ -75,6 +88,8 @@ enum AgentTriggerKind: String, CaseIterable, Identifiable, Codable {
     case screenSnap
     /// 饲养面板「喂食 / 戳戳」成功时请求旁白（不走定时 tick；由应用发通知触发）。
     case careInteraction
+    /// 盯屏任务命中后的通知旁白（不入触发器规则编辑器）。
+    case screenWatch
 
     var id: String { rawValue }
 
@@ -86,6 +101,7 @@ enum AgentTriggerKind: String, CaseIterable, Identifiable, Codable {
         case .frontApp: return "前台应用"
         case .screenSnap: return "截屏"
         case .careInteraction: return "饲养互动"
+        case .screenWatch: return "盯屏任务"
         }
     }
 
@@ -186,6 +202,11 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             用户刚在饲养面板完成了一次互动，以下为应用整理的数值与操作摘要（含在 {careContext}）。
             请用一两句简体中文，以桌宠口吻给出**动作反馈**（开心、呼噜、蹭手、撒娇等小描写均可），不要像报表一样复读数字列表。{extra}
             """
+        case .screenWatch:
+            return """
+            用户之前拜托你「盯着屏幕」等某个条件；现在应用检测到条件可能已满足。{extra}
+            请用一两句简体中文像桌宠一样提醒用户回来看看，语气开心或得意一点，不要长篇。
+            """
         }
     }
 
@@ -222,6 +243,11 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             本条为饲养互动旁白路由。摘要：{careContext}；条件概要：{matchedCondition}。{extra}
             请用一两句简体中文像桌宠一样对刚才的互动做出可爱反馈，不要机械罗列数字。
             """
+        case .screenWatch:
+            return """
+            盯屏任务条件已命中。{extra}
+            请用一两句简体中文像桌宠一样喊用户回屏幕确认，可带一点点「我帮你盯着呢」的得意感。
+            """
         }
     }
 
@@ -250,9 +276,9 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
     var screenSnapIntervalMinutes: Int
     /// 仅宠物窗口可见时才允许自动截屏旁白。
     var screenSnapOnlyWhenPetVisible: Bool
-    /// 截图长边缩放上限（768 或 1024）。
+    /// 截图长边缩放上限（768～2048，见设置 Picker）。
     var screenSnapMaxEdgePixels: Int
-    /// JPEG 压缩系数 0.55...0.85
+    /// JPEG `compressionFactor`（UI 滑条 0.55～0.85）：越大压缩越轻、画质越好、同分辨率下体积越大。
     var screenSnapJPEGQuality: Double
 
     init(
@@ -403,7 +429,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
                 promptTemplate: def
             )
             return ([route], def)
-        case .timer, .randomIdle, .screenSnap, .careInteraction:
+        case .timer, .randomIdle, .screenSnap, .careInteraction, .screenWatch:
             let route = TriggerPromptRoute(enabled: true, priority: 0, conditions: [.always], promptTemplate: def)
             return ([route], def)
         }
@@ -416,7 +442,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         let kbd: String
         let front: String
         switch kind {
-        case .timer, .randomIdle, .screenSnap, .careInteraction:
+        case .timer, .randomIdle, .screenSnap, .careInteraction, .screenWatch:
             defaultRoutes = [TriggerPromptRoute(enabled: true, priority: 0, conditions: [.always], promptTemplate: routeTmpl)]
             kbd = ""
             front = ""
@@ -435,6 +461,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         let defaultCooldown: Double = {
             if kind == .careInteraction { return 3 }
             if kind == .screenSnap { return 900 }
+            if kind == .screenWatch { return 3600 }
             return 120
         }()
         return AgentTriggerRule(
