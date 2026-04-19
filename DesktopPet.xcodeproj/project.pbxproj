@@ -67,6 +67,7 @@
 		C10000000000000000000042 /* SlackSyncController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000042 /* SlackSyncController.swift */; };
 		C10000000000000000000048 /* SlackPetWatchCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000048 /* SlackPetWatchCommand.swift */; };
 		C10000000000000000000061 /* SlackPetRemoteClickCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000061 /* SlackPetRemoteClickCommand.swift */; };
+		C10000000000000000000065 /* SlackPetHelpCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000065 /* SlackPetHelpCommand.swift */; };
 		C10000000000000000000062 /* SlackRemoteClickSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000062 /* SlackRemoteClickSessionStore.swift */; };
 		C10000000000000000000063 /* RemoteClickOverlayRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000063 /* RemoteClickOverlayRenderer.swift */; };
 		C10000000000000000000064 /* RemoteClickExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000064 /* RemoteClickExecutor.swift */; };
@@ -175,6 +176,7 @@
 		B100000000000000000000042 /* SlackSyncController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackSyncController.swift; sourceTree = "<group>"; };
 		B100000000000000000000048 /* SlackPetWatchCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackPetWatchCommand.swift; sourceTree = "<group>"; };
 		B100000000000000000000061 /* SlackPetRemoteClickCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackPetRemoteClickCommand.swift; sourceTree = "<group>"; };
+		B100000000000000000000065 /* SlackPetHelpCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackPetHelpCommand.swift; sourceTree = "<group>"; };
 		B100000000000000000000062 /* SlackRemoteClickSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackRemoteClickSessionStore.swift; sourceTree = "<group>"; };
 		B100000000000000000000063 /* RemoteClickOverlayRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteClickOverlayRenderer.swift; sourceTree = "<group>"; };
 		B100000000000000000000064 /* RemoteClickExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteClickExecutor.swift; sourceTree = "<group>"; };
@@ -268,6 +270,7 @@
 				B100000000000000000000042 /* SlackSyncController.swift */,
 				B100000000000000000000048 /* SlackPetWatchCommand.swift */,
 				B100000000000000000000061 /* SlackPetRemoteClickCommand.swift */,
+				B100000000000000000000065 /* SlackPetHelpCommand.swift */,
 				B100000000000000000000062 /* SlackRemoteClickSessionStore.swift */,
 			);
 			path = Integrations;
@@ -626,6 +629,7 @@
 				C10000000000000000000042 /* SlackSyncController.swift in Sources */,
 				C10000000000000000000048 /* SlackPetWatchCommand.swift in Sources */,
 				C10000000000000000000061 /* SlackPetRemoteClickCommand.swift in Sources */,
+				C10000000000000000000065 /* SlackPetHelpCommand.swift in Sources */,
 				C10000000000000000000062 /* SlackRemoteClickSessionStore.swift in Sources */,
 				C10000000000000000000063 /* RemoteClickOverlayRenderer.swift in Sources */,
 				C10000000000000000000064 /* RemoteClickExecutor.swift in Sources */,
