@@ -3,6 +3,7 @@
 // DeepSeek 连接、人格、触发器与隐私相关开关（API Key 仅钥匙串）。
 //
 
+import AppKit
 import SwiftUI
 
 struct AgentSettingsView: View {
@@ -69,10 +70,18 @@ struct AgentSettingsView: View {
         } message: {
             Text("开启后，应用会监听全局按键以匹配你配置的「模式串」，用于触发智能体旁白。不会把原始键入全文写入磁盘；但仍属于敏感能力，请仅在信任本机与源码时使用。")
         }
-        .alert("截屏触发", isPresented: $showScreenSnapInfo) {
-            Button("好的", role: .cancel) {}
+        .alert("关于截屏类触发", isPresented: $showScreenSnapInfo) {
+            Button("打开屏幕录制设置") {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            Button("请求系统授权") {
+                ScreenCaptureService.requestScreenRecordingPermission()
+            }
+            Button("关闭", role: .cancel) {}
         } message: {
-            Text("截屏/画面理解类触发仍在规划中。即使打开总开关，当前版本也不会发起截屏或上传图像。")
+            Text("开启后，满足条件的「截屏」触发器会通过 ScreenCaptureKit 截取主显示器画面，经缩放与 JPEG 压缩后，作为多模态请求的一部分发往你在「连接」里配置的 Base URL 与模型。画面可能包含屏幕上任何可见内容；请在会议或投屏场景关闭总开关或对应规则。默认不落盘原图。若模型不支持图像，应用会尝试自动改为纯文字重试一次。")
         }
         .alert("请打开键盘模式总开关", isPresented: $showNewKeyboardTriggerPrivacyHint) {
             Button("好的", role: .cancel) {}
@@ -251,7 +260,7 @@ struct AgentSettingsView: View {
                     }
                 }
                 Menu("添加触发器") {
-                    ForEach(AgentTriggerKind.allCases.filter { $0 != .screenSnap }) { k in
+                    ForEach(AgentTriggerKind.allCases.filter { $0 != .careInteraction }) { k in
                         Button(k.displayName) {
                             settings.triggers.append(.new(kind: k))
                             if k == .keyboardPattern, !settings.keyboardTriggerMasterEnabled {
@@ -259,8 +268,8 @@ struct AgentSettingsView: View {
                             }
                         }
                     }
-                    Button("截屏（占位）") {
-                        settings.triggers.append(.new(kind: .screenSnap))
+                    Button("饲养互动") {
+                        settings.triggers.append(.new(kind: .careInteraction))
                     }
                 }
             } header: {
@@ -313,13 +322,13 @@ struct AgentSettingsView: View {
                     .onChange(of: settings.screenSnapTriggerMasterEnabled) { _, on in
                         if on { showScreenSnapInfo = true }
                     }
-                Text("当前版本不会截屏；此开关为后续能力预留。")
+                Text("关闭后，引擎不会评估任何「截屏」规则，也不会发起截屏或图像请求。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
                 Text("进阶触发总开关")
             } footer: {
-                Text("键盘总闸：关闭后，所有「键盘模式」类触发器都不会匹配子串。截屏总闸：当前版本无实际截屏逻辑。")
+                Text("键盘总闸：关闭后，所有「键盘模式」类触发器都不会匹配子串。截屏总闸：关闭后不会截屏或上传图像；开启后仍需系统「屏幕录制」权限及至少一条已启用的截屏规则。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -954,7 +963,9 @@ private struct TriggerRuleRow: View {
         case .frontApp:
             if r.routes.isEmpty, !r.frontAppNameContains.isEmpty { return "前台包含「\(r.frontAppNameContains)」" }
             return "前台路由\(routeHint)"
-        case .screenSnap: return "占位，不触发\(routeHint)"
+        case .screenSnap:
+            let perm = ScreenCaptureService.hasScreenRecordingPermission ? "已授权" : "未授权"
+            return "间隔≥\(r.screenSnapIntervalMinutes)分·\(perm)\(routeHint)"
         case .careInteraction: return "饲养面板成功后·旁白\(routeHint)"
         }
     }
@@ -973,6 +984,7 @@ private struct PromptPlaceholderHelp: View {
                 Text("· {matchedCondition} — 替换为本次命中的那条旁白路由的条件摘要（例如「按键含「abc」且 空闲≥120s」），便于模型理解命中分支。")
                 Text("· {keySummary} — 仅键入摘要的短片段（与 {extra} 里可能带的摘要同源）；未开「附带键入摘要」时为空字符串。适合在模板中间单独引用摘要、而不想整段复述 {extra} 时使用。")
                 Text("· {careContext} — 仅「饲养互动」类型：喂食或戳戳成功时，由应用自动填入心情/能量变化与陪伴时长等摘要；未触发饲养操作或试跑占位时可能为空。")
+                Text("· {screenCaptureMeta} — 仅「截屏」类型：应用填入时间、前台应用名、缩放与是否降级为纯文字等摘要；勿在模板中手写该占位符以外的机密内容。")
             }
             .font(.caption2)
             .foregroundStyle(.secondary)
@@ -1185,16 +1197,45 @@ private struct TriggerRuleEditorSheet: View {
                     }
                 case .screenSnap:
                     Section {
-                        Text("当前版本不会触发；占位以便后续接入 ScreenCaptureKit 等能力。")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        HStack {
+                            Text("屏幕录制")
+                            Spacer()
+                            Text(ScreenCaptureService.hasScreenRecordingPermission ? "已授权" : "未授权")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(ScreenCaptureService.hasScreenRecordingPermission ? Color.secondary : Color.orange)
+                        }
+                        Button("打开系统设置…") {
+                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        Stepper("成功旁白最短间隔（分钟）: \(rule.screenSnapIntervalMinutes)", value: $rule.screenSnapIntervalMinutes, in: 5 ... 24 * 60)
+                        Text("与下方「冷却」取**更长**者作为实际上限。")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Toggle("仅宠物窗口可见时自动触发", isOn: $rule.screenSnapOnlyWhenPetVisible)
+                        Picker("截图长边上界", selection: $rule.screenSnapMaxEdgePixels) {
+                            Text("768 px").tag(768)
+                            Text("1024 px").tag(1024)
+                        }
+                        HStack {
+                            Text("JPEG 质量")
+                            Slider(value: $rule.screenSnapJPEGQuality, in: 0.55 ... 0.85, step: 0.02)
+                            Text(String(format: "%.2f", rule.screenSnapJPEGQuality))
+                                .font(.caption.monospacedDigit())
+                                .frame(width: 40, alignment: .trailing)
+                        }
                     } header: {
                         Text("截屏")
                     } footer: {
-                        Text("开启后也不会请求截屏权限；与「隐私」Tab 中的截屏总开关为后续版本预留。")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("冷却下限请使用上方「基本」中的「冷却（秒）」；与「成功旁白最短间隔」取**更长**者作为实际上限。")
+                            Text("自动触发需打开「隐私」中的截屏总开关，并授予屏幕录制。主显示器经 ScreenCaptureKit 抓取后缩放编码，仅在内存中上传至你配置的 API。")
+                            Text("若模型不支持图像，应用会在收到 HTTP 400 时自动改为纯文字再请求一次。")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 case .careInteraction:
                     Section {
@@ -1279,11 +1320,15 @@ private struct TriggerRuleEditorSheet: View {
                     Button("立即触发当前触发器") {
                         postForceFireTriggerNotification()
                     }
-                    .disabled(session.isSending || rule.kind == .screenSnap)
+                    .disabled(
+                        session.isSending
+                            || (rule.kind == .screenSnap
+                                && (!settings.screenSnapTriggerMasterEnabled || !ScreenCaptureService.hasScreenRecordingPermission))
+                    )
                 } header: {
                     Text("试跑")
                 } footer: {
-                    Text("使用当前编辑页中的表单内容（含未点「完成」的修改）向模型请求一次旁白；成功后会出现旁白气泡并写入「旁白历史」与「发给模型的请求」。与自动触发相同会更新该规则在列表中的「上次触发」时间。路由选择会先按当前真实环境（前台名、按键缓冲、空闲等）匹配；若无一命中（例如在设置窗试跑「前台含 Xcode」），会按优先级回退到第一条启用的旁白路由模板，便于预览文案。截屏类规则仍为占位，不会请求模型；正在发送时按钮不可用。")
+                    Text("使用当前编辑页中的表单内容（含未点「完成」的修改）向模型请求一次旁白；成功后会出现旁白气泡并写入「旁白历史」与「发给模型的请求」。截屏类在成功收到模型回复后才更新「上次触发」。路由会先按当前环境匹配；若无命中则回退第一条启用路由。截屏试跑需打开隐私总开关并已授予屏幕录制；正在发送时按钮不可用。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)

@@ -24,6 +24,9 @@ struct DesktopPetApp: App {
             Button("智能体设置…") {
                 appDelegate.coordinator.presentAgentSettingsWindow()
             }
+            Button("截屏并旁白一次…") {
+                appDelegate.coordinator.requestScreenSnapNarrativeFromMenu()
+            }
             Button("辅助功能与权限说明…") {
                 appDelegate.coordinator.presentOnboardingWindow()
             }

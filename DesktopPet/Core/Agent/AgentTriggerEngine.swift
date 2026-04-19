@@ -29,6 +29,8 @@ final class AgentTriggerEngine: ObservableObject {
     private var lastKnownFrontApp: String = ""
     private var recentKeyBuffer: String = ""
     private var tickIndex: Int = 0
+    /// 截屏旁白异步管线（与 `session.isSending` 一起防止并发抓屏/请求）。
+    private var screenSnapPipelineTask: Task<Void, Never>?
 
     private var isPetVisible: () -> Bool
     /// 触发旁白成功后的展示（如云气泡 + 历史记录）；与手动对话频道分离。
@@ -117,7 +119,22 @@ final class AgentTriggerEngine: ObservableObject {
 
     /// 设置页「立即触发」：用当前表单快照走与自动触发相同的模型请求与旁白链路；不经过各 kind 的自动门槛判断。
     func forceFireTrigger(ruleSnapshot: AgentTriggerRule) async {
-        guard ruleSnapshot.kind != .screenSnap else { return }
+        if ruleSnapshot.kind == .screenSnap {
+            guard let idx = settings.triggers.firstIndex(where: { $0.id == ruleSnapshot.id }) else { return }
+            guard settings.screenSnapTriggerMasterEnabled else {
+                session.lastError = "请先在「隐私」Tab 打开「截屏类触发（总开关）」。"
+                return
+            }
+            guard screenSnapPipelineTask == nil, !session.isSending else { return }
+            var merged = ruleSnapshot
+            merged.lastFiredAt = settings.triggers[idx].lastFiredAt
+            screenSnapPipelineTask = Task { @MainActor [weak self] in
+                defer { self?.screenSnapPipelineTask = nil }
+                guard let self else { return }
+                await self.runScreenSnapPipeline(rule: merged, forceFire: true)
+            }
+            return
+        }
         guard let i = settings.triggers.firstIndex(where: { $0.id == ruleSnapshot.id }) else { return }
         var ruleForEval = ruleSnapshot
         ruleForEval.lastFiredAt = settings.triggers[i].lastFiredAt
@@ -136,6 +153,24 @@ final class AgentTriggerEngine: ObservableObject {
             trimKeyboardBufferIfFired: false,
             careContextAppendix: careDryRun
         )
+    }
+
+    /// 菜单栏「截屏并旁白」：对**第一条已启用**的截屏规则执行一次（与设置页「立即触发」相同管线）。
+    func fireScreenSnapFromMenuBar() async {
+        guard settings.screenSnapTriggerMasterEnabled else {
+            session.lastError = "请先在「隐私」中打开截屏类触发总开关。"
+            return
+        }
+        guard let rule = settings.triggers.first(where: { $0.enabled && $0.kind == .screenSnap }) else {
+            session.lastError = "请先在「智能体设置 → 触发器」中添加并启用一条「截屏」规则。"
+            return
+        }
+        guard screenSnapPipelineTask == nil, !session.isSending else { return }
+        screenSnapPipelineTask = Task { @MainActor [weak self] in
+            defer { self?.screenSnapPipelineTask = nil }
+            guard let self else { return }
+            await self.runScreenSnapPipeline(rule: rule, forceFire: true)
+        }
     }
 
     /// 饲养面板喂食/戳戳成功后：若存在已启用的「饲养互动」规则，则按冷却与旁白链路请求模型。
@@ -174,7 +209,10 @@ final class AgentTriggerEngine: ObservableObject {
         for i in settings.triggers.indices {
             var rule = settings.triggers[i]
             guard rule.enabled else { continue }
-            if let last = rule.lastFiredAt, now.timeIntervalSince(last) < rule.cooldownSeconds {
+            let minWait: TimeInterval = rule.kind == .screenSnap
+                ? rule.screenSnapEffectiveMinIntervalSeconds()
+                : rule.cooldownSeconds
+            if let last = rule.lastFiredAt, now.timeIntervalSince(last) < minWait {
                 continue
             }
             var fired = false
@@ -187,7 +225,12 @@ final class AgentTriggerEngine: ObservableObject {
                 fired = evaluateKeyboard(rule: rule, ctx: ctx)
             case .frontApp:
                 fired = evaluateFrontApp(rule: rule, ctx: ctx)
-            case .screenSnap, .careInteraction:
+            case .screenSnap:
+                if evaluateScreenSnapSchedule(rule: rule, ctx: ctx) {
+                    scheduleScreenSnapPipeline(ruleID: rule.id)
+                }
+                fired = false
+            case .careInteraction:
                 fired = false
             }
             if fired {
@@ -202,6 +245,177 @@ final class AgentTriggerEngine: ObservableObject {
                 )
             }
         }
+    }
+
+    /// 自动截屏：总开关、权限、冷却+间隔、宠物可见、未在发送、无在途管线。
+    private func evaluateScreenSnapSchedule(rule: AgentTriggerRule, ctx: TriggerEvalContext) -> Bool {
+        guard rule.kind == .screenSnap else { return false }
+        guard settings.screenSnapTriggerMasterEnabled else { return false }
+        guard ScreenCaptureService.hasScreenRecordingPermission else { return false }
+        guard screenSnapPipelineTask == nil, !session.isSending else { return false }
+        if rule.screenSnapOnlyWhenPetVisible, !isPetVisible() { return false }
+        // 降低评估频率，避免每秒打扰 SCK
+        guard ctx.tickIndex % 5 == 0 else { return false }
+        let matched = selectMatchedRoute(rule: rule, ctx: ctx) ?? selectMatchedRouteForForceFire(rule: rule, ctx: ctx)
+        return matched != nil
+    }
+
+    private func scheduleScreenSnapPipeline(ruleID: UUID) {
+        guard screenSnapPipelineTask == nil else { return }
+        screenSnapPipelineTask = Task { @MainActor [weak self] in
+            defer { self?.screenSnapPipelineTask = nil }
+            guard let self else { return }
+            guard let rule = self.settings.triggers.first(where: { $0.id == ruleID && $0.kind == .screenSnap }) else { return }
+            await self.runScreenSnapPipeline(rule: rule, forceFire: false)
+        }
+    }
+
+    /// 截屏成功后才写入 `lastFiredAt`（与定时等「先写再请求」不同，避免失败仍进入长冷却）。
+    private func runScreenSnapPipeline(rule: AgentTriggerRule, forceFire: Bool) async {
+        guard settings.screenSnapTriggerMasterEnabled else { return }
+        guard ScreenCaptureService.hasScreenRecordingPermission else {
+            if forceFire {
+                session.lastError = ScreenCaptureServiceError.permissionDenied.localizedDescription
+            }
+            return
+        }
+        if !forceFire {
+            guard rule.enabled else { return }
+        }
+        let ctx = buildTriggerEvalContext(now: Date())
+        guard let matchedRoute = selectMatchedRoute(rule: rule, ctx: ctx)
+            ?? selectMatchedRouteForForceFire(rule: rule, ctx: ctx)
+        else {
+            if forceFire { session.lastError = "当前规则没有可用的旁白路由。" }
+            return
+        }
+
+        let maxEdge = Self.clampedScreenSnapMaxEdge(rule.screenSnapMaxEdgePixels)
+        let q = Self.clampedJPEGQuality(rule.screenSnapJPEGQuality)
+        let jpeg: Data
+        do {
+            jpeg = try await ScreenCaptureService.captureMainDisplayJPEG(maxEdge: maxEdge, jpegQuality: CGFloat(q))
+        } catch {
+            session.lastError = error.localizedDescription
+            return
+        }
+
+        let meta = Self.buildScreenCaptureMetaLine(jpegByteCount: jpeg.count, maxEdge: maxEdge, degraded: false)
+        await fireScreenSnapPrologue(
+            trigger: rule,
+            matchedRoute: matchedRoute,
+            screenCaptureMeta: meta,
+            jpegData: jpeg,
+            trimKeyboardBufferIfFired: false
+        )
+    }
+
+    private static func clampedScreenSnapMaxEdge(_ v: Int) -> Int {
+        if v <= 896 { return 768 }
+        return 1024
+    }
+
+    private static func clampedJPEGQuality(_ v: Double) -> Double {
+        min(0.85, max(0.55, v))
+    }
+
+    private static func buildScreenCaptureMetaLine(jpegByteCount: Int, maxEdge: Int, degraded: Bool) -> String {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let front = readFrontmostLocalizedName()
+        return "时间=\(f.string(from: Date()))；主显示器；长边≤\(maxEdge)px；JPEG≈\(jpegByteCount)字节；前台应用=\(front)；degradedToTextOnly=\(degraded ? "true" : "false")"
+    }
+
+    private func fireScreenSnapPrologue(
+        trigger: AgentTriggerRule,
+        matchedRoute: TriggerPromptRoute?,
+        screenCaptureMeta: String,
+        jpegData: Data,
+        trimKeyboardBufferIfFired: Bool
+    ) async {
+        session.setSending(true)
+        session.lastError = nil
+        let key = KeychainStore.readAPIKey()
+        var extra = "（系统触发：\(trigger.kind.displayName)）"
+        var keySummaryLine = ""
+        if settings.attachKeySummary {
+            let s = deskMirror.recentKeyLabelsSummary
+            if !s.isEmpty {
+                let clipped = String(s.prefix(80))
+                extra += " 最近键入摘要：\(clipped)"
+                keySummaryLine = clipped
+            }
+        }
+        let userLine = renderUserPrompt(
+            trigger: trigger,
+            matchedRoute: matchedRoute,
+            extra: extra,
+            keySummaryLine: keySummaryLine,
+            careContext: nil,
+            screenCaptureMeta: screenCaptureMeta
+        )
+        let personality = settings.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let userPayload: String
+        if personality.isEmpty {
+            userPayload = userLine
+        } else {
+            userPayload = "\(personality)\n\n\(userLine)"
+        }
+        let effTemp = trigger.triggerTemperature ?? settings.triggerDefaultTemperature
+        let rawMax = trigger.triggerMaxTokens ?? settings.triggerDefaultMaxTokens
+        let effMax = min(max(rawMax, 32), 1024)
+        let partsWithImage: [AgentAPIChatContentPart] = [.text(userPayload), .imageJPEG(jpegData)]
+
+        func send(_ parts: [AgentAPIChatContentPart]) async throws -> String {
+            try await client.completeChat(
+                baseURL: settings.baseURL,
+                model: settings.model,
+                apiKey: key,
+                systemPrompt: " ",
+                userMessages: [AgentAPIChatUserMessage(parts: parts)],
+                temperature: effTemp,
+                maxTokens: effMax,
+                extendedTimeout: parts.contains(where: {
+                    if case .imageJPEG = $0 { return true }
+                    return false
+                })
+            )
+        }
+
+        do {
+            let text: String
+            do {
+                text = try await send(partsWithImage)
+            } catch let err as AgentClientError {
+                if case let .http(code, _) = err, code == 400 {
+                    let meta2 = Self.buildScreenCaptureMetaLine(jpegByteCount: jpegData.count, maxEdge: Self.clampedScreenSnapMaxEdge(trigger.screenSnapMaxEdgePixels), degraded: true)
+                    let userLine2 = renderUserPrompt(
+                        trigger: trigger,
+                        matchedRoute: matchedRoute,
+                        extra: extra + " （模型拒绝图像输入，已自动改为纯文字请求；请勿假装见过截图。）",
+                        keySummaryLine: keySummaryLine,
+                        careContext: nil,
+                        screenCaptureMeta: meta2
+                    )
+                    let payload2 = personality.isEmpty ? userLine2 : "\(personality)\n\n\(userLine2)"
+                    text = try await send([.text(payload2)])
+                } else {
+                    throw err
+                }
+            }
+            if trimKeyboardBufferIfFired, trigger.kind == .keyboardPattern {
+                trimRecentKeyBufferAfterKeyboardFire(trigger: trigger, matchedRoute: matchedRoute)
+            }
+            settings.updateTrigger(id: trigger.id) { $0.lastFiredAt = Date() }
+            if let onTriggerSpeech {
+                onTriggerSpeech(TriggerSpeechPayload(text: text, triggerKind: trigger.kind, userPrompt: userPayload))
+            } else {
+                session.appendAssistant(text)
+            }
+        } catch {
+            session.lastError = error.localizedDescription
+        }
+        session.setSending(false)
     }
 
     private func evaluateTimer(rule: inout AgentTriggerRule, ctx: TriggerEvalContext) -> Bool {
@@ -323,7 +537,8 @@ final class AgentTriggerEngine: ObservableObject {
         matchedRoute: TriggerPromptRoute?,
         extra: String,
         keySummaryLine: String,
-        careContext: String? = nil
+        careContext: String? = nil,
+        screenCaptureMeta: String = ""
     ) -> String {
         let rawTemplate: String = {
             if let r = matchedRoute, !r.promptTemplate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -341,6 +556,7 @@ final class AgentTriggerEngine: ObservableObject {
             .replacingOccurrences(of: "{matchedCondition}", with: matchedRoute.map { Self.describeRouteConditions($0) } ?? "")
             .replacingOccurrences(of: "{keySummary}", with: keySummaryLine)
             .replacingOccurrences(of: "{careContext}", with: care)
+            .replacingOccurrences(of: "{screenCaptureMeta}", with: screenCaptureMeta)
         if !care.isEmpty, !hadCareSlot {
             merged += "\n\n" + care
         }
@@ -407,7 +623,8 @@ final class AgentTriggerEngine: ObservableObject {
             matchedRoute: matchedRoute,
             extra: extra,
             keySummaryLine: keySummaryLine,
-            careContext: careContextAppendix
+            careContext: careContextAppendix,
+            screenCaptureMeta: ""
         )
         let personality = settings.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
         let userPayload: String

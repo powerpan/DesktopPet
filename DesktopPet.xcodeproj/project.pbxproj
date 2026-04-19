@@ -57,6 +57,7 @@
 		C10000000000000000000037 /* PetLocalGrowthEventPool.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000037 /* PetLocalGrowthEventPool.swift */; };
 		C10000000000000000000038 /* PetDecayEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000038 /* PetDecayEngine.swift */; };
 		C10000000000000000000039 /* PetGrowthAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000039 /* PetGrowthAI.swift */; };
+		C1000000000000000000003A /* ScreenCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003A /* ScreenCaptureService.swift */; };
 		C3D4E5F60718293A4B5C6D7E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8F /* ContentView.swift */; };
 		E5F60718293A4B5C6D7E8F90 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F60718293A4B5C6D7E8F90AB /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -111,6 +112,7 @@
 		B100000000000000000000037 /* PetLocalGrowthEventPool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetLocalGrowthEventPool.swift; sourceTree = "<group>"; };
 		B100000000000000000000038 /* PetDecayEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetDecayEngine.swift; sourceTree = "<group>"; };
 		B100000000000000000000039 /* PetGrowthAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetGrowthAI.swift; sourceTree = "<group>"; };
+		B10000000000000000000003A /* ScreenCaptureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCaptureService.swift; sourceTree = "<group>"; };
 		B200000000000000000000040 /* DeskMirror */ = {isa = PBXFileReference; lastKnownFileType = folder; path = DeskMirror; sourceTree = "<group>"; };
 		B2C3D4E5F60718293A4B5C6D /* DesktopPetApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPetApp.swift; sourceTree = "<group>"; };
 		D4E5F60718293A4B5C6D7E8F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -177,10 +179,19 @@
 				A10000000000000000000007 /* Permissions */,
 				A10000000000000000000008 /* PetState */,
 				A10000000000000000000009 /* Window */,
+				A10000000000000000000013 /* Capture */,
 				A1000000000000000000000E /* Agent */,
 				A1000000000000000000000F /* Care */,
 			);
 			path = Core;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000013 /* Capture */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000003A /* ScreenCaptureService.swift */,
+			);
+			path = Capture;
 			sourceTree = "<group>";
 		};
 		A10000000000000000000003 /* Features */ = {
@@ -460,6 +471,7 @@
 				C10000000000000000000037 /* PetLocalGrowthEventPool.swift in Sources */,
 				C10000000000000000000038 /* PetDecayEngine.swift in Sources */,
 				C10000000000000000000039 /* PetGrowthAI.swift in Sources */,
+				C1000000000000000000003A /* ScreenCaptureService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -244,6 +244,13 @@ final class AppCoordinator: ObservableObject {
             .store(in: &cancellables)
     }
 
+    /// 菜单栏：对第一条已启用的「截屏」规则执行一次旁白（需隐私总开关 + 屏幕录制权限）。
+    func requestScreenSnapNarrativeFromMenu() {
+        Task { @MainActor in
+            await self.triggerEngine.fireScreenSnapFromMenuBar()
+        }
+    }
+
     private func wireCareInteractionFromPetPanel() {
         NotificationCenter.default.publisher(for: .desktopPetCareInteractionForNarrative)
             .receive(on: DispatchQueue.main)

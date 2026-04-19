@@ -3,7 +3,7 @@
 > **仓库实现备注（2026）**：当前工程已关闭 App Sandbox，采用菜单栏 accessory 形态启动；宠物窗口为 `NSPanel` 浮动层（`PetWindow` / `PetWindowController`），全局键盘与 `⌘K` 通过 `GlobalInputMonitor` 单路监听；设置项已接入 `UserDefaults`。**Bundle ID** 为 `io.github.powerpan.DesktopPet`；生成 Info 时含 `NSAccessibilityUsageDescription`。辅助功能未授权时由 `AccessibilityPermissionManager` 与 `AccessibilityOnboardingView` 引导登记 TCC、`AppCoordinator` 在激活与「重新检测」后延迟轮询信任状态。  
 > **窗口与命中**：`PetConfig.petCanvasLayoutPoints`（卡片基准边长）、`petScaleMin`/`petScaleMax`（缩放滑条范围，当前最大 1.2）、`exteriorHitSide` 与 `visualBaselineFactor` 统一窗口边长与 `PetRootContainerView.hitClipSidePoints`；穿透开启时精灵层不接收点击，包络外 `hitTest` 为 `nil`。拖动缩放滑条时以固定屏幕锚点缩放并夹紧 `visibleFrame`。细节以 `README.md` 与源码为准。  
 > **桌前镜像（默认卡片内容）**：`PetSpriteView` / `DeskMirrorTextView` 在授权且开启镜像时，以 **`DesktopPet/Resources/DeskMirror/`** 内 PNG 叠放整幅画面（空闲 `cover`、有键/鼠展示 `nohand_cover` + 爪印层 + 鼠标四向层）；`GlobalInputMonitor` 监听 **keyDown + keyUp**；键入历史为本地单行摘要，不采集完整文本。素材命名对齐参考工程 BongoCat 的 `keyboard/resources`，**分发前须自行核对许可**。  
-> **饲养与智能体（扩展）**：`PetCareModel` + `CareOverlayView`（心情/能量、陪伴时长、喂食与戳戳）；`AgentClient`（DeepSeek 兼容 HTTP）、`AgentSessionStore`、`ChatOverlayView`；API Key 仅 **Keychain**；`AgentTriggerEngine` 支持定时、随机空闲、键盘子串、前台应用名；敏感开关（键盘模式总闸、附带键入摘要、截屏占位）默认关闭并有文案说明。叠加面板由 `ExtensionOverlayController` 管理，菜单栏统一显隐。
+> **饲养与智能体（扩展）**：`PetCareModel` + `CareOverlayView`（心情/能量、陪伴时长、喂食与戳戳）；`AgentClient`（DeepSeek 兼容 HTTP）、`AgentSessionStore`、`ChatOverlayView`；API Key 仅 **Keychain**；`AgentTriggerEngine` 支持定时、随机空闲、键盘子串、前台应用名、截屏（ScreenCaptureKit + 多模态旁白）；敏感开关（键盘模式总闸、附带键入摘要、截屏总闸）默认关闭并有文案说明。叠加面板由 `ExtensionOverlayController` 管理，菜单栏统一显隐。
 
 ## 1. 项目概述
 

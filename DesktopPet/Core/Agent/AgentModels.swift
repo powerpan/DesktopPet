@@ -72,7 +72,7 @@ enum AgentTriggerKind: String, CaseIterable, Identifiable, Codable {
         case .randomIdle: return "随机空闲"
         case .keyboardPattern: return "键盘模式"
         case .frontApp: return "前台应用"
-        case .screenSnap: return "截屏（规划中）"
+        case .screenSnap: return "截屏"
         case .careInteraction: return "饲养互动"
         }
     }
@@ -165,8 +165,9 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             """
         case .screenSnap:
             return """
-            （截屏类触发仍为规划能力，当前不会真的截屏或读画面。）{extra}
-            请用一两句简体中文像桌宠一样打个招呼即可，勿假定已看到用户屏幕。触发类型：{triggerKind}
+            用户已启用「截屏旁白」：若请求中附带主显示器截图，请仅依据截图与下文元数据用一两句简体中文像桌宠一样轻松点评或关心用户状态；不要复述敏感信息、不要编造截图中不存在的细节。若未附带图像（例如模型不支持视觉、已降级为文字摘要），请诚实以桌宠口吻闲聊，勿假装已看到像素画面。
+            画面元数据：{screenCaptureMeta}
+            {extra}
             """
         case .careInteraction:
             return """
@@ -201,8 +202,8 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             """
         case .screenSnap:
             return """
-            （截屏能力占位。）本路由条件：{matchedCondition}。{extra}
-            请用一两句简体中文像桌宠一样简短回应，勿假设已取得屏幕或图像内容。
+            本条截屏旁白路由已命中。条件概要：{matchedCondition}。画面元数据：{screenCaptureMeta}。{extra}
+            请用一两句简体中文像桌宠一样回应；有图时紧扣画面氛围，无图时不要假装已见屏。
             """
         case .careInteraction:
             return """
@@ -232,6 +233,15 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
     var triggerTemperature: Double?
     /// 本条旁白请求的 `max_tokens`；`nil` 表示使用 `AgentSettingsStore.triggerDefaultMaxTokens`。
     var triggerMaxTokens: Int?
+    // MARK: 截屏专用（其它 kind 忽略；持久化兼容旧 JSON）
+    /// 两次成功截屏旁白之间的最小间隔（分钟）；与 `cooldownSeconds` 取更长者生效。
+    var screenSnapIntervalMinutes: Int
+    /// 仅宠物窗口可见时才允许自动截屏旁白。
+    var screenSnapOnlyWhenPetVisible: Bool
+    /// 截图长边缩放上限（768 或 1024）。
+    var screenSnapMaxEdgePixels: Int
+    /// JPEG 压缩系数 0.55...0.85
+    var screenSnapJPEGQuality: Double
 
     init(
         id: UUID,
@@ -247,7 +257,11 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         routes: [TriggerPromptRoute],
         defaultPromptTemplate: String,
         triggerTemperature: Double? = nil,
-        triggerMaxTokens: Int? = nil
+        triggerMaxTokens: Int? = nil,
+        screenSnapIntervalMinutes: Int = 20,
+        screenSnapOnlyWhenPetVisible: Bool = true,
+        screenSnapMaxEdgePixels: Int = 1024,
+        screenSnapJPEGQuality: Double = 0.72
     ) {
         self.id = id
         self.enabled = enabled
@@ -263,6 +277,15 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         self.defaultPromptTemplate = defaultPromptTemplate
         self.triggerTemperature = triggerTemperature
         self.triggerMaxTokens = triggerMaxTokens
+        self.screenSnapIntervalMinutes = screenSnapIntervalMinutes
+        self.screenSnapOnlyWhenPetVisible = screenSnapOnlyWhenPetVisible
+        self.screenSnapMaxEdgePixels = screenSnapMaxEdgePixels
+        self.screenSnapJPEGQuality = screenSnapJPEGQuality
+    }
+
+    /// 截屏规则：成功触发之间的最短等待（秒）= max(冷却, 定时间隔)。
+    func screenSnapEffectiveMinIntervalSeconds() -> TimeInterval {
+        max(cooldownSeconds, TimeInterval(screenSnapIntervalMinutes * 60))
     }
 
     init(from decoder: Decoder) throws {
@@ -290,6 +313,10 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         defaultPromptTemplate = migrated.defaultPromptTemplate
         triggerTemperature = try c.decodeIfPresent(Double.self, forKey: .triggerTemperature)
         triggerMaxTokens = try c.decodeIfPresent(Int.self, forKey: .triggerMaxTokens)
+        screenSnapIntervalMinutes = try c.decodeIfPresent(Int.self, forKey: .screenSnapIntervalMinutes) ?? 20
+        screenSnapOnlyWhenPetVisible = try c.decodeIfPresent(Bool.self, forKey: .screenSnapOnlyWhenPetVisible) ?? true
+        screenSnapMaxEdgePixels = try c.decodeIfPresent(Int.self, forKey: .screenSnapMaxEdgePixels) ?? 1024
+        screenSnapJPEGQuality = try c.decodeIfPresent(Double.self, forKey: .screenSnapJPEGQuality) ?? 0.72
     }
 
     func encode(to encoder: Encoder) throws {
@@ -308,6 +335,10 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         try c.encode(defaultPromptTemplate, forKey: .defaultPromptTemplate)
         try c.encodeIfPresent(triggerTemperature, forKey: .triggerTemperature)
         try c.encodeIfPresent(triggerMaxTokens, forKey: .triggerMaxTokens)
+        try c.encode(screenSnapIntervalMinutes, forKey: .screenSnapIntervalMinutes)
+        try c.encode(screenSnapOnlyWhenPetVisible, forKey: .screenSnapOnlyWhenPetVisible)
+        try c.encode(screenSnapMaxEdgePixels, forKey: .screenSnapMaxEdgePixels)
+        try c.encode(screenSnapJPEGQuality, forKey: .screenSnapJPEGQuality)
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -316,6 +347,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         case keyboardPattern, frontAppNameContains
         case routes, defaultPromptTemplate
         case triggerTemperature, triggerMaxTokens
+        case screenSnapIntervalMinutes, screenSnapOnlyWhenPetVisible, screenSnapMaxEdgePixels, screenSnapJPEGQuality
     }
 
     /// 旧数据无 `routes` 时，从单字段生成等价路由，避免升级后行为突变。
@@ -388,7 +420,11 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             ]
         }
         let defaultEnabled = kind == .timer || kind == .randomIdle
-        let defaultCooldown: Double = kind == .careInteraction ? 3 : 120
+        let defaultCooldown: Double = {
+            if kind == .careInteraction { return 3 }
+            if kind == .screenSnap { return 900 }
+            return 120
+        }()
         return AgentTriggerRule(
             id: UUID(),
             enabled: defaultEnabled,
@@ -403,7 +439,11 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             routes: defaultRoutes,
             defaultPromptTemplate: def,
             triggerTemperature: nil,
-            triggerMaxTokens: nil
+            triggerMaxTokens: nil,
+            screenSnapIntervalMinutes: 20,
+            screenSnapOnlyWhenPetVisible: true,
+            screenSnapMaxEdgePixels: 1024,
+            screenSnapJPEGQuality: 0.72
         )
     }
 }

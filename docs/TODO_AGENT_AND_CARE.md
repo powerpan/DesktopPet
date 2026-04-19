@@ -123,7 +123,7 @@ Trigger: id, enabled, kind(enum), cooldownSeconds, lastFiredAt, configJSON
 - [x] `AgentTriggerEngine` + 定时器 + 与 `MouseTracker`/`GlobalInputMonitor` 的轻量订阅。
 - [x] 键盘模式：配置校验、**默认关闭**、首次开启二次确认。
 - [x] 「前台应用名」无截屏权限版（`FrontmostAppWatcher`）。
-- [ ] 截屏：调研 `ScreenCaptureKit` / 旧 API 与沙盒外签名需求；当前 `screenSnap` 为占位，不触发。
+- [x] 截屏：`ScreenCaptureKit` 主显示器单次帧 → 缩放 JPEG → OpenAI 兼容多模态 `chat/completions`；隐私总开关 + 屏幕录制权限；规格见 [`docs/SCREEN_SNAP_TRIGGER_SPEC.md`](SCREEN_SNAP_TRIGGER_SPEC.md)。
 
 ---
 
@@ -140,7 +140,7 @@ Trigger: id, enabled, kind(enum), cooldownSeconds, lastFiredAt, configJSON
 2. **M2**：饲养状态模型 + 简单 UI + 持久化。（已完成）  
 3. **M3**：DeepSeek 文本对话 MVP + Keychain + 基础设置页。（已完成）  
 4. **M4**：定时 + 随机空闲触发器。（已完成）  
-5. **M5**：键盘模式触发（安全流程）→ 前台应用名（已完成）→ **截屏/多模态**（进行中/占位，见 4.3）。
+5. **M5**：键盘模式触发（安全流程）→ 前台应用名（已完成）→ **截屏/多模态**（已实现 ScreenCaptureKit + 多模态 API，见 4.3）。
 
 ---
 
