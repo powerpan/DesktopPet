@@ -556,10 +556,10 @@ struct AgentSettingsView: View {
 
             Section {
                 if let d = petCare.state.lastDecayAt {
-                    Text("lastDecayAt（ISO8601）")
+                    Text("lastDecayAt（本机时区 · 毫秒精度）")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
-                    Text(growthDebugISO8601(d))
+                    Text(growthDebugLocalISO8601(d))
                         .font(.caption.monospacedDigit())
                         .textSelection(.enabled)
                     Text("Unix 秒：\(Int64(d.timeIntervalSince1970))")
@@ -685,9 +685,11 @@ struct AgentSettingsView: View {
         }
     }
 
-    private func growthDebugISO8601(_ date: Date) -> String {
+    /// 使用本机日历时区输出 ISO8601（含偏移），避免默认 UTC + `Z` 与本地观感不一致。
+    private func growthDebugLocalISO8601(_ date: Date) -> String {
         let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        f.timeZone = .current
+        f.formatOptions = [.withInternetDateTime, .withTimeZone, .withFractionalSeconds]
         return f.string(from: date)
     }
 

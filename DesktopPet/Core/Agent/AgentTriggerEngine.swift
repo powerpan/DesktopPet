@@ -337,7 +337,8 @@ final class AgentTriggerEngine: ObservableObject {
 
     private static func buildScreenCaptureMetaLine(jpegByteCount: Int, maxEdge: Int, degraded: Bool) -> String {
         let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        f.timeZone = .current
+        f.formatOptions = [.withInternetDateTime, .withTimeZone, .withFractionalSeconds]
         let front = readFrontmostLocalizedName()
         return "时间=\(f.string(from: Date()))；主显示器；长边≤\(maxEdge)px；JPEG≈\(jpegByteCount)字节；前台应用=\(front)；degradedToTextOnly=\(degraded ? "true" : "false")"
     }
