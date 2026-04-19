@@ -22,7 +22,7 @@ enum RemoteClickExecutorError: LocalizedError {
 }
 
 enum RemoteClickExecutor {
-    /// 归一化坐标：图像左上为 (0,0)，右下为 (1,1)；`displayBounds` 为 `CGDisplayBounds(main)`。
+    /// 归一化坐标：图像左上为 (0,0)，右上为 (1,1)；`displayBounds` 为 `CGDisplayBounds(main)`。
     static func quartzPoint(
         normX: Double,
         normY: Double,

@@ -108,6 +108,39 @@ enum SlackPetRemoteClickCommand {
         return (nx, ny)
     }
 
+    /// 在「已点击、等待是否继续」阶段，用户确认再来一轮截屏+点屏（长短语优先匹配，避免「再来」误吞「再来一次」）。
+    static func isContinueRemoteClickReply(_ raw: String) -> Bool {
+        let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return false }
+        let lower = t.lowercased()
+        if ["continue", "yes", "y", "ok", "next"].contains(lower) { return true }
+        let phrases = [
+            "再来一次", "再点一次", "再来一轮", "再截一张", "下一轮", "下一图", "接着点", "继续", "再来",
+        ]
+        return matchesPhrasePrefix(t, phrases: phrases)
+    }
+
+    /// 结束多轮远程点屏会话。
+    static func isEndRemoteClickReply(_ raw: String) -> Bool {
+        let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return false }
+        let lower = t.lowercased()
+        if ["end", "stop", "no", "n", "quit", "done"].contains(lower) { return true }
+        let phrases = ["不用了", "不要了", "不点了", "停止", "取消", "够了", "退出", "结束"]
+        return matchesPhrasePrefix(t, phrases: phrases)
+    }
+
+    private static func matchesPhrasePrefix(_ t: String, phrases: [String]) -> Bool {
+        for p in phrases {
+            guard t.hasPrefix(p) else { continue }
+            if t.count == p.count { return true }
+            let after = t.dropFirst(p.count)
+            guard let ch = after.first else { return true }
+            if ch.isWhitespace || "，。！？、：；,.:!?;".contains(ch) { return true }
+        }
+        return false
+    }
+
     #if DEBUG
     /// 轻量解析不变量（无 XCTest 目标时仍可在 Debug 构建中尽早发现回归）。
     static func runSanityChecks() {
@@ -125,6 +158,11 @@ enum SlackPetRemoteClickCommand {
         assert(abs(b.0 - 0.25) < 0.001 && abs(b.1 - 0.75) < 0.001)
         assert(parseCoordinateReply("120,50") == nil)
         assert(parseCoordinateReply("x=101 y=0.5") == nil)
+        assert(isContinueRemoteClickReply("继续"))
+        assert(isContinueRemoteClickReply("再来一次"))
+        assert(!isContinueRemoteClickReply("远程点屏"))
+        assert(isEndRemoteClickReply("结束"))
+        assert(isEndRemoteClickReply("停止"))
     }
     #endif
 }
