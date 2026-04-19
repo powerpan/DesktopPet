@@ -124,9 +124,12 @@ final class AppCoordinator: ObservableObject {
     }
 
     /// 打开或前置对话面板（不切换关闭）；用于触发气泡点击后续聊。
-    func presentChatOverlay() {
+    /// - Parameter clearLastError: 为 `false` 时保留 `lastError`（例如菜单截屏失败后需要展示原因）。
+    func presentChatOverlay(clearLastError: Bool = true) {
         extensionOverlay.presentChatPanel(root: chatOverlayRoot())
-        agentSessionStore.lastError = nil
+        if clearLastError {
+            agentSessionStore.lastError = nil
+        }
     }
 
     private func chatOverlayRoot() -> AnyView {
@@ -244,10 +247,13 @@ final class AppCoordinator: ObservableObject {
             .store(in: &cancellables)
     }
 
-    /// 菜单栏：对第一条已启用的「截屏」规则执行一次旁白（需隐私总开关 + 屏幕录制权限）。
+    /// 菜单栏：对截屏规则执行一次旁白（需隐私总开关 + 屏幕录制权限）；失败时打开对话面板以展示 `lastError`。
     func requestScreenSnapNarrativeFromMenu() {
         Task { @MainActor in
             await self.triggerEngine.fireScreenSnapFromMenuBar()
+            if let err = self.agentSessionStore.lastError, !err.isEmpty {
+                self.presentChatOverlay(clearLastError: false)
+            }
         }
     }
 
@@ -279,7 +285,12 @@ final class AppCoordinator: ObservableObject {
 
     /// 条件触发或测试气泡：写入旁白历史并展示云朵（点气泡可续聊）。
     private func deliverTriggerSpeech(_ payload: TriggerSpeechPayload) {
-        agentSessionStore.triggerHistory.append(text: payload.text, kind: payload.triggerKind, userPrompt: payload.userPrompt)
+        agentSessionStore.triggerHistory.append(
+            text: payload.text,
+            kind: payload.triggerKind,
+            userPrompt: payload.userPrompt,
+            snapshotJPEG: payload.requestSnapshotJPEG
+        )
         extensionOverlay.showTriggerBubble(text: payload.text) { [weak self] in
             guard let self else { return }
             self.agentSessionStore.startSessionFromTrigger(text: payload.text)

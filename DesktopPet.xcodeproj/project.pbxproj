@@ -58,6 +58,7 @@
 		C10000000000000000000038 /* PetDecayEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000038 /* PetDecayEngine.swift */; };
 		C10000000000000000000039 /* PetGrowthAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000039 /* PetGrowthAI.swift */; };
 		C1000000000000000000003A /* ScreenCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003A /* ScreenCaptureService.swift */; };
+		C1000000000000000000003B /* TriggerSpeechSnapshotStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003B /* TriggerSpeechSnapshotStorage.swift */; };
 		C3D4E5F60718293A4B5C6D7E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8F /* ContentView.swift */; };
 		E5F60718293A4B5C6D7E8F90 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F60718293A4B5C6D7E8F90AB /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -113,6 +114,7 @@
 		B100000000000000000000038 /* PetDecayEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetDecayEngine.swift; sourceTree = "<group>"; };
 		B100000000000000000000039 /* PetGrowthAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetGrowthAI.swift; sourceTree = "<group>"; };
 		B10000000000000000000003A /* ScreenCaptureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCaptureService.swift; sourceTree = "<group>"; };
+		B10000000000000000000003B /* TriggerSpeechSnapshotStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriggerSpeechSnapshotStorage.swift; sourceTree = "<group>"; };
 		B200000000000000000000040 /* DeskMirror */ = {isa = PBXFileReference; lastKnownFileType = folder; path = DeskMirror; sourceTree = "<group>"; };
 		B2C3D4E5F60718293A4B5C6D /* DesktopPetApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPetApp.swift; sourceTree = "<group>"; };
 		D4E5F60718293A4B5C6D7E8F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -319,6 +321,7 @@
 				B10000000000000000000002B /* AgentSessionStore.swift */,
 				B100000000000000000000033 /* AgentConversationStore.swift */,
 				B100000000000000000000034 /* TriggerSpeechHistoryStore.swift */,
+				B10000000000000000000003B /* TriggerSpeechSnapshotStorage.swift */,
 				B10000000000000000000002C /* FrontmostAppWatcher.swift */,
 				B10000000000000000000002D /* AgentTriggerEngine.swift */,
 			);
@@ -466,6 +469,7 @@
 				C10000000000000000000032 /* TriggerSpeechBubbleView.swift in Sources */,
 				C10000000000000000000033 /* AgentConversationStore.swift in Sources */,
 				C10000000000000000000034 /* TriggerSpeechHistoryStore.swift in Sources */,
+				C1000000000000000000003B /* TriggerSpeechSnapshotStorage.swift in Sources */,
 				C10000000000000000000035 /* AgentSessionHistoryViews.swift in Sources */,
 				C10000000000000000000036 /* PetGrowthModels.swift in Sources */,
 				C10000000000000000000037 /* PetLocalGrowthEventPool.swift in Sources */,

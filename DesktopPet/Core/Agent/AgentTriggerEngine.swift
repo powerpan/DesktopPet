@@ -125,14 +125,21 @@ final class AgentTriggerEngine: ObservableObject {
                 session.lastError = "请先在「隐私」Tab 打开「截屏类触发（总开关）」。"
                 return
             }
-            guard screenSnapPipelineTask == nil, !session.isSending else { return }
+            guard screenSnapPipelineTask == nil, !session.isSending else {
+                session.lastError = screenSnapPipelineTask != nil
+                    ? "上一次截屏旁白尚未结束，请稍后再试。"
+                    : "当前正在与模型通信，请稍后再试。"
+                return
+            }
             var merged = ruleSnapshot
             merged.lastFiredAt = settings.triggers[idx].lastFiredAt
-            screenSnapPipelineTask = Task { @MainActor [weak self] in
+            let task = Task { @MainActor [weak self] in
                 defer { self?.screenSnapPipelineTask = nil }
                 guard let self else { return }
                 await self.runScreenSnapPipeline(rule: merged, forceFire: true)
             }
+            screenSnapPipelineTask = task
+            await task.value
             return
         }
         guard let i = settings.triggers.firstIndex(where: { $0.id == ruleSnapshot.id }) else { return }
@@ -155,22 +162,31 @@ final class AgentTriggerEngine: ObservableObject {
         )
     }
 
-    /// 菜单栏「截屏并旁白」：对**第一条已启用**的截屏规则执行一次（与设置页「立即触发」相同管线）。
+    /// 菜单栏「截屏并旁白」：优先**第一条已启用**的截屏规则；若无则取第一条截屏规则（与设置页「立即触发」同为 `forceFire`，避免列表未勾选启用时菜单无反应）。
     func fireScreenSnapFromMenuBar() async {
         guard settings.screenSnapTriggerMasterEnabled else {
             session.lastError = "请先在「隐私」中打开截屏类触发总开关。"
             return
         }
-        guard let rule = settings.triggers.first(where: { $0.enabled && $0.kind == .screenSnap }) else {
-            session.lastError = "请先在「智能体设置 → 触发器」中添加并启用一条「截屏」规则。"
+        let rule = settings.triggers.first(where: { $0.enabled && $0.kind == .screenSnap })
+            ?? settings.triggers.first(where: { $0.kind == .screenSnap })
+        guard let rule else {
+            session.lastError = "请先在「智能体设置 → 触发器」中添加一条「截屏」规则。"
             return
         }
-        guard screenSnapPipelineTask == nil, !session.isSending else { return }
-        screenSnapPipelineTask = Task { @MainActor [weak self] in
+        guard screenSnapPipelineTask == nil, !session.isSending else {
+            session.lastError = screenSnapPipelineTask != nil
+                ? "上一次截屏旁白尚未结束，请稍后再试。"
+                : "当前正在与模型通信，请稍后再试。"
+            return
+        }
+        let task = Task { @MainActor [weak self] in
             defer { self?.screenSnapPipelineTask = nil }
             guard let self else { return }
             await self.runScreenSnapPipeline(rule: rule, forceFire: true)
         }
+        screenSnapPipelineTask = task
+        await task.value
     }
 
     /// 饲养面板喂食/戳戳成功后：若存在已启用的「饲养互动」规则，则按冷却与旁白链路请求模型。
@@ -408,7 +424,7 @@ final class AgentTriggerEngine: ObservableObject {
             }
             settings.updateTrigger(id: trigger.id) { $0.lastFiredAt = Date() }
             if let onTriggerSpeech {
-                onTriggerSpeech(TriggerSpeechPayload(text: text, triggerKind: trigger.kind, userPrompt: userPayload))
+                onTriggerSpeech(TriggerSpeechPayload(text: text, triggerKind: trigger.kind, userPrompt: userPayload, requestSnapshotJPEG: jpegData))
             } else {
                 session.appendAssistant(text)
             }
@@ -653,7 +669,7 @@ final class AgentTriggerEngine: ObservableObject {
                 trimRecentKeyBufferAfterKeyboardFire(trigger: trigger, matchedRoute: matchedRoute)
             }
             if let onTriggerSpeech {
-                onTriggerSpeech(TriggerSpeechPayload(text: text, triggerKind: trigger.kind, userPrompt: userPayload))
+                onTriggerSpeech(TriggerSpeechPayload(text: text, triggerKind: trigger.kind, userPrompt: userPayload, requestSnapshotJPEG: nil))
             } else {
                 session.appendAssistant(text)
             }

@@ -3,6 +3,7 @@
 // 设置内：正式会话频道列表、单频道消息详情、条件触发旁白历史。
 //
 
+import AppKit
 import SwiftUI
 
 // MARK: - 正式会话频道
@@ -119,6 +120,37 @@ struct ConversationChannelDetailView: View {
     }
 }
 
+// MARK: - 触发旁白历史中的截图预览
+
+private struct TriggerSpeechSnapshotThumbnail: View {
+    let storedFileName: String?
+
+    var body: some View {
+        Group {
+            if let name = storedFileName,
+               let url = TriggerSpeechSnapshotStorage.fileURL(storedFileName: name),
+               let img = NSImage(contentsOf: url) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("随请求发送的截图（本地）")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Image(nsImage: img)
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(maxHeight: 220)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    Text("Application Support → DesktopPet → TriggerSnapshots → \(name)")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .textSelection(.enabled)
+                        .lineLimit(2)
+                }
+            }
+        }
+    }
+}
+
 // MARK: - 条件触发旁白历史
 
 struct TriggerSpeechHistoryListSheet: View {
@@ -145,8 +177,9 @@ struct TriggerSpeechHistoryListSheet: View {
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
+                            TriggerSpeechSnapshotThumbnail(storedFileName: r.userRequestSnapshotFileName)
                             if let req = r.userPromptSent, !req.isEmpty {
-                                Text("发给模型的 user")
+                                Text("发给模型的 user（纯文本部分）")
                                     .font(.caption2.weight(.semibold))
                                     .foregroundStyle(.secondary)
                                 Text(req)
@@ -216,6 +249,7 @@ struct TriggerUserPromptHistorySheet: View {
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
+                            TriggerSpeechSnapshotThumbnail(storedFileName: r.userRequestSnapshotFileName)
                             if let p = r.userPromptSent {
                                 Text(p)
                                     .font(.body)

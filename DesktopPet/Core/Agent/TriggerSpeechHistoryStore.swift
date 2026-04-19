@@ -21,25 +21,39 @@ final class TriggerSpeechHistoryStore: ObservableObject {
         load()
     }
 
-    func append(text: String, kind: AgentTriggerKind, userPrompt: String? = nil) {
+    func append(text: String, kind: AgentTriggerKind, userPrompt: String? = nil, snapshotJPEG: Data? = nil) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return }
         let prompt = userPrompt?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let id = UUID()
+        var snapshotFile: String?
+        if let data = snapshotJPEG, !data.isEmpty {
+            snapshotFile = try? TriggerSpeechSnapshotStorage.saveJPEG(data, recordId: id)
+        }
         let r = TriggerSpeechRecord(
-            id: UUID(),
+            id: id,
             text: t,
             triggerKind: kind,
             createdAt: Date(),
-            userPromptSent: (prompt?.isEmpty == false) ? prompt : nil
+            userPromptSent: (prompt?.isEmpty == false) ? prompt : nil,
+            userRequestSnapshotFileName: snapshotFile
         )
         records.insert(r, at: 0)
         if records.count > maxRecords {
+            let overflow = records.count - maxRecords
+            let dropped = records.suffix(overflow)
+            for old in dropped {
+                TriggerSpeechSnapshotStorage.deleteFile(storedFileName: old.userRequestSnapshotFileName)
+            }
             records = Array(records.prefix(maxRecords))
         }
         persist()
     }
 
     func clearAll() {
+        for r in records {
+            TriggerSpeechSnapshotStorage.deleteFile(storedFileName: r.userRequestSnapshotFileName)
+        }
         records = []
         persist()
     }

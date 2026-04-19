@@ -37,22 +37,34 @@ struct TriggerSpeechRecord: Identifiable, Equatable, Codable {
     var createdAt: Date
     /// 本次请求中发给模型的 user 消息全文（占位符已替换）；无 user 上下文时为 nil。
     var userPromptSent: String?
+    /// 与本次请求一并发送的截图在 Application Support 中的文件名（`\<id\>.jpg`）；无图时为 nil。
+    var userRequestSnapshotFileName: String?
 
-    init(id: UUID = UUID(), text: String, triggerKind: AgentTriggerKind, createdAt: Date = Date(), userPromptSent: String? = nil) {
+    init(
+        id: UUID = UUID(),
+        text: String,
+        triggerKind: AgentTriggerKind,
+        createdAt: Date = Date(),
+        userPromptSent: String? = nil,
+        userRequestSnapshotFileName: String? = nil
+    ) {
         self.id = id
         self.text = text
         self.triggerKind = triggerKind
         self.createdAt = createdAt
         self.userPromptSent = userPromptSent
+        self.userRequestSnapshotFileName = userRequestSnapshotFileName
     }
 }
 
 /// 触发成功后交给 UI / 历史记录的一包数据。
-struct TriggerSpeechPayload: Equatable {
+struct TriggerSpeechPayload {
     var text: String
     var triggerKind: AgentTriggerKind
     /// 已渲染占位符、即将作为 user 发给模型的内容；无模型调用时可为 nil。
     var userPrompt: String?
+    /// 截屏旁白：与 API 请求使用的同一张 JPEG（写入 Application Support 后再记入历史）。
+    var requestSnapshotJPEG: Data?
 }
 
 enum AgentTriggerKind: String, CaseIterable, Identifiable, Codable {
