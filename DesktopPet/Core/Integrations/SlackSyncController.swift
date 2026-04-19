@@ -3,6 +3,8 @@
 // Slack Web API 轮询：入站写入本地会话、出站 chat.postMessage；去重与指数退避。
 //
 
+import AppKit
+import CoreGraphics
 import Foundation
 import SwiftUI
 
@@ -27,12 +29,17 @@ final class SlackSyncController: ObservableObject {
     private weak var agentClientRef: AgentClient?
     private weak var agentSettingsRef: AgentSettingsStore?
     private weak var multimodalLimitsRef: MultimodalAttachmentLimitsStore?
+    private weak var accessibilityPermissionRef: AccessibilityPermissionManager?
+    private let remoteClickSessions = SlackRemoteClickSessionStore()
     private var dedupTs: [String] = []
     private var backoffSeconds: Double = 0
     private let maxDedup = 800
 
     init() {
         loadPersistedState()
+        #if DEBUG
+        SlackPetRemoteClickCommand.runSanityChecks()
+        #endif
     }
 
     deinit {
@@ -82,13 +89,15 @@ final class SlackSyncController: ObservableObject {
         screenWatchTasks: ScreenWatchTaskStore,
         agentClient: AgentClient,
         agentSettings: AgentSettingsStore,
-        multimodalLimits: MultimodalAttachmentLimitsStore
+        multimodalLimits: MultimodalAttachmentLimitsStore,
+        accessibilityPermission: AccessibilityPermissionManager
     ) {
         sessionRef = session
         screenWatchTasksRef = screenWatchTasks
         agentClientRef = agentClient
         agentSettingsRef = agentSettings
         multimodalLimitsRef = multimodalLimits
+        accessibilityPermissionRef = accessibilityPermission
         pollTask?.cancel()
         outboundObserver = NotificationCenter.default.addObserver(
             forName: .desktopPetConversationDidAppendMessage,
@@ -117,6 +126,7 @@ final class SlackSyncController: ObservableObject {
         agentClientRef = nil
         agentSettingsRef = nil
         multimodalLimitsRef = nil
+        accessibilityPermissionRef = nil
     }
 
     /// 盯屏命中等：在指定频道发帖，可选挂在 `thread_ts` 下。
@@ -219,6 +229,7 @@ final class SlackSyncController: ObservableObject {
             }
             let data = try await SlackWebAPI.conversationsHistory(token: token, channel: channel, limit: 30)
             try await processHistoryResponse(data: data, token: token, slackChannelId: channel, session: session)
+            await pollRemoteClickThreadReplies(token: token, slackChannelId: channel, session: session)
             statusMessage = "同步正常（\(DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium))）"
         } catch let e as SlackWebAPIError {
             switch e {
@@ -267,6 +278,7 @@ final class SlackSyncController: ObservableObject {
             await handleInboundSlackText(
                 raw: stripped,
                 slackTs: ts,
+                slackThreadParentTs: m.threadTs,
                 slackChannelId: slackChannelId,
                 token: token,
                 files: files,
@@ -286,11 +298,23 @@ final class SlackSyncController: ObservableObject {
     private func handleInboundSlackText(
         raw: String,
         slackTs: String,
+        slackThreadParentTs: String?,
         slackChannelId: String,
         token: String,
         files: [SlackHistoryFile],
         session: AgentSessionStore
     ) async {
+        if await tryHandleRemoteClickCoordinateIfNeeded(
+            raw: raw,
+            slackTs: slackTs,
+            slackThreadParentTs: slackThreadParentTs,
+            slackChannelId: slackChannelId,
+            token: token,
+            session: session
+        ) {
+            return
+        }
+
         let uploads: [(filename: String, mimeType: String, data: Data)]
         let rejections: [String]
         if files.isEmpty {
@@ -315,6 +339,18 @@ final class SlackSyncController: ObservableObject {
                 statusMessage = "已从 Slack 创建会话「\(title)」。"
                 return
             }
+        }
+
+        if !raw.isEmpty, SlackPetRemoteClickCommand.isStartCommand(raw) {
+            await handleRemoteClickStart(
+                raw: raw,
+                slackTs: slackTs,
+                slackThreadParentTs: slackThreadParentTs,
+                slackChannelId: slackChannelId,
+                token: token,
+                session: session
+            )
+            return
         }
 
         if !raw.isEmpty {
@@ -388,6 +424,211 @@ final class SlackSyncController: ObservableObject {
             }
         }
         return (uploads, rejections)
+    }
+
+    // MARK: - Slack 远程点屏
+
+    private func pollRemoteClickThreadReplies(token: String, slackChannelId: String, session: AgentSessionStore) async {
+        let pending = remoteClickSessions.allAwaitingKeys().filter { $0.channelId == slackChannelId }
+        for item in pending {
+            let data: Data
+            do {
+                data = try await SlackWebAPI.conversationsReplies(
+                    token: token,
+                    channel: slackChannelId,
+                    ts: item.threadRootTs,
+                    limit: 50
+                )
+            } catch {
+                continue
+            }
+            let dec = JSONDecoder()
+            dec.keyDecodingStrategy = .convertFromSnakeCase
+            guard let env = try? dec.decode(SlackConversationsRepliesEnvelope.self, from: data), env.ok else { continue }
+            let messages = (env.messages ?? []).sorted { (Double($0.ts ?? "0") ?? 0) < (Double($1.ts ?? "0") ?? 0) }
+            for m in messages {
+                guard let ts = m.ts else { continue }
+                if hasSeenTs(ts) { continue }
+                if m.botId != nil { rememberTs(ts); continue }
+                if let u = m.user, u == lastAuthUserId { rememberTs(ts); continue }
+                let trimmedText = m.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let files = m.files ?? []
+                if trimmedText.isEmpty && files.isEmpty {
+                    rememberTs(ts)
+                    continue
+                }
+                let stripped = Self.stripSlackMentions(trimmedText)
+                await handleInboundSlackText(
+                    raw: stripped,
+                    slackTs: ts,
+                    slackThreadParentTs: m.threadTs ?? item.threadRootTs,
+                    slackChannelId: slackChannelId,
+                    token: token,
+                    files: files,
+                    session: session
+                )
+                rememberTs(ts)
+            }
+        }
+    }
+
+    private func isPlausibleCoordinateAttempt(_ raw: String) -> Bool {
+        let s = raw.lowercased()
+        if s.contains("="), (s.contains("x") || s.contains("y")) { return true }
+        let parts = raw.split { ch in ",;，、 \t".contains(ch) }.map(String.init).filter { !$0.isEmpty }
+        return parts.count >= 2 && parts.contains(where: { $0.rangeOfCharacter(from: .decimalDigits) != nil })
+    }
+
+    private func tryHandleRemoteClickCoordinateIfNeeded(
+        raw: String,
+        slackTs: String,
+        slackThreadParentTs: String?,
+        slackChannelId: String,
+        token: String,
+        session: AgentSessionStore
+    ) async -> Bool {
+        guard let parent = slackThreadParentTs?.trimmingCharacters(in: .whitespacesAndNewlines), !parent.isEmpty else {
+            return false
+        }
+        guard let sess = remoteClickSessions.session(channelId: slackChannelId, threadRootTs: parent),
+              sess.status == .awaitingCoordinate else {
+            return false
+        }
+
+        if let pair = SlackPetRemoteClickCommand.parseCoordinateReply(raw) {
+            accessibilityPermissionRef?.refreshStatus(prompt: false, bumpUI: false)
+            let ax = accessibilityPermissionRef?.isGranted ?? false
+            do {
+                let pt = try RemoteClickExecutor.quartzPoint(
+                    normX: pair.0,
+                    normY: pair.1,
+                    displayBounds: sess.displayBounds,
+                    imagePixelSize: sess.imagePixelSize
+                )
+                try RemoteClickExecutor.performLeftClick(at: pt, accessibilityTrusted: ax)
+                remoteClickSessions.complete(channelId: slackChannelId, threadRootTs: parent)
+                await postSlackThreadReply(
+                    channelId: slackChannelId,
+                    threadTs: parent,
+                    text: "🐱 已在主屏执行一次左键点击（\(String(format: "%.0f", pair.0 * 100)),\(String(format: "%.0f", pair.1 * 100)) 标尺坐标）。会话已结束。"
+                )
+                if let binding = bindings.first(where: { $0.slackChannelId == slackChannelId }) {
+                    session.appendSystemNoticeInChannel(
+                        channelId: binding.localChannelId,
+                        text: "（Slack）远程点屏已在主屏执行一次点击。"
+                    )
+                }
+                statusMessage = "Slack 远程点屏已执行。"
+            } catch let e as RemoteClickExecutorError {
+                await postSlackThreadReply(channelId: slackChannelId, threadTs: parent, text: "🐱 \(e.localizedDescription)")
+            } catch {
+                await postSlackThreadReply(
+                    channelId: slackChannelId,
+                    threadTs: parent,
+                    text: "🐱 点击失败：\(error.localizedDescription)"
+                )
+            }
+            return true
+        }
+
+        if isPlausibleCoordinateAttempt(raw) {
+            await postSlackThreadReply(
+                channelId: slackChannelId,
+                threadTs: parent,
+                text: "🐱 坐标无法解析或超出 0–100（或 0–1）范围。请重试，例如 `50,50` 或 `x=0.5 y=0.5`。"
+            )
+            return true
+        }
+
+        return false
+    }
+
+    private func handleRemoteClickStart(
+        raw: String,
+        slackTs: String,
+        slackThreadParentTs: String?,
+        slackChannelId: String,
+        token: String,
+        session: AgentSessionStore
+    ) async {
+        _ = raw
+        let trimmedParent = slackThreadParentTs?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let threadRoot: String = {
+            if let t = trimmedParent, !t.isEmpty { return t }
+            return slackTs
+        }()
+        let postThreadTs = threadRoot
+
+        guard ScreenCaptureService.hasScreenRecordingPermission else {
+            await postSlackThreadReply(
+                channelId: slackChannelId,
+                threadTs: postThreadTs,
+                text: "🐱 远程点屏需要「屏幕录制」权限。请在系统设置 → 隐私与安全性 → 屏幕录制 中允许本应用，然后重试 `!pet click` / `!pet 点屏` 或中文触发词（如「远程点屏」）。"
+            )
+            return
+        }
+
+        let displayBounds = CGDisplayBounds(CGMainDisplayID())
+        let jpeg: Data
+        do {
+            jpeg = try await ScreenCaptureService.captureMainDisplayJPEG(maxEdge: 1600, jpegQuality: 0.82)
+        } catch {
+            await postSlackThreadReply(
+                channelId: slackChannelId,
+                threadTs: postThreadTs,
+                text: "🐱 截屏失败：\(error.localizedDescription)"
+            )
+            return
+        }
+
+        let overlay = RemoteClickOverlayRenderer.renderOverlayOnJPEG(jpeg)
+        let px = Self.jpegPixelSize(ofJPEG: overlay) ?? CGSize(width: 1280, height: 720)
+
+        remoteClickSessions.beginSession(
+            channelId: slackChannelId,
+            threadRootTs: threadRoot,
+            displayBounds: displayBounds,
+            imagePixelSize: px,
+            overlayJPEG: nil
+        )
+
+        let intro =
+            "🐱 主屏坐标图（0–100 标尺，左上为原点）。请在本线程回复一次坐标，例如 `50,50` 或 `x=0.5 y=0.5`（支持 0–100 或 0–1）。单次点击后自动结束，约 5 分钟超时。"
+
+        do {
+            _ = try await SlackWebAPI.filesUpload(
+                token: token,
+                channel: slackChannelId,
+                threadTs: postThreadTs,
+                filename: "remote_click_overlay.jpg",
+                mimeType: "image/jpeg",
+                initialComment: intro,
+                fileData: overlay
+            )
+        } catch {
+            await postSlackThreadReply(
+                channelId: slackChannelId,
+                threadTs: postThreadTs,
+                text:
+                    "\(intro)\n\n（上传坐标图失败：\(error.localizedDescription)。请确认 Bot 拥有 **files:write**，且工作区允许外部上传（`files.getUploadURLExternal` / `files.completeUploadExternal`）；你仍可凭记忆输入坐标，但强烈建议修好上传以免对错屏。）"
+            )
+        }
+
+        if let binding = bindings.first(where: { $0.slackChannelId == slackChannelId }) {
+            session.appendSystemNoticeInChannel(
+                channelId: binding.localChannelId,
+                text: "（Slack）已发起远程点屏，请在 Slack 该线程回复坐标。"
+            )
+        }
+        statusMessage = "Slack 远程点屏已发送坐标图。"
+    }
+
+    private static func jpegPixelSize(ofJPEG data: Data) -> CGSize? {
+        guard let img = NSImage(data: data),
+              let rep = img.representations.first as? NSBitmapImageRep,
+              rep.pixelsWide > 0,
+              rep.pixelsHigh > 0 else { return nil }
+        return CGSize(width: rep.pixelsWide, height: rep.pixelsHigh)
     }
 
     /// Slack 盯屏：`!pet watch` / `!pet 盯屏` 或自然语言；仅 OCR + 可选模型兜底（无亮度启发式）。无需已绑定本地会话也会在原帖下回复确认。
@@ -547,12 +788,19 @@ private struct SlackConversationsHistoryEnvelope: Decodable {
     let messages: [SlackHistoryMessage]?
 }
 
+private struct SlackConversationsRepliesEnvelope: Decodable {
+    let ok: Bool
+    let error: String?
+    let messages: [SlackHistoryMessage]?
+}
+
 private struct SlackHistoryMessage: Decodable {
     let type: String?
     let subtype: String?
     let user: String?
     let text: String?
     let ts: String?
+    let threadTs: String?
     let botId: String?
     let files: [SlackHistoryFile]?
 }
@@ -653,5 +901,144 @@ private enum SlackWebAPI {
             throw SlackWebAPIError.apiError(env.error ?? "chat.postMessage failed")
         }
         return data
+    }
+
+    static func conversationsReplies(token: String, channel: String, ts: String, limit: Int) async throws -> Data {
+        var c = URLComponents(string: "https://slack.com/api/conversations.replies")!
+        c.queryItems = [
+            URLQueryItem(name: "channel", value: channel),
+            URLQueryItem(name: "ts", value: ts),
+            URLQueryItem(name: "limit", value: "\(limit)"),
+        ]
+        guard let url = c.url else {
+            throw SlackWebAPIError.apiError("无效 conversations.replies URL")
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode == 429 {
+            throw SlackWebAPIError.rateLimited(retryAfter: Double(http.value(forHTTPHeaderField: "Retry-After") ?? "") ?? nil)
+        }
+        return data
+    }
+
+    /// 使用 Slack 推荐的外部上传链路（`files.getUploadURLExternal` → POST 字节 → `files.completeUploadExternal`），替代已弃用的 `files.upload`。
+    static func filesUpload(
+        token: String,
+        channel: String,
+        threadTs: String?,
+        filename: String,
+        mimeType: String,
+        initialComment: String?,
+        fileData: Data
+    ) async throws -> Data {
+        guard !fileData.isEmpty else {
+            throw SlackWebAPIError.apiError("文件为空，无法上传")
+        }
+
+        // 1) 申请边缘上传 URL（官方 curl 为表单字段；用带 host 的 URLComponents 生成 x-www-form-urlencoded 体，避免空 URL 时 percentEncodedQuery 为 nil）
+        var getComp = URLComponents(string: "https://slack.com/api/files.getUploadURLExternal")!
+        getComp.queryItems = [
+            URLQueryItem(name: "filename", value: filename),
+            URLQueryItem(name: "length", value: String(fileData.count)),
+        ]
+        guard let getQuery = getComp.percentEncodedQuery?.data(using: .utf8) else {
+            throw SlackWebAPIError.apiError("getUploadURL 参数编码失败")
+        }
+        var getReq = URLRequest(url: URL(string: "https://slack.com/api/files.getUploadURLExternal")!)
+        getReq.httpMethod = "POST"
+        getReq.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        getReq.setValue("application/x-www-form-urlencoded; charset=utf-8", forHTTPHeaderField: "Content-Type")
+        getReq.httpBody = getQuery
+        let (getData, getResp) = try await URLSession.shared.data(for: getReq)
+        if let http = getResp as? HTTPURLResponse, http.statusCode == 429 {
+            throw SlackWebAPIError.rateLimited(retryAfter: Double(http.value(forHTTPHeaderField: "Retry-After") ?? "") ?? nil)
+        }
+        let dec = JSONDecoder()
+        dec.keyDecodingStrategy = .convertFromSnakeCase
+        struct GetUploadEnvelope: Decodable {
+            let ok: Bool
+            let error: String?
+            let uploadUrl: String?
+            let fileId: String?
+        }
+        let getEnv = try dec.decode(GetUploadEnvelope.self, from: getData)
+        guard getEnv.ok,
+              let uploadURLStr = getEnv.uploadUrl?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !uploadURLStr.isEmpty,
+              let uploadURL = URL(string: uploadURLStr),
+              let fileId = getEnv.fileId?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !fileId.isEmpty else {
+            let hint = String(data: getData, encoding: .utf8)?.prefix(280) ?? ""
+            throw SlackWebAPIError.apiError(
+                "files.getUploadURLExternal：\(getEnv.error ?? "失败")\(hint.isEmpty ? "" : "（\(hint)）")"
+            )
+        }
+
+        // 2) 将文件 POST 到 Slack 返回的上传地址（官方文档：`Content-Type: application/octet-stream` + 原始字节）
+        var putReq = URLRequest(url: uploadURL)
+        putReq.httpMethod = "POST"
+        putReq.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+        putReq.httpBody = fileData
+        let (_, upResp) = try await URLSession.shared.data(for: putReq)
+        guard let upHttp = upResp as? HTTPURLResponse else {
+            throw SlackWebAPIError.apiError("上传坐标图无 HTTP 响应")
+        }
+        guard (200 ... 299).contains(upHttp.statusCode) else {
+            throw SlackWebAPIError.apiError("上传坐标图失败 HTTP \(upHttp.statusCode)")
+        }
+
+        // 3) 完成上传并分享到频道 / 线程（官方示例为 `curl --form`，用 multipart 最贴近 Slack 期望；`files` 值为 JSON 数组文本）
+        let filesMeta: [[String: String]] = [["id": fileId, "title": filename]]
+        let filesJSONBytes = try JSONSerialization.data(withJSONObject: filesMeta)
+        guard let filesJSONString = String(data: filesJSONBytes, encoding: .utf8) else {
+            throw SlackWebAPIError.apiError("files 元数据编码失败")
+        }
+
+        let completeBoundary = "CompleteBoundary-\(UUID().uuidString)"
+        var completeMultipart = Data()
+        func appendCompleteField(name: String, value: String) {
+            completeMultipart.append("--\(completeBoundary)\r\n".data(using: .utf8)!)
+            completeMultipart.append(
+                "Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".data(using: .utf8)!
+            )
+            completeMultipart.append(value.data(using: .utf8)!)
+            completeMultipart.append("\r\n".data(using: .utf8)!)
+        }
+        appendCompleteField(name: "files", value: filesJSONString)
+        appendCompleteField(name: "channel_id", value: channel)
+        if let ts = threadTs?.trimmingCharacters(in: .whitespacesAndNewlines), !ts.isEmpty {
+            appendCompleteField(name: "thread_ts", value: ts)
+        }
+        if let c = initialComment?.trimmingCharacters(in: .whitespacesAndNewlines), !c.isEmpty {
+            appendCompleteField(name: "initial_comment", value: c)
+        }
+        completeMultipart.append("--\(completeBoundary)--\r\n".data(using: .utf8)!)
+
+        var completeReq = URLRequest(url: URL(string: "https://slack.com/api/files.completeUploadExternal")!)
+        completeReq.httpMethod = "POST"
+        completeReq.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        completeReq.setValue(
+            "multipart/form-data; boundary=\(completeBoundary)",
+            forHTTPHeaderField: "Content-Type"
+        )
+        completeReq.httpBody = completeMultipart
+        let (completeData, completeResp) = try await URLSession.shared.data(for: completeReq)
+        if let http = completeResp as? HTTPURLResponse, http.statusCode == 429 {
+            throw SlackWebAPIError.rateLimited(retryAfter: Double(http.value(forHTTPHeaderField: "Retry-After") ?? "") ?? nil)
+        }
+        struct CompleteEnvelope: Decodable {
+            let ok: Bool
+            let error: String?
+        }
+        let completeEnv = try dec.decode(CompleteEnvelope.self, from: completeData)
+        guard completeEnv.ok else {
+            let hint = String(data: completeData, encoding: .utf8)?.prefix(280) ?? ""
+            throw SlackWebAPIError.apiError(
+                "files.completeUploadExternal：\(completeEnv.error ?? "失败")\(hint.isEmpty ? "" : "（\(hint)）")"
+            )
+        }
+        return completeData
     }
 }

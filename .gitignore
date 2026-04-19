@@ -3,6 +3,7 @@ build/
 DerivedData/
 .deriveddata/
 .derivedDataAgent/
+.derivedData/
 *.pbxuser
 !default.pbxuser
 *.mode1v3

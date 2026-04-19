@@ -85,7 +85,8 @@ final class AppCoordinator: ObservableObject {
             screenWatchTasks: screenWatchTaskStore,
             agentClient: agentClient,
             agentSettings: agentSettingsStore,
-            multimodalLimits: multimodalAttachmentLimitsStore
+            multimodalLimits: multimodalAttachmentLimitsStore,
+            accessibilityPermission: permissionManager
         )
         screenWatchRunner.start(agentClient: agentClient, agentSettings: agentSettingsStore) { [weak self] task, _, kind in
             self?.screenWatchHitFeedback.notifyHit(task: task, narrativeKind: kind)

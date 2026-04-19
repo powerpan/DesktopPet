@@ -69,6 +69,19 @@ struct IntegrationsTabView: View {
             }
 
             Section {
+                Text("在监控频道发送 **`!pet click`** / **`!pet 点屏`**，或整句以中文触发词开头（例如 **远程点屏**、**远程点击**、**帮点一下屏幕**、**猫猫远程点屏**、**屏幕远程点击** 等；关键词后请接空格、逗号或句号，不要写成「远程点屏谢谢」这种紧接其它汉字，以免误触）。应用会截取主屏并上传带 0–100 标尺的坐标图（需 **屏幕录制** + Bot **files:write**；上传失败时仍会提示你用文字回复坐标）。在**同一线程**回复一次坐标，例如 **`50,50`** 或 **`x=0.5 y=0.5`**（支持 0–100 或 0–1；越界会提示错误）。**执行点击需要「辅助功能」权限**（系统设置 → 隐私与安全性 → 辅助功能）。单次会话仅执行一次左键，成功后结束；约 5 分钟超时。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("端到端自测建议：① 发 `!pet click` 见线程内坐标图；② 回 `50,50` 应点在主屏视觉中心附近；③ 回 `x=120` 类越界应报错且不点击；④ 关闭辅助功能后应仅回帖提示授权。")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } header: {
+                Text("Slack 远程点屏")
+            }
+
+            Section {
                 Text("需已授予「屏幕录制」权限。本地 OCR / 进度条亮度启发式优先；可选多模态模型 YES/NO 兜底（消耗 API）。")
                     .font(.caption)
                     .foregroundStyle(.secondary)

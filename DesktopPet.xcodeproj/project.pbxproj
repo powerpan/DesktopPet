@@ -66,6 +66,10 @@
 		C10000000000000000000041 /* SlackTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000041 /* SlackTypes.swift */; };
 		C10000000000000000000042 /* SlackSyncController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000042 /* SlackSyncController.swift */; };
 		C10000000000000000000048 /* SlackPetWatchCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000048 /* SlackPetWatchCommand.swift */; };
+		C10000000000000000000061 /* SlackPetRemoteClickCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000061 /* SlackPetRemoteClickCommand.swift */; };
+		C10000000000000000000062 /* SlackRemoteClickSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000062 /* SlackRemoteClickSessionStore.swift */; };
+		C10000000000000000000063 /* RemoteClickOverlayRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000063 /* RemoteClickOverlayRenderer.swift */; };
+		C10000000000000000000064 /* RemoteClickExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000064 /* RemoteClickExecutor.swift */; };
 		C10000000000000000000043 /* ScreenWatchPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000043 /* ScreenWatchPersistence.swift */; };
 		C10000000000000000000044 /* ScreenWatchDetectors.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000044 /* ScreenWatchDetectors.swift */; };
 		C10000000000000000000045 /* ScreenWatchRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000045 /* ScreenWatchRunner.swift */; };
@@ -170,6 +174,10 @@
 		B100000000000000000000041 /* SlackTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackTypes.swift; sourceTree = "<group>"; };
 		B100000000000000000000042 /* SlackSyncController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackSyncController.swift; sourceTree = "<group>"; };
 		B100000000000000000000048 /* SlackPetWatchCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackPetWatchCommand.swift; sourceTree = "<group>"; };
+		B100000000000000000000061 /* SlackPetRemoteClickCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackPetRemoteClickCommand.swift; sourceTree = "<group>"; };
+		B100000000000000000000062 /* SlackRemoteClickSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackRemoteClickSessionStore.swift; sourceTree = "<group>"; };
+		B100000000000000000000063 /* RemoteClickOverlayRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteClickOverlayRenderer.swift; sourceTree = "<group>"; };
+		B100000000000000000000064 /* RemoteClickExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteClickExecutor.swift; sourceTree = "<group>"; };
 		B100000000000000000000043 /* ScreenWatchPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenWatchPersistence.swift; sourceTree = "<group>"; };
 		B100000000000000000000044 /* ScreenWatchDetectors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenWatchDetectors.swift; sourceTree = "<group>"; };
 		B100000000000000000000045 /* ScreenWatchRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenWatchRunner.swift; sourceTree = "<group>"; };
@@ -259,6 +267,8 @@
 				B100000000000000000000041 /* SlackTypes.swift */,
 				B100000000000000000000042 /* SlackSyncController.swift */,
 				B100000000000000000000048 /* SlackPetWatchCommand.swift */,
+				B100000000000000000000061 /* SlackPetRemoteClickCommand.swift */,
+				B100000000000000000000062 /* SlackRemoteClickSessionStore.swift */,
 			);
 			path = Integrations;
 			sourceTree = "<group>";
@@ -277,6 +287,7 @@
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000003A /* ScreenCaptureService.swift */,
+				B100000000000000000000063 /* RemoteClickOverlayRenderer.swift */,
 			);
 			path = Capture;
 			sourceTree = "<group>";
@@ -315,6 +326,7 @@
 			children = (
 				B100000000000000000000016 /* GlobalInputMonitor.swift */,
 				B100000000000000000000005 /* MouseTracker.swift */,
+				B100000000000000000000064 /* RemoteClickExecutor.swift */,
 			);
 			path = Input;
 			sourceTree = "<group>";
@@ -613,6 +625,10 @@
 				C10000000000000000000041 /* SlackTypes.swift in Sources */,
 				C10000000000000000000042 /* SlackSyncController.swift in Sources */,
 				C10000000000000000000048 /* SlackPetWatchCommand.swift in Sources */,
+				C10000000000000000000061 /* SlackPetRemoteClickCommand.swift in Sources */,
+				C10000000000000000000062 /* SlackRemoteClickSessionStore.swift in Sources */,
+				C10000000000000000000063 /* RemoteClickOverlayRenderer.swift in Sources */,
+				C10000000000000000000064 /* RemoteClickExecutor.swift in Sources */,
 				C10000000000000000000043 /* ScreenWatchPersistence.swift in Sources */,
 				C10000000000000000000044 /* ScreenWatchDetectors.swift in Sources */,
 				C10000000000000000000045 /* ScreenWatchRunner.swift in Sources */,
