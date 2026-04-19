@@ -151,6 +151,19 @@ final class AgentConversationStore: ObservableObject {
         postConversationAppend(channelId: activeChannelId, message: msg, origin: "local")
     }
 
+    /// 向指定频道追加猫猫回复（用于 Slack 入站自动续写等）；**不**切换当前选中频道。
+    func appendAssistantInChannel(channelId: UUID, text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let i = channels.firstIndex(where: { $0.id == channelId }) else { return }
+        var ch = channels[i]
+        let msg = ChatMessage(role: "assistant", content: trimmed)
+        ch.messages.append(msg)
+        ch.updatedAt = Date()
+        channels[i] = ch
+        persist()
+        postConversationAppend(channelId: channelId, message: msg, origin: "local")
+    }
+
     func appendSystemNotice(_ text: String) {
         guard let i = channels.firstIndex(where: { $0.id == activeChannelId }) else { return }
         var ch = channels[i]

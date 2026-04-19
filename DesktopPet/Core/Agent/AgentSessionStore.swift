@@ -76,6 +76,10 @@ final class AgentSessionStore: ObservableObject {
         conversation.appendAssistant(text)
     }
 
+    func appendAssistantInChannel(channelId: UUID, text: String) {
+        conversation.appendAssistantInChannel(channelId: channelId, text: text)
+    }
+
     func appendSystemNotice(_ text: String) {
         conversation.appendSystemNotice(text)
     }

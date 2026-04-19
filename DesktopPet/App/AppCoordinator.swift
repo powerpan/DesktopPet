@@ -48,6 +48,8 @@ final class AppCoordinator: ObservableObject {
     private var isPetVisible = true
     /// 辅助功能信任轮询：系统设置勾选后 TCC 可能延迟数秒才对本进程生效，取消旧任务避免重复排队。
     private var accessibilityTrustPollTask: Task<Void, Never>?
+    /// Slack 入站后自动请求模型：串行执行，避免同轮询里多条消息并发抢 `isSending`。
+    private var slackAutoReplyChain: Task<Void, Never>?
 
     func start() {
         preparePetWindow()
@@ -63,6 +65,7 @@ final class AppCoordinator: ObservableObject {
         wireForceFireTriggerFromSettings()
         wireCareInteractionFromPetPanel()
         wirePresentAgentSettingsTabFromNotification()
+        wireSlackInboundAutoReply()
 
         petCareModel.configureGrowthEngine(client: agentClient, settings: agentSettingsStore)
         petCareModel.startCompanionTicking { [weak self] in self?.isPetVisible ?? false }
@@ -295,6 +298,71 @@ final class AppCoordinator: ObservableObject {
                 self.presentAgentSettingsWindow()
             }
             .store(in: &cancellables)
+    }
+
+    /// Slack 入站写入 `user` 后，用当前「连接」里的模型对该**频道**自动续写一条 `assistant`（与对话面板逻辑一致，并会经出站同步回 Slack）。
+    private func wireSlackInboundAutoReply() {
+        NotificationCenter.default.publisher(for: .desktopPetConversationDidAppendMessage)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] note in
+                guard let self else { return }
+                guard (note.userInfo?[DesktopPetNotificationUserInfoKey.conversationAppendOrigin] as? String) == "slack" else { return }
+                guard (note.userInfo?[DesktopPetNotificationUserInfoKey.conversationAppendRole] as? String) == "user" else { return }
+                guard let idStr = note.userInfo?[DesktopPetNotificationUserInfoKey.conversationAppendChannelId] as? String,
+                      let channelId = UUID(uuidString: idStr) else { return }
+                guard self.slackSyncController.integrationConfig.enabled,
+                      self.slackSyncController.integrationConfig.syncInbound else { return }
+                let previous = self.slackAutoReplyChain
+                self.slackAutoReplyChain = Task { @MainActor [weak self] in
+                    await previous?.value
+                    guard let self else { return }
+                    await self.performSlackInboundAutoReply(channelId: channelId)
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    private func performSlackInboundAutoReply(channelId: UUID) async {
+        guard slackSyncController.integrationConfig.enabled else { return }
+        if agentSessionStore.isSending { return }
+        guard let channel = agentSessionStore.conversation.channel(id: channelId) else { return }
+
+        let key = KeychainStore.readAPIKey(forProvider: agentSettingsStore.activeAPIProvider)
+        var systemPrompt = agentSettingsStore.systemPrompt
+        systemPrompt += "\n\n（本条或本轮上下文中的部分 user 消息可能来自 Slack；请像平常一样以桌宠身份自然回复。）"
+        if agentSettingsStore.attachKeySummary {
+            let s = deskMirrorModel.recentKeyLabelsSummary.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !s.isEmpty {
+                systemPrompt += "\n\n（可选上下文）用户近期键入标签摘要：\(s.prefix(200))"
+            }
+        }
+
+        let apiMessages: [[String: String]] = channel.messages.compactMap { m in
+            if m.role == "user" || m.role == "assistant" {
+                return ["role": m.role, "content": m.content]
+            }
+            return nil
+        }
+        guard apiMessages.contains(where: { $0["role"] == "user" }) else { return }
+
+        agentSessionStore.setSending(true)
+        agentSessionStore.lastError = nil
+        defer { agentSessionStore.setSending(false) }
+
+        do {
+            let reply = try await agentClient.completeChat(
+                baseURL: agentSettingsStore.baseURL,
+                model: agentSettingsStore.model,
+                apiKey: key,
+                systemPrompt: systemPrompt,
+                messages: apiMessages,
+                temperature: agentSettingsStore.temperature,
+                maxTokens: agentSettingsStore.maxTokens
+            )
+            agentSessionStore.appendAssistantInChannel(channelId: channelId, text: reply)
+        } catch {
+            agentSessionStore.lastError = error.localizedDescription
+        }
     }
 
     private func notifyScreenWatchHit(taskTitle: String, detail: String) {
