@@ -315,6 +315,18 @@ final class SlackSyncController: ObservableObject {
             return
         }
 
+        if !raw.isEmpty, SlackPetHelpCommand.isHelpRequest(raw) {
+            let parent = slackThreadParentTs?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let threadTs = parent.isEmpty ? slackTs : parent
+            await postSlackThreadReply(
+                channelId: slackChannelId,
+                threadTs: threadTs,
+                text: SlackPetHelpCommand.integrationHelpText
+            )
+            statusMessage = "已在 Slack 回复帮助说明。"
+            return
+        }
+
         let uploads: [(filename: String, mimeType: String, data: Data)]
         let rejections: [String]
         if files.isEmpty {
@@ -479,6 +491,49 @@ final class SlackSyncController: ObservableObject {
         return parts.count >= 2 && parts.contains(where: { $0.rangeOfCharacter(from: .decimalDigits) != nil })
     }
 
+    /// 使用当前会话中的主屏几何与上一张标尺图尺寸执行点击，并回到「是否继续」。
+    private func performSlackRemoteClickFromNorm(
+        pair: (Double, Double),
+        sess: SlackRemoteClickSessionStore.Session,
+        slackChannelId: String,
+        parentThreadTs: String,
+        session: AgentSessionStore
+    ) async {
+        accessibilityPermissionRef?.refreshStatus(prompt: false, bumpUI: false)
+        let ax = accessibilityPermissionRef?.isGranted ?? false
+        do {
+            let pt = try RemoteClickExecutor.quartzPoint(
+                normX: pair.0,
+                normY: pair.1,
+                displayBounds: sess.displayBounds,
+                imagePixelSize: sess.imagePixelSize
+            )
+            try RemoteClickExecutor.performLeftClick(at: pt, accessibilityTrusted: ax)
+            remoteClickSessions.setAwaitingContinue(channelId: slackChannelId, threadRootTs: parentThreadTs)
+            await postSlackThreadReply(
+                channelId: slackChannelId,
+                threadTs: parentThreadTs,
+                text:
+                    "🐱 已在主屏执行一次左键点击（\(String(format: "%.0f", pair.0 * 100)),\(String(format: "%.0f", pair.1 * 100)) 标尺坐标）。\n\n若要**再来一轮**（重新截屏并点下一处），请回复 **继续** 或 **再来一次**；也可 **`继续`+坐标**（如 `继续90，62`）沿用当前坐标图直接再点。结束请回复 **结束** 或 **停止**。"
+            )
+            if let binding = bindings.first(where: { $0.slackChannelId == slackChannelId }) {
+                session.appendSystemNoticeInChannel(
+                    channelId: binding.localChannelId,
+                    text: "（Slack）远程点屏已在主屏执行一次点击；可在 Slack 线程回复「继续」多轮操作。"
+                )
+            }
+            statusMessage = "Slack 远程点屏已执行。"
+        } catch let e as RemoteClickExecutorError {
+            await postSlackThreadReply(channelId: slackChannelId, threadTs: parentThreadTs, text: "🐱 \(e.localizedDescription)")
+        } catch {
+            await postSlackThreadReply(
+                channelId: slackChannelId,
+                threadTs: parentThreadTs,
+                text: "🐱 点击失败：\(error.localizedDescription)"
+            )
+        }
+    }
+
     private func tryHandleRemoteClickCoordinateIfNeeded(
         raw: String,
         slackTs: String,
@@ -506,6 +561,37 @@ final class SlackSyncController: ObservableObject {
                 statusMessage = "Slack 远程点屏已结束。"
                 return true
             }
+
+            switch SlackPetRemoteClickCommand.parseContinueAfterClickMessage(raw) {
+            case .combinedCoordinateTail(let tail):
+                if let pair = SlackPetRemoteClickCommand.parseCoordinateReply(tail) {
+                    await performSlackRemoteClickFromNorm(
+                        pair: pair,
+                        sess: sess,
+                        slackChannelId: slackChannelId,
+                        parentThreadTs: parent,
+                        session: session
+                    )
+                } else {
+                    await postSlackThreadReply(
+                        channelId: slackChannelId,
+                        threadTs: parent,
+                        text: "🐱 无法在「继续」后解析坐标。请用如 **`继续90，62`**、**`继续 50, 50`**、**`再来一次 x=0.5 y=0.5`**，或先发 **继续** 再单独发坐标。"
+                    )
+                }
+                return true
+            case .bareContinue:
+                await handleRemoteClickContinueRound(
+                    channelId: slackChannelId,
+                    threadRootTs: parent,
+                    token: token,
+                    session: session
+                )
+                return true
+            case .notContinueLeadIn:
+                break
+            }
+
             if SlackPetRemoteClickCommand.isContinueRemoteClickReply(raw) {
                 await handleRemoteClickContinueRound(
                     channelId: slackChannelId,
@@ -519,7 +605,7 @@ final class SlackSyncController: ObservableObject {
                 await postSlackThreadReply(
                     channelId: slackChannelId,
                     threadTs: parent,
-                    text: "🐱 当前在等待是否继续：请先回复 **继续**（或 **再来一次**）以截下一张坐标图，或回复 **结束** 退出本轮。"
+                    text: "🐱 当前在等待是否继续：请先回复 **继续**（或 **`继续`+坐标** 沿用当前坐标图），或 **再来一次** 截新图，或回复 **结束** 退出。"
                 )
                 return true
             }
@@ -527,39 +613,13 @@ final class SlackSyncController: ObservableObject {
 
         case .awaitingCoordinate:
             if let pair = SlackPetRemoteClickCommand.parseCoordinateReply(raw) {
-                accessibilityPermissionRef?.refreshStatus(prompt: false, bumpUI: false)
-                let ax = accessibilityPermissionRef?.isGranted ?? false
-                do {
-                    let pt = try RemoteClickExecutor.quartzPoint(
-                        normX: pair.0,
-                        normY: pair.1,
-                        displayBounds: sess.displayBounds,
-                        imagePixelSize: sess.imagePixelSize
-                    )
-                    try RemoteClickExecutor.performLeftClick(at: pt, accessibilityTrusted: ax)
-                    remoteClickSessions.setAwaitingContinue(channelId: slackChannelId, threadRootTs: parent)
-                    await postSlackThreadReply(
-                        channelId: slackChannelId,
-                        threadTs: parent,
-                        text:
-                            "🐱 已在主屏执行一次左键点击（\(String(format: "%.0f", pair.0 * 100)),\(String(format: "%.0f", pair.1 * 100)) 标尺坐标）。\n\n若要**再来一轮**（重新截屏并点下一处），请回复 **继续** 或 **再来一次**；结束请回复 **结束** 或 **停止**。"
-                    )
-                    if let binding = bindings.first(where: { $0.slackChannelId == slackChannelId }) {
-                        session.appendSystemNoticeInChannel(
-                            channelId: binding.localChannelId,
-                            text: "（Slack）远程点屏已在主屏执行一次点击；可在 Slack 线程回复「继续」多轮操作。"
-                        )
-                    }
-                    statusMessage = "Slack 远程点屏已执行。"
-                } catch let e as RemoteClickExecutorError {
-                    await postSlackThreadReply(channelId: slackChannelId, threadTs: parent, text: "🐱 \(e.localizedDescription)")
-                } catch {
-                    await postSlackThreadReply(
-                        channelId: slackChannelId,
-                        threadTs: parent,
-                        text: "🐱 点击失败：\(error.localizedDescription)"
-                    )
-                }
+                await performSlackRemoteClickFromNorm(
+                    pair: pair,
+                    sess: sess,
+                    slackChannelId: slackChannelId,
+                    parentThreadTs: parent,
+                    session: session
+                )
                 return true
             }
 

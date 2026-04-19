@@ -108,16 +108,52 @@ enum SlackPetRemoteClickCommand {
         return (nx, ny)
     }
 
+    /// 与 `isContinueRemoteClickReply` 相同语序，**长词在前**，供「继续+坐标」解析。
+    private static let continueReplyPhrasesSorted: [String] = [
+        "再来一次", "再点一次", "再来一轮", "再截一张", "下一轮", "下一图", "接着点", "继续", "再来",
+    ].sorted { $0.count > $1.count }
+
+    /// 在「已点击、等待是否继续」阶段：是否「仅继续」、或「继续」前缀后紧跟坐标（不再截屏）。
+    enum ContinueAfterClickParse: Equatable {
+        case notContinueLeadIn
+        case bareContinue
+        case combinedCoordinateTail(String)
+    }
+
+    static func parseContinueAfterClickMessage(_ raw: String) -> ContinueAfterClickParse {
+        let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty else { return .notContinueLeadIn }
+        let lower = t.lowercased()
+        if ["continue", "yes", "y", "ok", "next"].contains(lower) { return .bareContinue }
+
+        if lower.hasPrefix("continue") {
+            let after = String(t.dropFirst("continue".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleaned = after.trimmingCharacters(in: CharacterSet(charactersIn: "，,"))
+            return cleaned.isEmpty ? .bareContinue : .combinedCoordinateTail(cleaned)
+        }
+        if lower.hasPrefix("next") {
+            let after = String(t.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleaned = after.trimmingCharacters(in: CharacterSet(charactersIn: "，,"))
+            return cleaned.isEmpty ? .bareContinue : .combinedCoordinateTail(cleaned)
+        }
+
+        for p in continueReplyPhrasesSorted {
+            guard t.hasPrefix(p) else { continue }
+            let after = String(t.dropFirst(p.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            let cleaned = after.trimmingCharacters(in: CharacterSet(charactersIn: "，,"))
+            if cleaned.isEmpty { return .bareContinue }
+            return .combinedCoordinateTail(cleaned)
+        }
+        return .notContinueLeadIn
+    }
+
     /// 在「已点击、等待是否继续」阶段，用户确认再来一轮截屏+点屏（长短语优先匹配，避免「再来」误吞「再来一次」）。
     static func isContinueRemoteClickReply(_ raw: String) -> Bool {
         let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return false }
         let lower = t.lowercased()
         if ["continue", "yes", "y", "ok", "next"].contains(lower) { return true }
-        let phrases = [
-            "再来一次", "再点一次", "再来一轮", "再截一张", "下一轮", "下一图", "接着点", "继续", "再来",
-        ]
-        return matchesPhrasePrefix(t, phrases: phrases)
+        return matchesPhrasePrefix(t, phrases: continueReplyPhrasesSorted)
     }
 
     /// 结束多轮远程点屏会话。
@@ -163,6 +199,14 @@ enum SlackPetRemoteClickCommand {
         assert(!isContinueRemoteClickReply("远程点屏"))
         assert(isEndRemoteClickReply("结束"))
         assert(isEndRemoteClickReply("停止"))
+        if case .combinedCoordinateTail(let s) = parseContinueAfterClickMessage("继续90，62") {
+            assert(s == "90，62")
+            assert(parseCoordinateReply(s) != nil)
+        } else {
+            assertionFailure()
+        }
+        assert(parseContinueAfterClickMessage("继续") == .bareContinue)
+        assert(parseContinueAfterClickMessage("继续 50, 50") == .combinedCoordinateTail("50, 50"))
     }
     #endif
 }
