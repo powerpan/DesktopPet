@@ -1049,7 +1049,18 @@ private enum SlackWebAPI {
         req.httpMethod = "POST"
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
-        var body: [String: Any] = ["channel": channel, "text": text]
+        // 使用 `markdown_text`：Slack 标准 Markdown（`**粗体**` 等），与客户端「Markdown」一致。
+        // 勿与顶层 `text` 同发（会 `markdown_text_conflict`）；顶层 `text`+mrkdwn 的 `*粗体*` 在部分客户端会整段当纯文本，星号原样显示。
+        let maxMarkdown = 12_000
+        let markdownBody: String = {
+            guard text.count > maxMarkdown else { return text }
+            let head = String(text.prefix(max(0, maxMarkdown - 24)))
+            return head + "\n\n…（消息过长已截断）"
+        }()
+        var body: [String: Any] = [
+            "channel": channel,
+            "markdown_text": markdownBody,
+        ]
         if let ts = threadTs?.trimmingCharacters(in: .whitespacesAndNewlines), !ts.isEmpty {
             body["thread_ts"] = ts
         }

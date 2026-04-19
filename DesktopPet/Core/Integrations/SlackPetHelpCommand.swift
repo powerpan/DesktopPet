@@ -26,7 +26,7 @@ enum SlackPetHelpCommand {
         return false
     }
 
-    /// 发回 Slack 的简明说明（与项目内其它 Slack 文案一致使用 ** 粗体）。
+    /// 发回 Slack 的简明说明（`chat.postMessage` 使用 `markdown_text`，与常见 Markdown 一致写 `**粗体**`）。
     static let integrationHelpText: String = """
     🐱 **DesktopPet × Slack 简明说明**
 
