@@ -36,6 +36,9 @@ struct AgentSettingsView: View {
     @State private var watchOCRText: String = ""
     @State private var watchVisionHint: String = ""
     @State private var watchUseVision = false
+    /// 新建盯屏任务时模型兜底的冷却：分、秒（秒取 0…59，与列表编辑一致）。
+    @State private var watchVisionCDMinutes: String = "0"
+    @State private var watchVisionCDSeconds: String = "15"
     @State private var watchEnableProgress = false
     /// 进度条启发式在主屏上框选的区域（内部存为相对主屏的归一化矩形，与截屏 UV 一致）。
     @State private var watchPickedProgressRect: NormalizedRect?
@@ -779,6 +782,27 @@ struct AgentSettingsView: View {
                 TextField("新任务标题", text: $watchNewTitle)
                 TextField("OCR 包含子串（可空）", text: $watchOCRText)
                 Toggle("启用模型兜底（需填写说明）", isOn: $watchUseVision)
+                if watchUseVision {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("模型调用冷却")
+                        TextField("分", text: $watchVisionCDMinutes)
+                            .frame(width: 48)
+                            .multilineTextAlignment(.trailing)
+                        Text("分")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("秒", text: $watchVisionCDSeconds)
+                            .frame(width: 48)
+                            .multilineTextAlignment(.trailing)
+                        Text("秒（0…59）")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text("秒为钟表意义上的 0…59；总间隔最长 24 小时。仅当本地条件未全部满足时才会请求模型。")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 TextField("兜底条件说明（给模型）", text: $watchVisionHint, axis: .vertical)
                     .lineLimit(2 ... 6)
                 Toggle("附加：进度条区域亮度启发式", isOn: $watchEnableProgress)
@@ -799,31 +823,74 @@ struct AgentSettingsView: View {
                                 .foregroundStyle(.tertiary)
                         }
                     }
-                    TextField("左右亮度差阈值（0…1）", text: $watchDelta)
+                    Text("把整条进度条框进矩形。算法取该区域最左 1/5 与最右 1/5 的平均亮度（约 0=黑、1=白）。常见「从左往右填满」时：未完成往往左右一边更亮、差较大；走完后整条颜色接近一致，差会变小。当「左右平均亮度差的绝对值」≤ 下方阈值时，判定为接近/已完成。")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("最大允许左右亮度差")
+                        TextField("0.08", text: $watchDelta)
+                            .frame(width: 56)
+                            .multilineTextAlignment(.trailing)
+                        Text("（0～1）")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        if let d = Double(watchDelta.trimmingCharacters(in: .whitespacesAndNewlines)), !d.isNaN, d >= 0, d <= 1 {
+                            Text("即 |左−右| ≤ \(Int((d * 100).rounded())) 个百分点")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Text("默认 0.08：左右平均亮度最多相差约 8 个百分点即视为「够均匀」。阈值越大越容易满足（更早触发）；越小越严格。注意：若未开始时整条轨左右也很均匀，单靠本项可能与 100% 混淆，请配合 OCR 或模型兜底。")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Button("添加盯屏任务") {
                     addScreenWatchTaskFromForm()
                 }
                 ForEach(screenWatchTasks.tasks) { t in
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(t.title).font(.headline)
-                            Text(t.isEnabled ? "运行中" : "已停用/已命中")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(t.title).font(.headline)
+                                Text(t.isEnabled ? "运行中" : "已停用/已命中")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Toggle("", isOn: screenWatchEnabledBinding(for: t))
+                                .labelsHidden()
+                            Button("删除", role: .destructive) {
+                                screenWatchTasks.remove(id: t.id)
+                            }
                         }
-                        Spacer()
-                        Toggle("", isOn: screenWatchEnabledBinding(for: t))
-                            .labelsHidden()
-                        Button("删除", role: .destructive) {
-                            screenWatchTasks.remove(id: t.id)
+                        if t.useVisionFallback {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("模型调用冷却")
+                                    .font(.caption)
+                                TextField("分", text: visionCooldownMinutesBinding(for: t.id))
+                                    .frame(width: 44)
+                                    .multilineTextAlignment(.trailing)
+                                    .font(.caption)
+                                Text("分")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                TextField("秒", text: visionCooldownSecondsBinding(for: t.id))
+                                    .frame(width: 44)
+                                    .multilineTextAlignment(.trailing)
+                                    .font(.caption)
+                                Text("秒（0…59）")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
             } header: {
                 Text("盯屏任务")
             } footer: {
-                Text("启用进度条启发式时，请在主屏拖拽框选区域（Esc 取消）；无需手填数字。模型兜底在本地未命中时才会调用，且额外有约 15 秒冷却，避免频繁消耗 API。")
+                Text("启用进度条启发式时，请在主屏拖拽框选区域（Esc 取消）；无需手填数字。模型兜底在本地未命中时才会调用，冷却可按任务用「分 + 秒」配置（已添加的任务可在列表中修改）。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -862,6 +929,59 @@ struct AgentSettingsView: View {
         .formStyle(.grouped)
     }
 
+    /// 进度条启发式的亮度差阈值：与算法中 0…1 亮度同量纲，超出范围则钳制。
+    private static func clampedProgressDeltaThreshold(string: String) -> Double {
+        let t = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let v = Double(t), !v.isNaN, !v.isInfinite else { return 0.08 }
+        return min(1, max(0, v))
+    }
+
+    /// 将「分 + 秒」字符串解析为存库的冷却秒数（秒限制 0…59，总时长 1…86400）。
+    private static func visionCooldownTotalSeconds(minutesString: String, secondsString: String) -> Double {
+        let m = Int(minutesString.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let sRaw = Int(secondsString.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let mclamped = max(0, m)
+        let sclamped = min(59, max(0, sRaw))
+        let total = mclamped * 60 + sclamped
+        return Double(max(1, min(86_400, total)))
+    }
+
+    private func visionCooldownMinutesBinding(for taskId: UUID) -> Binding<String> {
+        Binding(
+            get: {
+                guard let t = screenWatchTasks.tasks.first(where: { $0.id == taskId }) else { return "0" }
+                let total = Int(t.visionFallbackCooldownSeconds.rounded())
+                return String(total / 60)
+            },
+            set: { new in
+                guard var t = screenWatchTasks.tasks.first(where: { $0.id == taskId }) else { return }
+                let m = max(0, Int(new.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0)
+                let s = Int(t.visionFallbackCooldownSeconds.rounded()) % 60
+                let newTotal = max(1, min(86_400, m * 60 + s))
+                t.visionFallbackCooldownSeconds = Double(newTotal)
+                screenWatchTasks.upsert(t)
+            }
+        )
+    }
+
+    private func visionCooldownSecondsBinding(for taskId: UUID) -> Binding<String> {
+        Binding(
+            get: {
+                guard let t = screenWatchTasks.tasks.first(where: { $0.id == taskId }) else { return "0" }
+                let total = Int(t.visionFallbackCooldownSeconds.rounded())
+                return String(total % 60)
+            },
+            set: { new in
+                guard var t = screenWatchTasks.tasks.first(where: { $0.id == taskId }) else { return }
+                let m = Int(t.visionFallbackCooldownSeconds.rounded()) / 60
+                let s = min(59, max(0, Int(new.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0))
+                let newTotal = max(1, min(86_400, m * 60 + s))
+                t.visionFallbackCooldownSeconds = Double(newTotal)
+                screenWatchTasks.upsert(t)
+            }
+        )
+    }
+
     private func screenWatchEnabledBinding(for task: ScreenWatchTask) -> Binding<Bool> {
         Binding(
             get: { screenWatchTasks.tasks.first { $0.id == task.id }?.isEnabled ?? false },
@@ -883,7 +1003,7 @@ struct AgentSettingsView: View {
         }
         if watchEnableProgress {
             guard let rect = watchPickedProgressRect else { return }
-            let delta = Double(watchDelta) ?? 0.08
+            let delta = Self.clampedProgressDeltaThreshold(string: watchDelta)
             conditions.append(.progressBarFilled(rect: rect, deltaThreshold: delta))
         }
         if conditions.isEmpty, !watchUseVision {
@@ -894,13 +1014,18 @@ struct AgentSettingsView: View {
             guard !h.isEmpty else { return }
         }
         let hint = watchVisionHint.trimmingCharacters(in: .whitespacesAndNewlines)
+        let visionCooldown = Self.visionCooldownTotalSeconds(
+            minutesString: watchVisionCDMinutes,
+            secondsString: watchVisionCDSeconds
+        )
         let task = ScreenWatchTask(
             title: title,
             isEnabled: true,
             sampleIntervalSeconds: 3,
             conditions: conditions,
             useVisionFallback: watchUseVision,
-            visionUserHint: hint
+            visionUserHint: hint,
+            visionFallbackCooldownSeconds: visionCooldown
         )
         screenWatchTasks.upsert(task)
         watchNewTitle = ""

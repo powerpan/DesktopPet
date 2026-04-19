@@ -50,7 +50,7 @@ struct NormalizedRect: Codable, Equatable {
 enum ScreenWatchCondition: Codable, Equatable {
     /// 主屏截图 OCR 后是否包含子串。
     case ocrContains(text: String, caseInsensitive: Bool)
-    /// 在矩形区域内比较左右亮度差，大于阈值则认为「进度条已满」类状态（启发式，需用户把框选在进度条区域）。
+    /// 在矩形内比较左 1/5 与右 1/5 平均亮度；`|Δ| <= deltaThreshold` 时认为「条已够均匀」类完成态（启发式）。`deltaThreshold` 为允许的最大亮度差（0…1）。
     case progressBarFilled(rect: NormalizedRect, deltaThreshold: Double)
 }
 
@@ -64,7 +64,14 @@ struct ScreenWatchTask: Identifiable, Codable, Equatable {
     var useVisionFallback: Bool
     /// 模型兜底时的用户说明（会随截图发给模型）。
     var visionUserHint: String
+    /// 模型兜底（多模态）两次 `completeChat` 之间的最短间隔（秒），按任务配置；建议长任务设大一些。
+    var visionFallbackCooldownSeconds: Double
     var createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, isEnabled, sampleIntervalSeconds, conditions
+        case useVisionFallback, visionUserHint, visionFallbackCooldownSeconds, createdAt
+    }
 
     init(
         id: UUID = UUID(),
@@ -74,6 +81,7 @@ struct ScreenWatchTask: Identifiable, Codable, Equatable {
         conditions: [ScreenWatchCondition] = [],
         useVisionFallback: Bool = false,
         visionUserHint: String = "",
+        visionFallbackCooldownSeconds: Double = 15,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -83,7 +91,40 @@ struct ScreenWatchTask: Identifiable, Codable, Equatable {
         self.conditions = conditions
         self.useVisionFallback = useVisionFallback
         self.visionUserHint = visionUserHint
+        self.visionFallbackCooldownSeconds = Self.clampVisionCooldownSeconds(visionFallbackCooldownSeconds)
         self.createdAt = createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        isEnabled = try c.decode(Bool.self, forKey: .isEnabled)
+        sampleIntervalSeconds = try c.decode(Double.self, forKey: .sampleIntervalSeconds)
+        conditions = try c.decode([ScreenWatchCondition].self, forKey: .conditions)
+        useVisionFallback = try c.decode(Bool.self, forKey: .useVisionFallback)
+        visionUserHint = try c.decode(String.self, forKey: .visionUserHint)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        let raw = try c.decodeIfPresent(Double.self, forKey: .visionFallbackCooldownSeconds) ?? 15
+        visionFallbackCooldownSeconds = Self.clampVisionCooldownSeconds(raw)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(title, forKey: .title)
+        try c.encode(isEnabled, forKey: .isEnabled)
+        try c.encode(sampleIntervalSeconds, forKey: .sampleIntervalSeconds)
+        try c.encode(conditions, forKey: .conditions)
+        try c.encode(useVisionFallback, forKey: .useVisionFallback)
+        try c.encode(visionUserHint, forKey: .visionUserHint)
+        try c.encode(visionFallbackCooldownSeconds, forKey: .visionFallbackCooldownSeconds)
+        try c.encode(createdAt, forKey: .createdAt)
+    }
+
+    private static func clampVisionCooldownSeconds(_ raw: Double) -> Double {
+        if raw.isNaN || raw.isInfinite { return 15 }
+        return min(86_400, max(1, raw))
     }
 }
 

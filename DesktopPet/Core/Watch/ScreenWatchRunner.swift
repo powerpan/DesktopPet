@@ -14,7 +14,6 @@ final class ScreenWatchRunner: ObservableObject {
     private var lastSampleAt: [UUID: Date] = [:]
     /// 模型兜底（多模态）两次调用之间的最短间隔，按任务分别节流。
     private var lastVisionCallAt: [UUID: Date] = [:]
-    private let visionFallbackCooldownSeconds: TimeInterval = 15
     private weak var agentClient: AgentClient?
     private weak var agentSettings: AgentSettingsStore?
     private var onHit: ((String, String) -> Void)?
@@ -99,8 +98,9 @@ final class ScreenWatchRunner: ObservableObject {
         guard task.useVisionFallback, let client = agentClient, let settings = agentSettings else { return }
         let hint = task.visionUserHint.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !hint.isEmpty else { return }
+        let cooldown = min(86_400, max(1, task.visionFallbackCooldownSeconds))
         let sinceVision = Date().timeIntervalSince(lastVisionCallAt[task.id] ?? .distantPast)
-        if sinceVision < visionFallbackCooldownSeconds { return }
+        if sinceVision < cooldown { return }
         let key = KeychainStore.readAPIKey(forProvider: settings.activeAPIProvider)
         let sys = "你只回答一个大写单词：YES 或 NO。不要解释。"
         let userText = """

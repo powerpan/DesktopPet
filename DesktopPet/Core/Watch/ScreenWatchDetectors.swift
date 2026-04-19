@@ -44,7 +44,10 @@ enum ScreenWatchOCRDetector {
 }
 
 enum ScreenWatchProgressHeuristic {
-    /// 在归一化矩形内比较左侧 1/3 与右侧 1/3 平均亮度差；差值大于阈值认为「右侧更亮」（常见于进度条走完）。
+    /// 在归一化矩形内比较**左 1/5** 与**右 1/5** 的平均亮度（Rec.709，约 0=黑…1=白）。
+    /// 典型「从左往右填满」的进度条：未完成时常一侧更亮、一侧更暗，**左右平均亮度差较大**；走完后整条常为同一颜色，**差值接近 0**。
+    /// 当 `|右侧平均 − 左侧平均| <= deltaThreshold` 时返回 true。`deltaThreshold` 表示**允许的最大亮度差**（如 0.08 ≈ 8 个百分点）。
+    /// 局限：若 0% 时轨条左右也已经很均匀，单靠本规则无法区分「未开始」与「已满」，请配合 OCR 或模型兜底。
     static func progressLikelyFilled(jpegData: Data, rect: NormalizedRect, deltaThreshold: Double) -> Bool {
         guard let img = NSImage(data: jpegData),
               let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil)
@@ -57,14 +60,16 @@ enum ScreenWatchProgressHeuristic {
             width: rect.width * Double(w),
             height: rect.height * Double(h)
         ).integral
-        guard outer.width >= 6, outer.height >= 6 else { return false }
-        let thirdW = outer.width / 3
-        let left = CGRect(x: outer.minX, y: outer.minY, width: thirdW, height: outer.height)
-        let right = CGRect(x: outer.maxX - thirdW, y: outer.minY, width: thirdW, height: outer.height)
+        guard outer.width >= 10, outer.height >= 6 else { return false }
+        let fifthW = outer.width / 5
+        guard fifthW >= 1 else { return false }
+        let left = CGRect(x: outer.minX, y: outer.minY, width: fifthW, height: outer.height)
+        let right = CGRect(x: outer.maxX - fifthW, y: outer.minY, width: fifthW, height: outer.height)
         guard let cgL = cg.cropping(to: left), let cgR = cg.cropping(to: right) else { return false }
         let l = averageLuminance(cgImage: cgL) ?? 0
         let r = averageLuminance(cgImage: cgR) ?? 0
-        return (r - l) >= deltaThreshold
+        let cap = max(0, min(1, deltaThreshold))
+        return abs(r - l) <= cap
     }
 
     private static func averageLuminance(cgImage: CGImage) -> Double? {
