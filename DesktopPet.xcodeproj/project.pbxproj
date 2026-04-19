@@ -74,6 +74,10 @@
 		C1000000000000000000004B /* AppRouteBus.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004B /* AppRouteBus.swift */; };
 		C1000000000000000000004C /* SlackInboundAutoReplyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004C /* SlackInboundAutoReplyService.swift */; };
 		C1000000000000000000004D /* ScreenWatchHitFeedbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004D /* ScreenWatchHitFeedbackService.swift */; };
+		C1000000000000000000005D /* MultimodalAttachmentLimitsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005D /* MultimodalAttachmentLimitsStore.swift */; };
+		C1000000000000000000005E /* ChatAttachmentStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005E /* ChatAttachmentStorage.swift */; };
+		C1000000000000000000005F /* ChatMultimodalAttachmentCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005F /* ChatMultimodalAttachmentCodec.swift */; };
+		C10000000000000000000060 /* ChatMultimodalAPIBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000060 /* ChatMultimodalAPIBuilder.swift */; };
 		C10000000000000000000051 /* ConnectionTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000051 /* ConnectionTabView.swift */; };
 		C10000000000000000000052 /* SessionHistoryTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000052 /* SessionHistoryTabView.swift */; };
 		C10000000000000000000053 /* PersonaTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000053 /* PersonaTabView.swift */; };
@@ -97,6 +101,10 @@
 		B10000000000000000000004B /* AppRouteBus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouteBus.swift; sourceTree = "<group>"; };
 		B10000000000000000000004C /* SlackInboundAutoReplyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlackInboundAutoReplyService.swift; sourceTree = "<group>"; };
 		B10000000000000000000004D /* ScreenWatchHitFeedbackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenWatchHitFeedbackService.swift; sourceTree = "<group>"; };
+		B10000000000000000000005D /* MultimodalAttachmentLimitsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultimodalAttachmentLimitsStore.swift; sourceTree = "<group>"; };
+		B10000000000000000000005E /* ChatAttachmentStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAttachmentStorage.swift; sourceTree = "<group>"; };
+		B10000000000000000000005F /* ChatMultimodalAttachmentCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMultimodalAttachmentCodec.swift; sourceTree = "<group>"; };
+		B100000000000000000000060 /* ChatMultimodalAPIBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMultimodalAPIBuilder.swift; sourceTree = "<group>"; };
 		B100000000000000000000051 /* ConnectionTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionTabView.swift; sourceTree = "<group>"; };
 		B100000000000000000000052 /* SessionHistoryTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionHistoryTabView.swift; sourceTree = "<group>"; };
 		B100000000000000000000053 /* PersonaTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonaTabView.swift; sourceTree = "<group>"; };
@@ -402,6 +410,10 @@
 				B10000000000000000000003B /* TriggerSpeechSnapshotStorage.swift */,
 				B10000000000000000000002C /* FrontmostAppWatcher.swift */,
 				B10000000000000000000002D /* AgentTriggerEngine.swift */,
+				B10000000000000000000005D /* MultimodalAttachmentLimitsStore.swift */,
+				B10000000000000000000005E /* ChatAttachmentStorage.swift */,
+				B10000000000000000000005F /* ChatMultimodalAttachmentCodec.swift */,
+				B100000000000000000000060 /* ChatMultimodalAPIBuilder.swift */,
 			);
 			path = Agent;
 			sourceTree = "<group>";
@@ -567,6 +579,10 @@
 				C1000000000000000000002B /* AgentSessionStore.swift in Sources */,
 				C1000000000000000000002C /* FrontmostAppWatcher.swift in Sources */,
 				C1000000000000000000002D /* AgentTriggerEngine.swift in Sources */,
+				C1000000000000000000005D /* MultimodalAttachmentLimitsStore.swift in Sources */,
+				C1000000000000000000005E /* ChatAttachmentStorage.swift in Sources */,
+				C1000000000000000000005F /* ChatMultimodalAttachmentCodec.swift in Sources */,
+				C10000000000000000000060 /* ChatMultimodalAPIBuilder.swift in Sources */,
 				C1000000000000000000002E /* ExtensionOverlayController.swift in Sources */,
 				C1000000000000000000002F /* CareOverlayView.swift in Sources */,
 				C10000000000000000000030 /* ChatOverlayView.swift in Sources */,

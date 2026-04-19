@@ -112,6 +112,7 @@ final class AgentConversationStore: ObservableObject {
 
     func deleteChannel(id: UUID) {
         guard channels.count > 1, let i = channels.firstIndex(where: { $0.id == id }) else { return }
+        ChatAttachmentStorage.deleteAttachments(for: channels[i].messages)
         channels.remove(at: i)
         if activeChannelId == id {
             activeChannelId = channels[0].id
@@ -122,17 +123,41 @@ final class AgentConversationStore: ObservableObject {
     func clearActiveChannelMessages() {
         guard let i = channels.firstIndex(where: { $0.id == activeChannelId }) else { return }
         var ch = channels[i]
+        ChatAttachmentStorage.deleteAttachments(for: ch.messages)
         ch.messages = []
         ch.updatedAt = Date()
         channels[i] = ch
         persist()
     }
 
-    func appendUser(_ text: String) {
+    func appendUser(
+        _ text: String,
+        uploads: [(filename: String, mimeType: String, data: Data)] = []
+    ) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty, let i = channels.firstIndex(where: { $0.id == activeChannelId }) else { return }
+        guard !t.isEmpty || !uploads.isEmpty, let i = channels.firstIndex(where: { $0.id == activeChannelId }) else { return }
         var ch = channels[i]
-        let msg = ChatMessage(role: "user", content: t)
+        let msgId = UUID()
+        var refs: [ChatAttachmentRef] = []
+        for u in uploads {
+            let ref = ChatAttachmentRef(
+                id: UUID(),
+                filename: u.filename,
+                mimeType: u.mimeType,
+                byteCount: u.data.count
+            )
+            do {
+                try ChatAttachmentStorage.write(messageId: msgId, ref: ref, data: u.data)
+                refs.append(ref)
+            } catch {
+                ChatAttachmentStorage.deleteAll(messageId: msgId)
+                return
+            }
+        }
+        let display = t.isEmpty
+            ? (refs.isEmpty ? "" : "（已附 \(refs.count) 个文件）")
+            : t
+        let msg = ChatMessage(id: msgId, role: "user", content: display, attachments: refs)
         ch.messages.append(msg)
         ch.updatedAt = Date()
         channels[i] = ch
@@ -185,15 +210,45 @@ final class AgentConversationStore: ObservableObject {
     }
 
     /// Slack 入站：写入指定本地频道，**不**切换当前选中频道。
-    func appendSlackInboundUser(channelId: UUID, text: String, slackTs: String, slackChannelId: String) {
+    func appendSlackInboundUser(
+        channelId: UUID,
+        text: String,
+        slackTs: String,
+        slackChannelId: String,
+        uploads: [(filename: String, mimeType: String, data: Data)] = []
+    ) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty, let i = channels.firstIndex(where: { $0.id == channelId }) else { return }
+        guard !t.isEmpty || !uploads.isEmpty, let i = channels.firstIndex(where: { $0.id == channelId }) else { return }
         var ch = channels[i]
+        let msgId = UUID()
+        var refs: [ChatAttachmentRef] = []
+        for u in uploads {
+            let ref = ChatAttachmentRef(
+                id: UUID(),
+                filename: u.filename,
+                mimeType: u.mimeType,
+                byteCount: u.data.count
+            )
+            do {
+                try ChatAttachmentStorage.write(messageId: msgId, ref: ref, data: u.data)
+                refs.append(ref)
+            } catch {
+                ChatAttachmentStorage.deleteAll(messageId: msgId)
+                return
+            }
+        }
+        let display: String = {
+            if t.isEmpty { return refs.isEmpty ? "" : "（Slack 附件 \(refs.count) 个）" }
+            if refs.isEmpty { return t }
+            return t + "\n（含 \(refs.count) 个 Slack 附件）"
+        }()
         let msg = ChatMessage(
+            id: msgId,
             role: "user",
-            content: t,
+            content: display,
             slackMessageTs: slackTs,
-            slackChannelId: slackChannelId
+            slackChannelId: slackChannelId,
+            attachments: refs
         )
         ch.messages.append(msg)
         ch.updatedAt = Date()
@@ -235,6 +290,9 @@ final class AgentConversationStore: ObservableObject {
         if let ch = message.slackChannelId {
             userInfo[DesktopPetNotificationUserInfoKey.conversationAppendSlackChannelId] = ch
         }
+        if !message.attachments.isEmpty {
+            userInfo[DesktopPetNotificationUserInfoKey.conversationAppendAttachmentCount] = message.attachments.count
+        }
         NotificationCenter.default.post(name: .desktopPetConversationDidAppendMessage, object: nil, userInfo: userInfo)
     }
 
@@ -248,6 +306,9 @@ final class AgentConversationStore: ObservableObject {
 
     /// 隐私/重置：仅保留一个空会话频道。
     func resetToSingleDefaultChannel() {
+        for ch in channels {
+            ChatAttachmentStorage.deleteAttachments(for: ch.messages)
+        }
         let ch = Self.makeDefaultChannel()
         channels = [ch]
         activeChannelId = ch.id

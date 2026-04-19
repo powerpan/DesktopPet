@@ -14,6 +14,12 @@ struct ChatMessage: Identifiable, Equatable, Codable {
     var slackMessageTs: String?
     /// Slack 频道 `C…`（入站时写入）。
     var slackChannelId: String?
+    /// 多模态附件（二进制在 Application Support，仅存元数据）。
+    var attachments: [ChatAttachmentRef]
+
+    enum CodingKeys: String, CodingKey {
+        case id, role, content, createdAt, slackMessageTs, slackChannelId, attachments
+    }
 
     init(
         id: UUID = UUID(),
@@ -21,7 +27,8 @@ struct ChatMessage: Identifiable, Equatable, Codable {
         content: String,
         createdAt: Date = Date(),
         slackMessageTs: String? = nil,
-        slackChannelId: String? = nil
+        slackChannelId: String? = nil,
+        attachments: [ChatAttachmentRef] = []
     ) {
         self.id = id
         self.role = role
@@ -29,6 +36,31 @@ struct ChatMessage: Identifiable, Equatable, Codable {
         self.createdAt = createdAt
         self.slackMessageTs = slackMessageTs
         self.slackChannelId = slackChannelId
+        self.attachments = attachments
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        role = try c.decode(String.self, forKey: .role)
+        content = try c.decode(String.self, forKey: .content)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        slackMessageTs = try c.decodeIfPresent(String.self, forKey: .slackMessageTs)
+        slackChannelId = try c.decodeIfPresent(String.self, forKey: .slackChannelId)
+        attachments = try c.decodeIfPresent([ChatAttachmentRef].self, forKey: .attachments) ?? []
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(role, forKey: .role)
+        try c.encode(content, forKey: .content)
+        try c.encode(createdAt, forKey: .createdAt)
+        try c.encodeIfPresent(slackMessageTs, forKey: .slackMessageTs)
+        try c.encodeIfPresent(slackChannelId, forKey: .slackChannelId)
+        if !attachments.isEmpty {
+            try c.encode(attachments, forKey: .attachments)
+        }
     }
 }
 

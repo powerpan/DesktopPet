@@ -1,15 +1,24 @@
 //
 // ChatOverlayView.swift
-// 智能体对话叠加层（DeepSeek）；多会话频道持久化，API 仅发送 user/assistant。
+// 智能体对话叠加层：多会话、多模态 user 消息（图片 / PDF / 文本文件等）。
 //
 
+import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
+
+private struct PendingLocalAttachment: Identifiable {
+    let id = UUID()
+    var filename: String
+    var data: Data
+}
 
 struct ChatOverlayView: View {
     @EnvironmentObject private var session: AgentSessionStore
     @EnvironmentObject private var agentSettings: AgentSettingsStore
     @EnvironmentObject private var deskMirror: DeskMirrorModel
     @EnvironmentObject private var routeBus: AppRouteBus
+    @EnvironmentObject private var multimodalLimits: MultimodalAttachmentLimitsStore
     @Environment(\.desktopPetAgentClient) private var agentClient: AgentClient?
 
     @State private var draft: String = ""
@@ -17,6 +26,10 @@ struct ChatOverlayView: View {
     @State private var showRenameAlert = false
     @State private var renameDraft: String = ""
     @State private var showDeleteConfirm = false
+    @State private var pendingAttachments: [PendingLocalAttachment] = []
+    @State private var showFileImporter = false
+
+    private static let importerTypes: [UTType] = [.image, .pdf, .plainText, .json, .commaSeparatedText]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -33,7 +46,7 @@ struct ChatOverlayView: View {
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
-                    Text("手动对话支持多会话频道（UserDefaults 持久化）。条件触发的旁白先入历史并以气泡展示；轻点气泡会新建会话带上文并打开本面板。")
+                    Text("支持图片与常见文本类文件（多模态）；大小上限在智能体工作台 **集成** 中配置。Slack 入站附件使用同一套限额。")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -80,7 +93,30 @@ struct ChatOverlayView: View {
                     .padding(.horizontal, 10)
             }
 
-            HStack(spacing: 8) {
+            if !pendingAttachments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(pendingAttachments) { p in
+                            pendingChip(p)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                }
+                .frame(maxHeight: 72)
+            }
+
+            HStack(alignment: .center, spacing: 8) {
+                Button {
+                    showFileImporter = true
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
+                        .symbolRenderingMode(.hierarchical)
+                }
+                .buttonStyle(.plain)
+                .help("添加图片或文件")
+                .disabled(session.isSending)
+
                 TextField("说点什么…", text: $draft)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { Task { await send() } }
@@ -93,6 +129,26 @@ struct ChatOverlayView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .fileImporter(
+            isPresented: $showFileImporter,
+            allowedContentTypes: Self.importerTypes,
+            allowsMultipleSelection: true
+        ) { result in
+            switch result {
+            case .success(let urls):
+                for url in urls {
+                    let started = url.startAccessingSecurityScopedResource()
+                    defer {
+                        if started { url.stopAccessingSecurityScopedResource() }
+                    }
+                    guard let data = try? Data(contentsOf: url) else { continue }
+                    let name = url.lastPathComponent
+                    pendingAttachments.append(PendingLocalAttachment(filename: name, data: data))
+                }
+            case .failure(let err):
+                session.lastError = err.localizedDescription
+            }
+        }
         .onAppear {
             keychainConfigured = KeychainStore.readAPIKey(forProvider: agentSettings.activeAPIProvider) != nil
         }
@@ -118,6 +174,44 @@ struct ChatOverlayView: View {
             Button("取消", role: .cancel) {}
         } message: {
             Text("将移除该频道及其消息；至少保留一个会话。")
+        }
+    }
+
+    private func pendingChip(_ p: PendingLocalAttachment) -> some View {
+        ZStack(alignment: .topTrailing) {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.primary.opacity(0.06))
+                .frame(width: 96, height: 56)
+            attachmentThumbView(data: p.data, filename: p.filename)
+                .frame(width: 88, height: 48)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            Button {
+                pendingAttachments.removeAll { $0.id == p.id }
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .symbolRenderingMode(.hierarchical)
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .offset(x: 4, y: -4)
+        }
+    }
+
+    @ViewBuilder
+    private func attachmentThumbView(data: Data, filename: String) -> some View {
+        let mime = ChatMultimodalAttachmentCodec.declaredMime(filename: filename, data: data)
+        if mime.hasPrefix("image/"), let img = NSImage(data: data) {
+            Image(nsImage: img)
+                .resizable()
+                .scaledToFill()
+        } else {
+            VStack(spacing: 2) {
+                Image(systemName: "doc.text")
+                Text(filename)
+                    .font(.caption2)
+                    .lineLimit(1)
+            }
+            .foregroundStyle(.secondary)
         }
     }
 
@@ -192,13 +286,27 @@ struct ChatOverlayView: View {
             let isUser = m.role == "user"
             HStack {
                 if isUser { Spacer(minLength: 24) }
-                VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
+                VStack(alignment: isUser ? .trailing : .leading, spacing: 6) {
                     if m.slackMessageTs != nil {
                         Text("Slack")
                             .font(.caption2.weight(.semibold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.purple.opacity(0.2), in: Capsule())
+                    }
+                    if !m.attachments.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(m.attachments) { ref in
+                                    if let d = ChatAttachmentStorage.read(messageId: m.id, ref: ref) {
+                                        attachmentThumbView(data: d, filename: ref.filename)
+                                            .frame(width: 72, height: 48)
+                                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxWidth: 260)
                     }
                     Text(InlineMarkdownBubble.attributedDisplayString(m.content))
                         .font(.callout)
@@ -213,9 +321,27 @@ struct ChatOverlayView: View {
     @MainActor
     private func send() async {
         let t = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return }
+        guard !t.isEmpty || !pendingAttachments.isEmpty else { return }
+
+        var uploads: [(filename: String, mimeType: String, data: Data)] = []
+        for p in pendingAttachments {
+            do {
+                _ = try ChatMultimodalAttachmentCodec.partsFromLocalUpload(
+                    data: p.data,
+                    filename: p.filename,
+                    limits: multimodalLimits
+                )
+                let mime = ChatMultimodalAttachmentCodec.declaredMime(filename: p.filename, data: p.data)
+                uploads.append((p.filename, mime, p.data))
+            } catch {
+                session.lastError = error.localizedDescription
+                return
+            }
+        }
+
         draft = ""
-        session.appendUser(t)
+        pendingAttachments.removeAll()
+        session.appendUser(t, uploads: uploads)
         session.setSending(true)
         session.lastError = nil
         guard let client = agentClient else {
@@ -233,11 +359,30 @@ struct ChatOverlayView: View {
             }
         }
 
-        let apiMessages: [[String: String]] = session.messages.compactMap { m in
-            if m.role == "user" || m.role == "assistant" {
-                return ["role": m.role, "content": m.content]
+        guard let channel = session.activeChannel else {
+            session.lastError = "无当前会话。"
+            session.setSending(false)
+            return
+        }
+
+        let userMessages: [AgentAPIChatUserMessage]
+        do {
+            userMessages = try ChatMultimodalAPIBuilder.openAICompatibleUserMessages(
+                from: channel,
+                limits: multimodalLimits
+            )
+        } catch {
+            session.lastError = error.localizedDescription
+            session.setSending(false)
+            return
+        }
+
+        let extended = userMessages.contains { u in
+            u.parts.contains { p in
+                if case .imageJPEG = p { return true }
+                if case .imageData = p { return true }
+                return false
             }
-            return nil
         }
 
         do {
@@ -246,9 +391,10 @@ struct ChatOverlayView: View {
                 model: agentSettings.model,
                 apiKey: key,
                 systemPrompt: systemPrompt,
-                messages: apiMessages,
+                userMessages: userMessages,
                 temperature: agentSettings.temperature,
-                maxTokens: agentSettings.maxTokens
+                maxTokens: agentSettings.maxTokens,
+                extendedTimeout: extended
             )
             session.appendAssistant(reply)
         } catch {

@@ -353,4 +353,6 @@ enum DesktopPetNotificationUserInfoKey {
     static let conversationAppendOrigin = "conversationAppendOrigin"
     static let conversationAppendSlackTs = "conversationAppendSlackTs"
     static let conversationAppendSlackChannelId = "conversationAppendSlackChannelId"
+    /// 本条消息的附件数量（出站 Slack 文案用）。
+    static let conversationAppendAttachmentCount = "conversationAppendAttachmentCount"
 }

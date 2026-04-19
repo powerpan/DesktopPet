@@ -400,6 +400,7 @@ final class AgentTriggerEngine: ObservableObject {
                 maxTokens: effMax,
                 extendedTimeout: parts.contains(where: {
                     if case .imageJPEG = $0 { return true }
+                    if case .imageData = $0 { return true }
                     return false
                 })
             )

@@ -26,6 +26,7 @@ final class SlackSyncController: ObservableObject {
     private weak var screenWatchTasksRef: ScreenWatchTaskStore?
     private weak var agentClientRef: AgentClient?
     private weak var agentSettingsRef: AgentSettingsStore?
+    private weak var multimodalLimitsRef: MultimodalAttachmentLimitsStore?
     private var dedupTs: [String] = []
     private var backoffSeconds: Double = 0
     private let maxDedup = 800
@@ -80,12 +81,14 @@ final class SlackSyncController: ObservableObject {
         session: AgentSessionStore,
         screenWatchTasks: ScreenWatchTaskStore,
         agentClient: AgentClient,
-        agentSettings: AgentSettingsStore
+        agentSettings: AgentSettingsStore,
+        multimodalLimits: MultimodalAttachmentLimitsStore
     ) {
         sessionRef = session
         screenWatchTasksRef = screenWatchTasks
         agentClientRef = agentClient
         agentSettingsRef = agentSettings
+        multimodalLimitsRef = multimodalLimits
         pollTask?.cancel()
         outboundObserver = NotificationCenter.default.addObserver(
             forName: .desktopPetConversationDidAppendMessage,
@@ -113,6 +116,7 @@ final class SlackSyncController: ObservableObject {
         screenWatchTasksRef = nil
         agentClientRef = nil
         agentSettingsRef = nil
+        multimodalLimitsRef = nil
     }
 
     /// 盯屏命中等：在指定频道发帖，可选挂在 `thread_ts` 下。
@@ -253,15 +257,19 @@ final class SlackSyncController: ObservableObject {
             if hasSeenTs(ts) { continue }
             if m.botId != nil { rememberTs(ts); continue }
             if let u = m.user, u == lastAuthUserId { rememberTs(ts); continue }
-            guard let text = m.text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+            let trimmedText = m.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let files = m.files ?? []
+            if trimmedText.isEmpty && files.isEmpty {
                 rememberTs(ts)
                 continue
             }
-            let stripped = Self.stripSlackMentions(text)
+            let stripped = Self.stripSlackMentions(trimmedText)
             await handleInboundSlackText(
                 raw: stripped,
                 slackTs: ts,
                 slackChannelId: slackChannelId,
+                token: token,
+                files: files,
                 session: session
             )
             rememberTs(ts)
@@ -279,30 +287,107 @@ final class SlackSyncController: ObservableObject {
         raw: String,
         slackTs: String,
         slackChannelId: String,
+        token: String,
+        files: [SlackHistoryFile],
         session: AgentSessionStore
     ) async {
-        let lower = raw.lowercased()
-        if lower.hasPrefix("!pet new") {
-            let rest = raw.dropFirst("!pet new".count).trimmingCharacters(in: .whitespacesAndNewlines)
-            let title = rest.isEmpty ? "Slack 会话" : String(rest)
-            let newId = session.createNewEmptyChannel(title: title)
-            bindings.removeAll { $0.slackChannelId == slackChannelId }
-            bindings.append(SlackChannelBinding(slackChannelId: slackChannelId, localChannelId: newId))
-            persistBindings()
-            session.appendSystemNotice("（Slack）已通过命令创建会话并绑定本频道。")
-            statusMessage = "已从 Slack 创建会话「\(title)」。"
-            return
+        let uploads: [(filename: String, mimeType: String, data: Data)]
+        let rejections: [String]
+        if files.isEmpty {
+            uploads = []
+            rejections = []
+        } else {
+            let r = await ingestSlackFilesFromSlackAPI(files: files, token: token)
+            uploads = r.uploads
+            rejections = r.rejections
         }
 
-        if await handlePetWatchSlackMessage(raw: raw, slackTs: slackTs, slackChannelId: slackChannelId, session: session) {
-            return
+        if !raw.isEmpty {
+            let lower = raw.lowercased()
+            if lower.hasPrefix("!pet new") {
+                let rest = raw.dropFirst("!pet new".count).trimmingCharacters(in: .whitespacesAndNewlines)
+                let title = rest.isEmpty ? "Slack 会话" : String(rest)
+                let newId = session.createNewEmptyChannel(title: title)
+                bindings.removeAll { $0.slackChannelId == slackChannelId }
+                bindings.append(SlackChannelBinding(slackChannelId: slackChannelId, localChannelId: newId))
+                persistBindings()
+                session.appendSystemNotice("（Slack）已通过命令创建会话并绑定本频道。")
+                statusMessage = "已从 Slack 创建会话「\(title)」。"
+                return
+            }
+        }
+
+        if !raw.isEmpty {
+            if await handlePetWatchSlackMessage(raw: raw, slackTs: slackTs, slackChannelId: slackChannelId, session: session) {
+                return
+            }
+        }
+
+        if !rejections.isEmpty {
+            let body =
+                "🐱 以下附件无法传给模型（超过你在「集成」中配置的大小，或格式不支持）：\n"
+                + rejections.joined(separator: "\n")
+            await postSlackThreadReply(channelId: slackChannelId, threadTs: slackTs, text: body)
         }
 
         guard let binding = bindings.first(where: { $0.slackChannelId == slackChannelId }) else {
             statusMessage = "收到 Slack 消息但未绑定本地频道，请在「连接」中绑定或使用 `!pet new 标题`。"
             return
         }
-        session.appendSlackInboundUser(channelId: binding.localChannelId, text: raw, slackTs: slackTs, slackChannelId: slackChannelId)
+
+        guard !raw.isEmpty || !uploads.isEmpty else { return }
+        session.appendSlackInboundUser(
+            channelId: binding.localChannelId,
+            text: raw,
+            slackTs: slackTs,
+            slackChannelId: slackChannelId,
+            uploads: uploads
+        )
+    }
+
+    /// 下载 Slack `files` 并校验多模态限额；失败项写入 `rejections` 供在 Slack 线程回复用户。
+    private func ingestSlackFilesFromSlackAPI(
+        files: [SlackHistoryFile],
+        token: String
+    ) async -> (uploads: [(filename: String, mimeType: String, data: Data)], rejections: [String]) {
+        guard let limits = multimodalLimitsRef else {
+            return ([], ["（应用未注入多模态限额，已跳过 Slack 附件）"])
+        }
+        var uploads: [(filename: String, mimeType: String, data: Data)] = []
+        var rejections: [String] = []
+        for f in files {
+            let name = (f.name ?? "未命名").trimmingCharacters(in: .whitespacesAndNewlines)
+            let urlStr = [f.urlPrivateDownload, f.urlPrivate].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.first { !$0.isEmpty } ?? ""
+            guard !urlStr.isEmpty else {
+                rejections.append("「\(name)」缺少可下载地址（请为 Bot 授予 **files:read**，并确保文件未过期）。")
+                continue
+            }
+            let data: Data
+            do {
+                data = try await SlackWebAPI.downloadPrivateFile(token: token, urlString: urlStr)
+            } catch {
+                rejections.append("「\(name)」下载失败：\(error.localizedDescription)")
+                continue
+            }
+            let sniffed = ChatMultimodalAttachmentCodec.declaredMime(filename: name, data: data)
+            let mimeHint = (f.mimetype?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? sniffed
+            let isImg = mimeHint.hasPrefix("image/") || sniffed.hasPrefix("image/")
+            let cap = isImg ? limits.maxImageAttachmentBytes : limits.maxFileAttachmentBytes
+            if data.count > cap {
+                rejections.append(
+                    "「\(name)」约 \(data.count / 1024) KB，超过\(isImg ? "单张图片" : "单个文件")上限 \(cap / 1024) KB。"
+                )
+                continue
+            }
+            do {
+                _ = try ChatMultimodalAttachmentCodec.partsFromLocalUpload(data: data, filename: name, limits: limits)
+                let mime = ChatMultimodalAttachmentCodec.declaredMime(filename: name, data: data)
+                uploads.append((name, mime, data))
+            } catch {
+                rejections.append("「\(name)」：\(error.localizedDescription)")
+            }
+        }
+        return (uploads, rejections)
     }
 
     /// Slack 盯屏：`!pet watch` / `!pet 盯屏` 或自然语言；仅 OCR + 可选模型兜底（无亮度启发式）。无需已绑定本地会话也会在原帖下回复确认。
@@ -422,7 +507,10 @@ final class SlackSyncController: ObservableObject {
 
         guard let binding = bindings.first(where: { $0.localChannelId == localChannelId }) else { return }
         let prefix = role == "user" ? "🐱 用户" : "🐱 猫猫"
-        let outbound = "\(prefix)：\(text)"
+        var outbound = "\(prefix)：\(text)"
+        if let n = note.userInfo?[DesktopPetNotificationUserInfoKey.conversationAppendAttachmentCount] as? Int, n > 0 {
+            outbound += "（另含 \(n) 个附件；Slack 出站仅同步文字）"
+        }
         do {
             let data = try await SlackWebAPI.chatPostMessage(token: token, channel: binding.slackChannelId, text: outbound, threadTs: nil)
             let dec = JSONDecoder()
@@ -466,6 +554,16 @@ private struct SlackHistoryMessage: Decodable {
     let text: String?
     let ts: String?
     let botId: String?
+    let files: [SlackHistoryFile]?
+}
+
+private struct SlackHistoryFile: Decodable {
+    let id: String?
+    let name: String?
+    let mimetype: String?
+    let size: Int?
+    let urlPrivate: String?
+    let urlPrivateDownload: String?
 }
 
 private struct SlackAuthTestEnvelope: Decodable {
@@ -496,6 +594,26 @@ private enum SlackWebAPI {
             throw SlackWebAPIError.apiError(env.error ?? "auth.test failed")
         }
         return uid
+    }
+
+    static func downloadPrivateFile(token: String, urlString: String) async throws -> Data {
+        guard let url = URL(string: urlString) else {
+            throw SlackWebAPIError.apiError("无效的文件 URL")
+        }
+        var req = URLRequest(url: url)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        if let http = resp as? HTTPURLResponse, http.statusCode == 429 {
+            throw SlackWebAPIError.rateLimited(retryAfter: Double(http.value(forHTTPHeaderField: "Retry-After") ?? "") ?? nil)
+        }
+        guard let http = resp as? HTTPURLResponse else {
+            throw SlackWebAPIError.apiError("文件下载无 HTTP 响应")
+        }
+        guard (200 ... 299).contains(http.statusCode) else {
+            let s = String(data: data, encoding: .utf8) ?? ""
+            throw SlackWebAPIError.apiError("文件下载 HTTP \(http.statusCode)：\(s.prefix(160))")
+        }
+        return data
     }
 
     static func conversationsHistory(token: String, channel: String, limit: Int) async throws -> Data {

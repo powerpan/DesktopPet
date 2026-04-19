@@ -20,6 +20,8 @@ final class AppCoordinator: ObservableObject {
     let petCareModel = PetCareModel()
     let agentSettingsStore = AgentSettingsStore()
     let agentSessionStore = AgentSessionStore()
+    /// 对话 / Slack 多模态附件大小上限（「集成」Tab 可调）。
+    let multimodalAttachmentLimitsStore = MultimodalAttachmentLimitsStore()
     let slackSyncController = SlackSyncController()
     let screenWatchTaskStore = ScreenWatchTaskStore()
     let screenWatchEventStore = ScreenWatchEventStore()
@@ -82,7 +84,8 @@ final class AppCoordinator: ObservableObject {
             session: agentSessionStore,
             screenWatchTasks: screenWatchTaskStore,
             agentClient: agentClient,
-            agentSettings: agentSettingsStore
+            agentSettings: agentSettingsStore,
+            multimodalLimits: multimodalAttachmentLimitsStore
         )
         screenWatchRunner.start(agentClient: agentClient, agentSettings: agentSettingsStore) { [weak self] task, _, kind in
             self?.screenWatchHitFeedback.notifyHit(task: task, narrativeKind: kind)
@@ -167,6 +170,7 @@ final class AppCoordinator: ObservableObject {
                 .environmentObject(agentSettingsStore)
                 .environmentObject(deskMirrorModel)
                 .environmentObject(routeBus)
+                .environmentObject(multimodalAttachmentLimitsStore)
                 .environment(\.desktopPetAgentClient, agentClient)
         )
     }
@@ -180,6 +184,7 @@ final class AppCoordinator: ObservableObject {
                 .environmentObject(slackSyncController)
                 .environmentObject(screenWatchTaskStore)
                 .environmentObject(screenWatchEventStore)
+                .environmentObject(multimodalAttachmentLimitsStore)
                 .environmentObject(routeBus)
                 .environment(\.desktopPetAgentClient, agentClient)
         ))
@@ -321,7 +326,8 @@ final class AppCoordinator: ObservableObject {
                         session: self.agentSessionStore,
                         settings: self.agentSettingsStore,
                         deskMirror: self.deskMirrorModel,
-                        client: self.agentClient
+                        client: self.agentClient,
+                        multimodalLimits: self.multimodalAttachmentLimitsStore
                     )
                     await svc.performAutoReplyIfPossible(channelId: channelId)
                 }

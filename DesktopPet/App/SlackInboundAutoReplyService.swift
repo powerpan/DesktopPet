@@ -12,6 +12,7 @@ struct SlackInboundAutoReplyService {
     let settings: AgentSettingsStore
     let deskMirror: DeskMirrorModel
     let client: AgentClient
+    let multimodalLimits: MultimodalAttachmentLimitsStore
 
     func performAutoReplyIfPossible(channelId: UUID) async {
         guard slackSync.integrationConfig.enabled else { return }
@@ -28,13 +29,25 @@ struct SlackInboundAutoReplyService {
             }
         }
 
-        let apiMessages: [[String: String]] = channel.messages.compactMap { m in
-            if m.role == "user" || m.role == "assistant" {
-                return ["role": m.role, "content": m.content]
-            }
-            return nil
+        let userMessages: [AgentAPIChatUserMessage]
+        do {
+            userMessages = try ChatMultimodalAPIBuilder.openAICompatibleUserMessages(
+                from: channel,
+                limits: multimodalLimits
+            )
+        } catch {
+            session.lastError = error.localizedDescription
+            return
         }
-        guard apiMessages.contains(where: { $0["role"] == "user" }) else { return }
+        guard userMessages.contains(where: { $0.role == "user" }) else { return }
+
+        let extended = userMessages.contains { u in
+            u.parts.contains { p in
+                if case .imageJPEG = p { return true }
+                if case .imageData = p { return true }
+                return false
+            }
+        }
 
         session.setSending(true)
         session.lastError = nil
@@ -46,9 +59,10 @@ struct SlackInboundAutoReplyService {
                 model: settings.model,
                 apiKey: key,
                 systemPrompt: systemPrompt,
-                messages: apiMessages,
+                userMessages: userMessages,
                 temperature: settings.temperature,
-                maxTokens: settings.maxTokens
+                maxTokens: settings.maxTokens,
+                extendedTimeout: extended
             )
             session.appendAssistantInChannel(channelId: channelId, text: reply)
         } catch {

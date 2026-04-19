@@ -10,6 +10,7 @@ private struct ScreenWatchEditorPresentation: Identifiable, Equatable {
 }
 
 struct IntegrationsTabView: View {
+    @EnvironmentObject private var multimodalLimits: MultimodalAttachmentLimitsStore
     @EnvironmentObject private var screenWatchTasks: ScreenWatchTaskStore
     @EnvironmentObject private var screenWatchEvents: ScreenWatchEventStore
 
@@ -29,6 +30,44 @@ struct IntegrationsTabView: View {
 
     var body: some View {
         Form {
+            Section {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("同时作用于对话面板「+」上传与 Slack 入站附件；超出限额时不会在 Slack 调用模型，并在对应线程回复原因。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("单张图片最大：\(String(format: "%.1f", Double(multimodalLimits.maxImageAttachmentBytes) / 1_048_576)) MB")
+                    Slider(value: Binding(
+                        get: { Double(multimodalLimits.maxImageAttachmentBytes) / 1_048_576 },
+                        set: {
+                            multimodalLimits.maxImageAttachmentBytes = Int($0 * 1_048_576)
+                            multimodalLimits.clampAll()
+                        }
+                    ), in: 0.5 ... 25)
+                    Text("单个非图片文件最大：\(String(format: "%.1f", Double(multimodalLimits.maxFileAttachmentBytes) / 1_048_576)) MB")
+                    Slider(value: Binding(
+                        get: { Double(multimodalLimits.maxFileAttachmentBytes) / 1_048_576 },
+                        set: {
+                            multimodalLimits.maxFileAttachmentBytes = Int($0 * 1_048_576)
+                            multimodalLimits.clampAll()
+                        }
+                    ), in: (1.0 / 1024.0) ... 20)
+                    Text("PDF / 文本抽取 UTF-8 上限：\(multimodalLimits.maxTextExtractBytes / 1024) KB")
+                    Slider(value: Binding(
+                        get: { Double(multimodalLimits.maxTextExtractBytes) / 1024 },
+                        set: {
+                            multimodalLimits.maxTextExtractBytes = Int($0 * 1024)
+                            multimodalLimits.clampAll()
+                        }
+                    ), in: 4 ... 2048)
+                }
+            } header: {
+                Text("多模态附件限额")
+            } footer: {
+                Text("Slack 侧需为 Bot 配置 **files:read**（及可访问 files.slack.com 私有下载链接），否则无法下载频道内图片/文件。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section {
                 Text("需已授予「屏幕录制」权限。本地 OCR / 进度条亮度启发式优先；可选多模态模型 YES/NO 兜底（消耗 API）。")
                     .font(.caption)

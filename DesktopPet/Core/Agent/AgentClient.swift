@@ -28,20 +28,28 @@ enum AgentClientError: LocalizedError {
 enum AgentAPIChatContentPart: Sendable {
     case text(String)
     case imageJPEG(Data)
+    /// 任意 `image/*` 的 data URL（jpeg/png/gif/webp 等）。
+    case imageData(mimeType: String, data: Data)
 
     fileprivate func jsonObject() -> [String: Any] {
         switch self {
         case let .text(t):
             return ["type": "text", "text": t]
         case let .imageJPEG(data):
-            let b64 = data.base64EncodedString()
-            return [
-                "type": "image_url",
-                "image_url": [
-                    "url": "data:image/jpeg;base64,\(b64)",
-                ],
-            ]
+            return Self.imageURLJSON(mimeType: "image/jpeg", data: data)
+        case let .imageData(mime, data):
+            return Self.imageURLJSON(mimeType: mime, data: data)
         }
+    }
+
+    private static func imageURLJSON(mimeType: String, data: Data) -> [String: Any] {
+        let b64 = data.base64EncodedString()
+        return [
+            "type": "image_url",
+            "image_url": [
+                "url": "data:\(mimeType);base64,\(b64)",
+            ],
+        ]
     }
 }
 

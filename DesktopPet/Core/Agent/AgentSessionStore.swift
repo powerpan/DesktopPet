@@ -68,8 +68,11 @@ final class AgentSessionStore: ObservableObject {
         lastError = nil
     }
 
-    func appendUser(_ text: String) {
-        conversation.appendUser(text)
+    func appendUser(
+        _ text: String,
+        uploads: [(filename: String, mimeType: String, data: Data)] = []
+    ) {
+        conversation.appendUser(text, uploads: uploads)
     }
 
     func appendAssistant(_ text: String) {
@@ -88,8 +91,20 @@ final class AgentSessionStore: ObservableObject {
         conversation.appendSystemNoticeInChannel(channelId: channelId, text: text)
     }
 
-    func appendSlackInboundUser(channelId: UUID, text: String, slackTs: String, slackChannelId: String) {
-        conversation.appendSlackInboundUser(channelId: channelId, text: text, slackTs: slackTs, slackChannelId: slackChannelId)
+    func appendSlackInboundUser(
+        channelId: UUID,
+        text: String,
+        slackTs: String,
+        slackChannelId: String,
+        uploads: [(filename: String, mimeType: String, data: Data)] = []
+    ) {
+        conversation.appendSlackInboundUser(
+            channelId: channelId,
+            text: text,
+            slackTs: slackTs,
+            slackChannelId: slackChannelId,
+            uploads: uploads
+        )
     }
 
     func appendSlackInboundAssistant(channelId: UUID, text: String, slackTs: String, slackChannelId: String) {
