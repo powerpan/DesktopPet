@@ -22,8 +22,12 @@ struct TriggerSpeechBubbleView: View {
     var tailEdge: TriggerBubbleTailEdge = .bottom
     /// 沿附着边方向的偏移（pt）：上/下边为水平偏移（相对气泡宽度中心），左/右边为垂直偏移（相对高度中心）。
     var tailAlongOffset: CGFloat = 0
-    /// 轻点气泡：通常先关气泡，再在回调里打开聊天等（由外层 `ExtensionOverlayController` 编排）。
-    var onTap: () -> Void = {}
+    /// 轻点气泡：仅收起（由外层 `ExtensionOverlayController` 调用 `dismissTriggerBubble`）。
+    var onTapDismiss: () -> Void = {}
+    /// 长按约 1 秒后：收起并续聊（外层先 `dismissTriggerBubble` 再 `presentChatOverlay` 等）；为 `nil` 时与轻点相同只收起。
+    var onLongPressContinueChat: (() -> Void)? = nil
+
+    @State private var longPressDidTrigger = false
 
     private let textMaxWidthBase: CGFloat = 300
     private let tailW: CGFloat = 16
@@ -58,7 +62,28 @@ struct TriggerSpeechBubbleView: View {
             .compositingGroup()
             .shadow(color: .black.opacity(0.22), radius: 10, y: 4)
             .contentShape(Rectangle())
-            .onTapGesture { onTap() }
+            .onLongPressGesture(
+                minimumDuration: 1,
+                maximumDistance: 18,
+                pressing: { pressing in
+                    if pressing {
+                        longPressDidTrigger = false
+                    } else {
+                        if !longPressDidTrigger {
+                            onTapDismiss()
+                        }
+                        longPressDidTrigger = false
+                    }
+                },
+                perform: {
+                    longPressDidTrigger = true
+                    if let onLongPressContinueChat {
+                        onLongPressContinueChat()
+                    } else {
+                        onTapDismiss()
+                    }
+                }
+            )
     }
 
     @ViewBuilder

@@ -49,7 +49,7 @@ final class AgentSessionStore: ObservableObject {
         conversation.createEmptyChannel(title: title)
     }
 
-    /// 点击触发气泡后续聊：新建频道，首条为猫猫旁白作为上文。
+    /// 长按触发气泡后续聊：新建频道，首条为猫猫旁白作为上文。
     @discardableResult
     func startSessionFromTrigger(text: String) -> UUID {
         conversation.createChannelFromTriggerPrologue(text)

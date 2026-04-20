@@ -139,35 +139,8 @@ final class ExtensionOverlayController {
         let pf = win.frame
         let w: CGFloat = min(320, max(220, pf.width))
         let h: CGFloat = 200
-        let vf = win.screen?.visibleFrame ?? ScreenGeometry.visibleFrameContainingMouse()
-        let edgeGap: CGFloat = 8
-        let margin: CGFloat = 10
-
-        let xCentered = pf.midX - w / 2
-        /// 默认：饲养窗在宠窗**下方**（与原先一致）。
-        let belowOrigin = NSPoint(x: xCentered, y: pf.minY - h - edgeGap)
-        let belowFits = belowOrigin.y >= vf.minY + margin
-        /// 避让：下方会进 Dock / 屏外时，改挂到宠窗**上方**。
-        let aboveOrigin = NSPoint(x: xCentered, y: pf.maxY + edgeGap)
-        let aboveFits = aboveOrigin.y + h <= vf.maxY - margin
-
-        let originRaw: NSPoint
-        if belowFits {
-            originRaw = belowOrigin
-        } else if aboveFits {
-            originRaw = aboveOrigin
-        } else {
-            // 上下都紧张时仍优先「下方」逻辑，再由 `clampedOrigin` 压进可见区。
-            originRaw = belowOrigin
-        }
-
-        let clamped = ScreenGeometry.clampedOrigin(
-            NSSize(width: w, height: h),
-            origin: originRaw,
-            in: vf,
-            margin: margin
-        )
-        panel.setFrame(NSRect(origin: clamped, size: NSSize(width: w, height: h)), display: true)
+        let origin = NSPoint(x: pf.midX - w / 2, y: pf.minY - h - 8)
+        panel.setFrame(NSRect(origin: origin, size: NSSize(width: w, height: h)), display: true)
     }
 
     private func layoutChatPanel() {
@@ -185,8 +158,23 @@ final class ExtensionOverlayController {
         if bubblePanel?.contentView != nil, bubblePanel?.isVisible == true { layoutTriggerBubble() }
     }
 
+    private func triggerBubbleTapDismissAction() -> () -> Void {
+        { [weak self] in
+            self?.dismissTriggerBubble()
+        }
+    }
+
+    private func triggerBubbleLongPressContinueAction() -> () -> Void {
+        { [weak self] in
+            guard let self else { return }
+            let cont = self.bubbleContinueChat
+            self.dismissTriggerBubble()
+            cont?()
+        }
+    }
+
     /// 条件触发旁白：云朵气泡挂在宠窗附近；靠近屏幕右下时改挂到猫猫左上侧。
-    /// - Parameter onContinueChat: 用户轻点气泡后：先收起气泡，再执行（例如新建会话并打开聊天窗）。
+    /// - Parameter onContinueChat: 用户**长按约 1 秒**后：先收起气泡，再执行（例如新建会话并打开聊天窗）。轻点仅收起。
     func showTriggerBubble(text: String, onContinueChat: (() -> Void)? = nil) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -199,14 +187,17 @@ final class ExtensionOverlayController {
         bubbleSpeechText = trimmed
         bubbleContinueChat = onContinueChat
 
-        let tap: () -> Void = { [weak self] in
-            guard let self else { return }
-            let cont = self.bubbleContinueChat
-            self.dismissTriggerBubble()
-            cont?()
-        }
+        let tapDismiss = triggerBubbleTapDismissAction()
+        let longPressContinue = triggerBubbleLongPressContinueAction()
         // 先用默认尾巴测量 intrinsic，再由 layoutTriggerBubble 选象限并替换为最终视图。
-        let provisional = TriggerSpeechBubbleView(text: trimmed, bubbleFontScale: bubbleFontScale, tailEdge: .bottom, tailAlongOffset: 0, onTap: tap)
+        let provisional = TriggerSpeechBubbleView(
+            text: trimmed,
+            bubbleFontScale: bubbleFontScale,
+            tailEdge: .bottom,
+            tailAlongOffset: 0,
+            onTapDismiss: tapDismiss,
+            onLongPressContinueChat: longPressContinue
+        )
         let hosting = NSHostingView(rootView: provisional)
         hosting.setFrameSize(NSSize(width: 360, height: 400))
         hosting.wantsLayer = true
@@ -298,18 +289,15 @@ final class ExtensionOverlayController {
             bubbleHeight: h
         )
 
-        let tap: () -> Void = { [weak self] in
-            guard let self else { return }
-            let cont = self.bubbleContinueChat
-            self.dismissTriggerBubble()
-            cont?()
-        }
+        let tapDismiss = triggerBubbleTapDismissAction()
+        let longPressContinue = triggerBubbleLongPressContinueAction()
         let measureView = TriggerSpeechBubbleView(
             text: bubbleSpeechText,
             bubbleFontScale: bubbleFontScale,
             tailEdge: tailEdge,
             tailAlongOffset: tailAlong0,
-            onTap: tap
+            onTapDismiss: tapDismiss,
+            onLongPressContinueChat: longPressContinue
         )
         let hosting = NSHostingView(rootView: measureView)
         hosting.setFrameSize(NSSize(width: 400, height: 400))
@@ -342,7 +330,8 @@ final class ExtensionOverlayController {
             bubbleFontScale: bubbleFontScale,
             tailEdge: tailEdge,
             tailAlongOffset: tailAlong2,
-            onTap: tap
+            onTapDismiss: tapDismiss,
+            onLongPressContinueChat: longPressContinue
         )
         let hostFinal = NSHostingView(rootView: refined)
         hostFinal.frame = NSRect(x: 0, y: 0, width: w2, height: h2)

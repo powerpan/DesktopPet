@@ -32,6 +32,49 @@ struct SettingsPanelView: View {
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Text("巡逻间隔")
+                    Slider(
+                        value: $viewModel.patrolIntervalSeconds,
+                        in: PetConfig.patrolIntervalSecondsMin...PetConfig.patrolIntervalSecondsMax,
+                        step: 1
+                    )
+                    Text("\(Int(viewModel.patrolIntervalSeconds.rounded())) 秒")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(minWidth: 52, alignment: .trailing)
+                }
+                HStack {
+                    Text("巡逻靠边距")
+                    Slider(
+                        value: $viewModel.patrolEdgeMargin,
+                        in: PetConfig.patrolEdgeMarginMin...PetConfig.patrolEdgeMarginMax,
+                        step: 2
+                    )
+                    Text(String(format: "%.0f pt", viewModel.patrolEdgeMargin))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(minWidth: 52, alignment: .trailing)
+                }
+                HStack {
+                    Text("贴近前台窗")
+                    Slider(
+                        value: Binding(
+                            get: { Double(viewModel.patrolFrontWindowBiasPercent) },
+                            set: { viewModel.patrolFrontWindowBiasPercent = Int($0.rounded()) }
+                        ),
+                        in: 0 ... 100,
+                        step: 1
+                    )
+                    Text("\(viewModel.patrolFrontWindowBiasPercent)%")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(minWidth: 44, alignment: .trailing)
+                }
+                MarkdownInlineText(source: AgentSettingsUICopy.settingsPanelPatrolTuneFooter(testing: viewModel.testingModeEnabled))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             HStack {
                 Text("宠物缩放")

@@ -18,6 +18,14 @@ struct PetConfig {
         idleToSleepInterval: 180
     )
 
+    /// 系统设置「巡逻间隔」滑条（秒）。
+    static let patrolIntervalSecondsMin: Double = 5
+    static let patrolIntervalSecondsMax: Double = 180
+
+    /// 系统设置「巡逻靠边距」滑条（pt），与 `PetWindowController` 内 `clampedOrigin` 一致。
+    static let patrolEdgeMarginMin: Double = 24
+    static let patrolEdgeMarginMax: Double = 96
+
     /// SwiftUI 中宠物卡片基准边长（略小于原 220pt，降低对周边可点区域的影响）。
     static let petCanvasLayoutPoints: CGFloat = 176
 

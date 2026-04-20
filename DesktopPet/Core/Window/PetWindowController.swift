@@ -14,6 +14,8 @@ final class PetWindowController: NSWindowController {
     private var cancellables = Set<AnyCancellable>()
     /// 拖动缩放滑条期间固定用「第一次变化前」的窗口中心，避免每帧用 setFrame 后的 frame 重算中心导致舍入漂移（宠物往右下跑飞屏）。
     private var petScaleResizeAnchorScreen: CGPoint?
+    /// 上一次巡逻落点（窗口原点），用于与下一次随机采样拉开距离，减轻总在同一角/边徘徊。
+    private var lastPatrolOrigin: CGPoint?
 
     init(settings: SettingsViewModel, stateMachine: PetStateMachine, deskMirror: DeskMirrorModel) {
         self.settings = settings
@@ -102,27 +104,44 @@ final class PetWindowController: NSWindowController {
     func nudgePatrolStep(in visibleFrame: CGRect) {
         guard let window else { return }
         var frame = window.frame
-        let margin: CGFloat = 48
-        var candidates: [CGPoint] = [
-            CGPoint(x: visibleFrame.minX + margin, y: visibleFrame.minY + margin),
-            CGPoint(x: visibleFrame.maxX - frame.width - margin, y: visibleFrame.minY + margin),
-            CGPoint(x: visibleFrame.midX - frame.width / 2, y: visibleFrame.maxY - frame.height - margin),
-        ]
+        let margin = CGFloat(
+            min(max(settings.patrolEdgeMargin, PetConfig.patrolEdgeMarginMin), PetConfig.patrolEdgeMarginMax)
+        )
+        let sz = frame.size
+        let frontBiasP = min(100, max(0, settings.patrolFrontWindowBiasPercent))
+
+        // 原先只从 3 个角点 + 偶发「贴前台窗上沿」里抽，可放置区域很大时仍像「总在几个老地方」；改为在合法矩形内**均匀随机**，并尽量与上次原点拉开距离。
+        var raw = ScreenGeometry.randomPatrolWindowOrigin(
+            windowSize: sz,
+            in: visibleFrame,
+            margin: margin,
+            lastOrigin: lastPatrolOrigin,
+            minDistanceFromLast: max(28, min(sz.width, sz.height) * 0.12)
+        )
 
         let myPID = ProcessInfo.processInfo.processIdentifier
-        // 前台窗口若在巡逻区域外（例如在副屏），不要把目标点加进来，否则 clamp 后常贴在主屏边缘、看起来像「往副屏跑」。
-        if Double.random(in: 0...1) < 0.5,
+        let minX = visibleFrame.minX + margin
+        let minY = visibleFrame.minY + margin
+        let maxX = visibleFrame.maxX - sz.width - margin
+        let maxY = visibleFrame.maxY - sz.height - margin
+        if maxX >= minX, maxY >= minY,
+           Double.random(in: 0...1) < Double(frontBiasP) / 100.0,
            let front = ScreenGeometry.approximateFrontmostAppWindowFrame(excludingPID: myPID),
            visibleFrame.intersects(front) {
-            let targetX = front.midX - frame.width / 2
-            let targetY = front.maxY - frame.height * 0.12
-            candidates.append(CGPoint(x: targetX, y: targetY))
+            let jitterX = CGFloat.random(in: -56 ... 56)
+            let jitterY = CGFloat.random(in: -20 ... 20)
+            let fx = min(max(front.midX - sz.width / 2 + jitterX, minX), maxX)
+            let fy = min(max(front.maxY - sz.height * 0.12 + jitterY, minY), maxY)
+            let t = CGFloat.random(in: 0.38 ... 0.62)
+            raw = CGPoint(
+                x: raw.x * (1 - t) + fx * t,
+                y: raw.y * (1 - t) + fy * t
+            )
         }
 
-        if let raw = candidates.randomElement() {
-            frame.origin = ScreenGeometry.clampedOrigin(frame.size, origin: raw, in: visibleFrame, margin: margin)
-            window.setFrame(frame, display: true, animate: true)
-        }
+        frame.origin = ScreenGeometry.clampedOrigin(sz, origin: raw, in: visibleFrame, margin: margin)
+        lastPatrolOrigin = frame.origin
+        window.setFrame(frame, display: true, animate: true)
     }
 
     func setPetVisible(_ visible: Bool) {

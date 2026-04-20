@@ -159,7 +159,7 @@ final class AppCoordinator: ObservableObject {
         }
     }
 
-    /// 打开或前置对话面板（不切换关闭）；用于触发气泡点击后续聊。
+    /// 打开或前置对话面板（不切换关闭）；用于触发气泡长按后续聊。
     /// - Parameter clearLastError: 为 `false` 时保留 `lastError`（例如菜单截屏失败后需要展示原因）。
     func presentChatOverlay(clearLastError: Bool = true) {
         appRouter.presentChatPanel(root: chatOverlayRoot())
@@ -344,7 +344,7 @@ final class AppCoordinator: ObservableObject {
             .store(in: &cancellables)
     }
 
-    /// 条件触发或测试气泡：写入旁白历史并展示云朵（点气泡可续聊）。
+    /// 条件触发或测试气泡：写入旁白历史并展示云朵（轻点关气泡，长按约 1 秒打开对话续聊）。
     private func deliverTriggerSpeech(_ payload: TriggerSpeechPayload) {
         agentSessionStore.triggerHistory.append(
             text: payload.text,
@@ -494,10 +494,22 @@ final class AppCoordinator: ObservableObject {
             .sink { [weak self] enabled in
                 guard let self else { return }
                 if enabled {
-                    self.patrolScheduler.start()
+                    self.patrolScheduler.stop()
+                    self.patrolScheduler.start(interval: self.settingsViewModel.patrolIntervalSeconds)
                 } else {
                     self.patrolScheduler.stop()
                 }
+            }
+            .store(in: &cancellables)
+
+        settingsViewModel.$patrolIntervalSeconds
+            .removeDuplicates()
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, self.settingsViewModel.isPatrolEnabled else { return }
+                self.patrolScheduler.stop()
+                self.patrolScheduler.start(interval: self.settingsViewModel.patrolIntervalSeconds)
             }
             .store(in: &cancellables)
     }

@@ -105,6 +105,41 @@ enum ScreenGeometry {
         )
     }
 
+    /// 巡逻用：在 `visibleFrame` 内对窗口**原点**做**均匀随机**（四边留 `margin`）。若提供 `lastOrigin`，会尽量在 `minDistanceFromLast` 以外重采样若干次，减轻「总在同一小块区域打转」；退化时退回 `clampedOrigin` 的几何中心附近。
+    static func randomPatrolWindowOrigin(
+        windowSize: CGSize,
+        in visibleFrame: CGRect,
+        margin: CGFloat,
+        lastOrigin: CGPoint?,
+        minDistanceFromLast: CGFloat,
+        maxResamples: Int = 14
+    ) -> CGPoint {
+        let minX = visibleFrame.minX + margin
+        let minY = visibleFrame.minY + margin
+        let maxX = visibleFrame.maxX - windowSize.width - margin
+        let maxY = visibleFrame.maxY - windowSize.height - margin
+        if maxX < minX || maxY < minY {
+            return clampedOrigin(
+                windowSize,
+                origin: CGPoint(x: visibleFrame.midX - windowSize.width / 2, y: visibleFrame.midY - windowSize.height / 2),
+                in: visibleFrame,
+                margin: margin
+            )
+        }
+        func sample() -> CGPoint {
+            CGPoint(x: CGFloat.random(in: minX...maxX), y: CGFloat.random(in: minY...maxY))
+        }
+        if let last = lastOrigin {
+            for _ in 0..<maxResamples {
+                let p = sample()
+                if hypot(p.x - last.x, p.y - last.y) >= minDistanceFromLast {
+                    return p
+                }
+            }
+        }
+        return sample()
+    }
+
     /// AppKit 窗口坐标：原点在左下角，将 origin 限制在 visibleFrame 内并留边距
     static func clampedOrigin(_ windowSize: CGSize, origin: CGPoint, in visibleFrame: CGRect, margin: CGFloat) -> CGPoint {
         let minX = visibleFrame.minX + margin

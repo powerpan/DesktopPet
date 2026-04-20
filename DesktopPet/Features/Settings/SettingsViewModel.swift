@@ -12,6 +12,9 @@ private enum SettingsKeys {
     static let patrol = "DesktopPet.settings.patrol"
     /// `PatrolRegionMode.rawValue`
     static let patrolRegion = "DesktopPet.settings.patrolRegion"
+    static let patrolIntervalSeconds = "DesktopPet.settings.patrolIntervalSeconds"
+    static let patrolEdgeMargin = "DesktopPet.settings.patrolEdgeMargin"
+    static let patrolFrontWindowBiasPercent = "DesktopPet.settings.patrolFrontWindowBiasPercent"
     static let scale = "DesktopPet.settings.petScale"
     /// 条件触发旁白气泡正文字号相对 callout 的倍数（与 `petScale` 独立），默认 1.0。
     static let triggerBubbleFontScale = "DesktopPet.settings.triggerBubbleFontScale"
@@ -26,6 +29,12 @@ final class SettingsViewModel: ObservableObject {
     @Published var isPatrolEnabled: Bool
     /// 启用巡逻时：随机落点限制在主屏、仅副屏、主+副随机一屏，或「焦点屏」（跟前台应用所在显示器）。
     @Published var patrolRegionMode: PatrolRegionMode
+    /// 巡逻定时器间隔（秒），见 `PetConfig.patrolIntervalSecondsMin`…`Max`。
+    @Published var patrolIntervalSeconds: Double
+    /// 巡逻落点相对 `visibleFrame` 的最小边距（pt）。
+    @Published var patrolEdgeMargin: Double
+    /// 每次巡逻是否向「前台应用窗口上沿」混合的近似概率（0…100）。
+    @Published var patrolFrontWindowBiasPercent: Int
     @Published var petScale: Double
     /// 条件触发云朵气泡内正文字号倍数（与 `petScale` 独立）；**1.0** 为系统 callout 基准，与此前未单独调字体时一致。
     @Published var triggerBubbleFontScale: Double
@@ -54,6 +63,27 @@ final class SettingsViewModel: ObservableObject {
             patrolRegionMode = m
         } else {
             patrolRegionMode = .mainAndSecondary
+        }
+
+        if defaults.object(forKey: SettingsKeys.patrolIntervalSeconds) == nil {
+            patrolIntervalSeconds = PetConfig.default.patrolInterval
+        } else {
+            let v = defaults.double(forKey: SettingsKeys.patrolIntervalSeconds)
+            patrolIntervalSeconds = min(max(v, PetConfig.patrolIntervalSecondsMin), PetConfig.patrolIntervalSecondsMax)
+        }
+
+        if defaults.object(forKey: SettingsKeys.patrolEdgeMargin) == nil {
+            patrolEdgeMargin = 48
+        } else {
+            let v = defaults.double(forKey: SettingsKeys.patrolEdgeMargin)
+            patrolEdgeMargin = min(max(v, PetConfig.patrolEdgeMarginMin), PetConfig.patrolEdgeMarginMax)
+        }
+
+        if defaults.object(forKey: SettingsKeys.patrolFrontWindowBiasPercent) == nil {
+            patrolFrontWindowBiasPercent = 38
+        } else {
+            let v = defaults.integer(forKey: SettingsKeys.patrolFrontWindowBiasPercent)
+            patrolFrontWindowBiasPercent = min(100, max(0, v))
         }
 
         let rawPetScale: Double
@@ -99,6 +129,36 @@ final class SettingsViewModel: ObservableObject {
             .dropFirst()
             .sink { [weak self] value in
                 self?.defaults.set(value.rawValue, forKey: SettingsKeys.patrolRegion)
+            }
+            .store(in: &cancellables)
+
+        $patrolIntervalSeconds
+            .dropFirst()
+            .sink { [weak self] raw in
+                guard let self else { return }
+                let v = min(max(raw, PetConfig.patrolIntervalSecondsMin), PetConfig.patrolIntervalSecondsMax)
+                if v != raw { self.patrolIntervalSeconds = v }
+                self.defaults.set(v, forKey: SettingsKeys.patrolIntervalSeconds)
+            }
+            .store(in: &cancellables)
+
+        $patrolEdgeMargin
+            .dropFirst()
+            .sink { [weak self] raw in
+                guard let self else { return }
+                let v = min(max(raw, PetConfig.patrolEdgeMarginMin), PetConfig.patrolEdgeMarginMax)
+                if v != raw { self.patrolEdgeMargin = v }
+                self.defaults.set(v, forKey: SettingsKeys.patrolEdgeMargin)
+            }
+            .store(in: &cancellables)
+
+        $patrolFrontWindowBiasPercent
+            .dropFirst()
+            .sink { [weak self] raw in
+                guard let self else { return }
+                let v = min(100, max(0, raw))
+                if v != raw { self.patrolFrontWindowBiasPercent = v }
+                self.defaults.set(v, forKey: SettingsKeys.patrolFrontWindowBiasPercent)
             }
             .store(in: &cancellables)
 
