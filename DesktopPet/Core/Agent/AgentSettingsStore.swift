@@ -19,7 +19,10 @@ private enum AgentSettingsKeys {
     static let maxTokens = "DesktopPet.agent.maxTokens"
     static let attachKeySummary = "DesktopPet.agent.attachKeySummary"
     static let keyboardTriggerEnabled = "DesktopPet.agent.keyboardTriggerEnabled"
+    /// 旧版布尔总开关；仅用于一次性迁移到 `screenSnapCaptureTargetV1`。
     static let screenSnapTriggerEnabled = "DesktopPet.agent.screenSnapTriggerEnabled"
+    static let screenSnapCaptureTargetV1 = "DesktopPet.agent.screenSnapCaptureTarget.v1"
+    static let screenSnapSlackRemotePickV1 = "DesktopPet.agent.screenSnapSlackRemotePick.v1"
     static let triggerDefaultTemperature = "DesktopPet.agent.triggerDefaultTemperature"
     static let triggerDefaultMaxTokens = "DesktopPet.agent.triggerDefaultMaxTokens"
     static let triggers = "DesktopPet.agent.triggers"
@@ -54,7 +57,12 @@ final class AgentSettingsStore: ObservableObject {
     @Published var attachKeySummary: Bool
     /// 键盘模式触发总开关（仍受每条 trigger 控制）
     @Published var keyboardTriggerMasterEnabled: Bool
-    @Published var screenSnapTriggerMasterEnabled: Bool
+    /// 截屏类自动化总档位：关 / 主屏 / 副屏（「隐私」下拉与 Slack 指令）。
+    @Published var screenSnapCaptureTarget: ScreenSnapCaptureTarget
+    /// 总开关为「关」时，Slack 仅可写入此项，供远程点屏等按偏好选择物理屏。
+    @Published var screenSnapSlackRemoteDisplayPick: ScreenSnapSlackRemoteDisplayPick?
+    /// 与旧代码兼容：非「关」即此前「截屏总开关打开」语义。
+    var screenSnapTriggerMasterEnabled: Bool { screenSnapCaptureTarget != .off }
     /// 条件旁白请求的默认温度（与「连接」里长对话温度独立）。
     @Published var triggerDefaultTemperature: Double
     /// 条件旁白请求的默认 max_tokens（与长对话独立）。
@@ -83,7 +91,27 @@ final class AgentSettingsStore: ObservableObject {
         maxTokens = defaults.object(forKey: AgentSettingsKeys.maxTokens) as? Int ?? 512
         attachKeySummary = defaults.bool(forKey: AgentSettingsKeys.attachKeySummary)
         keyboardTriggerMasterEnabled = defaults.bool(forKey: AgentSettingsKeys.keyboardTriggerEnabled)
-        screenSnapTriggerMasterEnabled = defaults.bool(forKey: AgentSettingsKeys.screenSnapTriggerEnabled)
+        let initialScreenSnap: ScreenSnapCaptureTarget
+        if let raw = defaults.string(forKey: AgentSettingsKeys.screenSnapCaptureTargetV1),
+           let v = ScreenSnapCaptureTarget(rawValue: raw) {
+            initialScreenSnap = v
+        } else if defaults.object(forKey: AgentSettingsKeys.screenSnapTriggerEnabled) != nil {
+            let legacyOn = defaults.bool(forKey: AgentSettingsKeys.screenSnapTriggerEnabled)
+            initialScreenSnap = legacyOn ? .mainDisplay : .off
+            defaults.set(initialScreenSnap.rawValue, forKey: AgentSettingsKeys.screenSnapCaptureTargetV1)
+        } else {
+            initialScreenSnap = .off
+            defaults.set(ScreenSnapCaptureTarget.off.rawValue, forKey: AgentSettingsKeys.screenSnapCaptureTargetV1)
+        }
+        screenSnapCaptureTarget = initialScreenSnap
+        let initialSlackPick: ScreenSnapSlackRemoteDisplayPick?
+        if let pr = defaults.string(forKey: AgentSettingsKeys.screenSnapSlackRemotePickV1),
+           let p = ScreenSnapSlackRemoteDisplayPick(rawValue: pr) {
+            initialSlackPick = p
+        } else {
+            initialSlackPick = nil
+        }
+        screenSnapSlackRemoteDisplayPick = initialSlackPick
         triggerDefaultTemperature = defaults.object(forKey: AgentSettingsKeys.triggerDefaultTemperature) as? Double ?? 0.7
         triggerDefaultMaxTokens = defaults.object(forKey: AgentSettingsKeys.triggerDefaultMaxTokens) as? Int ?? 256
         triggerSlackNotifyMasterEnabled = defaults.bool(forKey: AgentSettingsKeys.triggerSlackNotifyMasterEnabled)
@@ -133,7 +161,19 @@ final class AgentSettingsStore: ObservableObject {
         $maxTokens.dropFirst().debounce(for: .milliseconds(200), scheduler: DispatchQueue.main).sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.maxTokens) }.store(in: &cancellables)
         $attachKeySummary.dropFirst().sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.attachKeySummary) }.store(in: &cancellables)
         $keyboardTriggerMasterEnabled.dropFirst().sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.keyboardTriggerEnabled) }.store(in: &cancellables)
-        $screenSnapTriggerMasterEnabled.dropFirst().sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.screenSnapTriggerEnabled) }.store(in: &cancellables)
+        $screenSnapCaptureTarget.dropFirst().sink { [weak self] v in
+            guard let self else { return }
+            self.defaults.set(v.rawValue, forKey: AgentSettingsKeys.screenSnapCaptureTargetV1)
+            if v != .off { self.screenSnapSlackRemoteDisplayPick = nil }
+        }.store(in: &cancellables)
+        $screenSnapSlackRemoteDisplayPick.dropFirst().sink { [weak self] v in
+            guard let self else { return }
+            if let v {
+                self.defaults.set(v.rawValue, forKey: AgentSettingsKeys.screenSnapSlackRemotePickV1)
+            } else {
+                self.defaults.removeObject(forKey: AgentSettingsKeys.screenSnapSlackRemotePickV1)
+            }
+        }.store(in: &cancellables)
         $triggerDefaultTemperature.dropFirst().debounce(for: .milliseconds(200), scheduler: DispatchQueue.main).sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.triggerDefaultTemperature) }.store(in: &cancellables)
         $triggerDefaultMaxTokens.dropFirst().debounce(for: .milliseconds(200), scheduler: DispatchQueue.main).sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.triggerDefaultMaxTokens) }.store(in: &cancellables)
         $triggerSlackNotifyMasterEnabled.dropFirst().sink { [weak self] v in
@@ -216,5 +256,14 @@ final class AgentSettingsStore: ObservableObject {
         var r = triggers[i]
         mutate(&r)
         triggers[i] = r
+    }
+
+    /// 远程点屏等：总开关非「关」时用当前档位；为「关」时用 Slack 记录的显示器偏好，缺省主屏。
+    func effectiveCaptureTargetForRemoteClickImaging() -> ScreenSnapCaptureTarget {
+        if screenSnapCaptureTarget != .off { return screenSnapCaptureTarget }
+        if let p = screenSnapSlackRemoteDisplayPick {
+            return p == .mainDisplay ? .mainDisplay : .secondaryDisplay
+        }
+        return .mainDisplay
     }
 }

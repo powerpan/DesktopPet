@@ -129,7 +129,7 @@ final class AgentTriggerEngine: ObservableObject {
         if ruleSnapshot.kind == .screenSnap {
             guard let idx = settings.triggers.firstIndex(where: { $0.id == ruleSnapshot.id }) else { return }
             guard settings.screenSnapTriggerMasterEnabled else {
-                session.lastError = "请先在「隐私」Tab 打开「截屏类触发（总开关）」。"
+                session.lastError = "请先在「隐私」Tab 将「截屏类触发」设为「截取主屏」或「截取副屏」。"
                 return
             }
             guard screenSnapPipelineTask == nil, !session.isSending else {
@@ -177,7 +177,7 @@ final class AgentTriggerEngine: ObservableObject {
     /// 菜单栏「截屏并旁白」：优先**第一条已启用**的截屏规则；若无则取第一条截屏规则（与设置页「立即触发」同为 `forceFire`，避免列表未勾选启用时菜单无反应）。
     func fireScreenSnapFromMenuBar() async {
         guard settings.screenSnapTriggerMasterEnabled else {
-            session.lastError = "请先在「隐私」中打开截屏类触发总开关。"
+            session.lastError = "请先在「隐私」中将「截屏类触发」设为「截取主屏」或「截取副屏」。"
             return
         }
         let rule = settings.triggers.first(where: { $0.enabled && $0.kind == .screenSnap })
@@ -328,15 +328,21 @@ final class AgentTriggerEngine: ObservableObject {
 
         let maxEdge = Self.clampedScreenSnapMaxEdge(rule.screenSnapMaxEdgePixels)
         let q = Self.clampedJPEGQuality(rule.screenSnapJPEGQuality)
+        let cap = settings.screenSnapCaptureTarget
         let jpeg: Data
         do {
-            jpeg = try await ScreenCaptureService.captureMainDisplayJPEG(maxEdge: maxEdge, jpegQuality: CGFloat(q))
+            jpeg = try await ScreenCaptureService.captureJPEG(for: cap, maxEdge: maxEdge, jpegQuality: CGFloat(q))
         } catch {
             session.lastError = error.localizedDescription
             return
         }
 
-        let meta = Self.buildScreenCaptureMetaLine(jpegByteCount: jpeg.count, maxEdge: maxEdge, degraded: false)
+        let meta = Self.buildScreenCaptureMetaLine(
+            jpegByteCount: jpeg.count,
+            maxEdge: maxEdge,
+            degraded: false,
+            captureDisplayPhrase: cap.metaDisplayPhrase
+        )
         await fireScreenSnapPrologue(
             trigger: rule,
             matchedRoute: matchedRoute,
@@ -346,7 +352,7 @@ final class AgentTriggerEngine: ObservableObject {
         )
     }
 
-    /// 与 `ScreenCaptureService.captureMainDisplayJPEG` 的上界（2048）对齐；下界 768 避免过小图难以认字。
+    /// 与 `ScreenCaptureService.captureJPEG` 的上界（2048）对齐；下界 768 避免过小图难以认字。
     private static func clampedScreenSnapMaxEdge(_ v: Int) -> Int {
         min(2048, max(768, v))
     }
@@ -355,12 +361,17 @@ final class AgentTriggerEngine: ObservableObject {
         min(0.85, max(0.55, v))
     }
 
-    private static func buildScreenCaptureMetaLine(jpegByteCount: Int, maxEdge: Int, degraded: Bool) -> String {
+    private static func buildScreenCaptureMetaLine(
+        jpegByteCount: Int,
+        maxEdge: Int,
+        degraded: Bool,
+        captureDisplayPhrase: String
+    ) -> String {
         let f = ISO8601DateFormatter()
         f.timeZone = .current
         f.formatOptions = [.withInternetDateTime, .withTimeZone, .withFractionalSeconds]
         let front = readFrontmostLocalizedName()
-        return "时间=\(f.string(from: Date()))；主显示器；长边≤\(maxEdge)px；JPEG≈\(jpegByteCount)字节；前台应用=\(front)；degradedToTextOnly=\(degraded ? "true" : "false")"
+        return "时间=\(f.string(from: Date()))；显示器=\(captureDisplayPhrase)；长边≤\(maxEdge)px；JPEG≈\(jpegByteCount)字节；前台应用=\(front)；degradedToTextOnly=\(degraded ? "true" : "false")"
     }
 
     private func fireScreenSnapPrologue(
@@ -427,7 +438,12 @@ final class AgentTriggerEngine: ObservableObject {
                 text = try await send(partsWithImage)
             } catch let err as AgentClientError {
                 if case let .http(code, _) = err, code == 400 {
-                    let meta2 = Self.buildScreenCaptureMetaLine(jpegByteCount: jpegData.count, maxEdge: Self.clampedScreenSnapMaxEdge(trigger.screenSnapMaxEdgePixels), degraded: true)
+                    let meta2 = Self.buildScreenCaptureMetaLine(
+                        jpegByteCount: jpegData.count,
+                        maxEdge: Self.clampedScreenSnapMaxEdge(trigger.screenSnapMaxEdgePixels),
+                        degraded: true,
+                        captureDisplayPhrase: settings.screenSnapCaptureTarget.metaDisplayPhrase
+                    )
                     let userLine2 = renderUserPrompt(
                         trigger: trigger,
                         matchedRoute: matchedRoute,

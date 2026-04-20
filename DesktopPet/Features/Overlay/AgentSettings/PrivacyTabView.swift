@@ -47,17 +47,22 @@ struct PrivacyTabView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Toggle("截屏类触发（总开关）", isOn: $settings.screenSnapTriggerMasterEnabled)
-                    .onChange(of: settings.screenSnapTriggerMasterEnabled) { _, on in
-                        if on { showScreenSnapInfo = true }
+                Picker("截屏类触发", selection: $settings.screenSnapCaptureTarget) {
+                    ForEach(ScreenSnapCaptureTarget.allCases) { mode in
+                        Text(mode.privacyMenuTitle).tag(mode)
                     }
-                Text("关闭后，引擎不会评估任何「截屏」规则，也不会发起截屏或图像请求。")
+                }
+                .pickerStyle(.menu)
+                .onChange(of: settings.screenSnapCaptureTarget) { old, new in
+                    if old == .off, new != .off { showScreenSnapInfo = true }
+                }
+                Text("「关」：不跑截屏类自动化、菜单栏截屏旁白；远程点屏仍可在有屏幕录制权限时按 Slack 记录的显示器偏好截屏。「截取主/副屏」：按所选物理显示器截一张图（副屏需外接且系统可见）。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } header: {
                 Text("进阶触发总开关")
             } footer: {
-                Text("键盘总闸：关闭后，所有「键盘模式」类触发器都不会匹配子串。截屏总闸：关闭后不会截屏或上传图像；开启后仍需系统「屏幕录制」权限及至少一条已启用的截屏规则。")
+                Text("键盘总闸：关闭后，所有「键盘模式」类触发器都不会匹配子串。截屏档位为「关」时不跑截屏自动化与菜单栏截屏旁白；为「主/副屏」时仍须系统「屏幕录制」权限及已启用的截屏规则。Slack 可在总开关为关时发「截屏目标主屏」等仅记录显示器偏好。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -84,7 +89,7 @@ struct PrivacyTabView: View {
             }
             Button("关闭", role: .cancel) {}
         } message: {
-            Text("开启后，满足条件的「截屏」触发器会通过 ScreenCaptureKit 截取主显示器画面，经缩放与 JPEG 压缩后，作为多模态请求的一部分发往你在「连接」里为**当前服务商**配置的 Base URL 与模型。画面可能包含屏幕上任何可见内容；请在会议或投屏场景关闭总开关或对应规则。默认不落盘原图。若模型不支持图像，应用会尝试自动改为纯文字重试一次。")
+            Text("开启「截取主屏」或「截取副屏」后，满足条件的「截屏」触发器会通过 ScreenCaptureKit 截取所选显示器画面，经缩放与 JPEG 压缩后，作为多模态请求的一部分发往你在「连接」里为**当前服务商**配置的 Base URL 与模型。画面可能包含屏幕上任何可见内容；请在会议或投屏场景改回「关」或关闭对应规则。默认不落盘原图。若模型不支持图像，应用会尝试自动改为纯文字重试一次。")
         }
     }
 }

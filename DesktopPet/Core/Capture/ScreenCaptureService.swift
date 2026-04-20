@@ -1,6 +1,6 @@
 //
 // ScreenCaptureService.swift
-// 主显示器单次截屏（ScreenCaptureKit）→ 缩放 → JPEG，仅内存、不落盘。
+// 主/副显示器单次截屏（ScreenCaptureKit）→ 缩放 → JPEG，仅内存、不落盘。
 //
 
 import AppKit
@@ -10,9 +10,11 @@ import CoreMedia
 import Foundation
 import ScreenCaptureKit
 
-enum ScreenCaptureServiceError: LocalizedError {
+enum ScreenCaptureServiceError: LocalizedError, Equatable {
     case permissionDenied
     case noDisplay
+    case noSecondaryDisplay
+    case invalidCaptureTarget
     case streamFailed(String)
     case noFrame
     case encodingFailed
@@ -23,6 +25,10 @@ enum ScreenCaptureServiceError: LocalizedError {
             return "未授予屏幕录制权限。请在「系统设置 → 隐私与安全性 → 屏幕录制」中勾选本应用。"
         case .noDisplay:
             return "未找到可用显示器。"
+        case .noSecondaryDisplay:
+            return "未检测到副显示器（仅有一块屏或系统未列出第二块）。"
+        case .invalidCaptureTarget:
+            return "截屏目标为「关」，无法截取。"
         case let .streamFailed(s):
             return "截屏流失败：\(s)"
         case .noFrame:
@@ -33,7 +39,7 @@ enum ScreenCaptureServiceError: LocalizedError {
     }
 }
 
-/// 单次主显示器截屏；不负责 prompt 或网络。
+/// 单次显示器截屏；不负责 prompt 或网络。
 enum ScreenCaptureService {
     /// 是否已通过系统「屏幕录制」授权（不弹窗）。
     static var hasScreenRecordingPermission: Bool {
@@ -46,25 +52,64 @@ enum ScreenCaptureService {
         CGRequestScreenCaptureAccess()
     }
 
-    /// 捕获主显示器一帧，缩放到 `maxEdge` 像素以内，输出 JPEG。
-    static func captureMainDisplayJPEG(maxEdge: Int, jpegQuality: CGFloat) async throws -> Data {
+    /// 按总开关档位截取一帧（`.off` 会抛错）；缩放到 `maxEdge` 像素以内，输出 JPEG。
+    static func captureJPEG(for target: ScreenSnapCaptureTarget, maxEdge: Int, jpegQuality: CGFloat) async throws -> Data {
+        guard target != .off else {
+            throw ScreenCaptureServiceError.invalidCaptureTarget
+        }
         guard hasScreenRecordingPermission else {
             throw ScreenCaptureServiceError.permissionDenied
         }
         let q = min(0.95, max(0.4, jpegQuality))
         let edge = min(2048, max(256, maxEdge))
-        let buffer = try await captureMainDisplayPixelBufferWithTimeout(seconds: 8)
+        let buffer = try await capturePixelBuffer(for: target, seconds: 8)
         return try jpegData(from: buffer, maxEdge: edge, quality: q)
+    }
+
+    /// 捕获主显示器一帧（兼容旧调用点）。
+    static func captureMainDisplayJPEG(maxEdge: Int, jpegQuality: CGFloat) async throws -> Data {
+        try await captureJPEG(for: .mainDisplay, maxEdge: maxEdge, jpegQuality: jpegQuality)
+    }
+
+    /// 与当前截取目标一致的 `CGDisplayBounds`（用于远程点屏坐标映射等）。
+    static func displayBounds(for target: ScreenSnapCaptureTarget) async throws -> CGRect {
+        guard target != .off else {
+            throw ScreenCaptureServiceError.invalidCaptureTarget
+        }
+        let id = try await resolveCGDisplayID(for: target)
+        return CGDisplayBounds(id)
     }
 
     // MARK: - SCK
 
-    private static func captureMainDisplayPixelBufferWithTimeout(seconds: TimeInterval) async throws -> CVPixelBuffer {
-        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
+    private static func resolveSCDisplay(for target: ScreenSnapCaptureTarget, content: SCShareableContent) throws -> SCDisplay {
         let mainID = CGMainDisplayID()
-        guard let display = content.displays.first(where: { $0.displayID == mainID }) ?? content.displays.first else {
-            throw ScreenCaptureServiceError.noDisplay
+        switch target {
+        case .off:
+            throw ScreenCaptureServiceError.invalidCaptureTarget
+        case .mainDisplay:
+            guard let d = content.displays.first(where: { $0.displayID == mainID }) ?? content.displays.first else {
+                throw ScreenCaptureServiceError.noDisplay
+            }
+            return d
+        case .secondaryDisplay:
+            let others = content.displays.filter { $0.displayID != mainID }.sorted { $0.displayID < $1.displayID }
+            guard let d = others.first else {
+                throw ScreenCaptureServiceError.noSecondaryDisplay
+            }
+            return d
         }
+    }
+
+    private static func resolveCGDisplayID(for target: ScreenSnapCaptureTarget) async throws -> CGDirectDisplayID {
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
+        let d = try resolveSCDisplay(for: target, content: content)
+        return d.displayID
+    }
+
+    private static func capturePixelBuffer(for target: ScreenSnapCaptureTarget, seconds: TimeInterval) async throws -> CVPixelBuffer {
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
+        let display = try resolveSCDisplay(for: target, content: content)
         let filter = SCContentFilter(display: display, excludingApplications: [], exceptingWindows: [])
         let config = SCStreamConfiguration()
         config.width = display.width

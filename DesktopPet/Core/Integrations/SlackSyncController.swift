@@ -335,6 +335,19 @@ final class SlackSyncController: ObservableObject {
             return
         }
 
+        if !raw.isEmpty, let parsed = SlackPetScreenSnapSettingsCommand.parse(raw), let agent = agentSettingsRef {
+            let parent = slackThreadParentTs?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let threadTs = parent.isEmpty ? slackTs : parent
+            await applySlackPetScreenSnapSettingsCommand(
+                parsed,
+                agent: agent,
+                channelId: slackChannelId,
+                threadTs: threadTs
+            )
+            statusMessage = "已处理 Slack 截屏档位指令。"
+            return
+        }
+
         if !raw.isEmpty, SlackPetHelpCommand.isHelpRequest(raw) {
             let parent = slackThreadParentTs?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let threadTs = parent.isEmpty ? slackTs : parent
@@ -458,6 +471,57 @@ final class SlackSyncController: ObservableObject {
         return (uploads, rejections)
     }
 
+    // MARK: - Slack 截屏档位
+
+    private func applySlackPetScreenSnapSettingsCommand(
+        _ parsed: SlackPetScreenSnapSettingsCommand.Result,
+        agent: AgentSettingsStore,
+        channelId: String,
+        threadTs: String
+    ) async {
+        switch parsed {
+        case .remotePickOnly(let pick):
+            agent.screenSnapSlackRemoteDisplayPick = pick
+            let label = pick == .mainDisplay ? "主屏" : "副屏"
+            let tail: String
+            if agent.screenSnapCaptureTarget == .off {
+                tail =
+                    "当前 Mac 上「截屏类触发」仍为**关**，**不能**通过 Slack 远程改为「开」；自动截屏与菜单栏截屏旁白不会执行。\n\n已记录：远程点屏等会优先按 **\(label)** 截取（需屏幕录制权限）。若要启用自动截屏，请在装有 DesktopPet 的 Mac 上打开：**智能体工作台 → 自动化 → 隐私**，选择「截取主屏」或「截取副屏」。"
+            } else {
+                tail =
+                    "当前本机已选择「\(agent.screenSnapCaptureTarget.privacyMenuTitle)」；自动截屏按该档位执行。本偏好仍会在你将来改回「关」时，供远程点屏等使用。"
+            }
+            await postSlackThreadReply(
+                channelId: channelId,
+                threadTs: threadTs,
+                text: "🐱 已通过 Slack 记录远程截屏目标为 **\(label)**。\n\n\(tail)"
+            )
+        case .setCaptureTarget(let t):
+            if t != .off, agent.screenSnapCaptureTarget == .off {
+                await postSlackThreadReply(
+                    channelId: channelId,
+                    threadTs: threadTs,
+                    text:
+                        """
+                        🐱 当前 Mac 上「截屏类触发」为**关**，**不能通过 Slack 远程改为「截取主屏 / 截取副屏」**（避免在你不知情时打开截屏与多模态上传）。
+
+                        请在本机 **智能体工作台 → 自动化 → 隐私** 中手动选择「截取主屏」或「截取副屏」。
+
+                        你仍可在总开关为关时，用 Slack **仅选择显示器**：`!pet screen pick main` / `!pet screen pick secondary`，或发「**截屏目标主屏**」「**截屏目标副屏**」，供远程点屏等按该屏截取。
+                        """
+                )
+                return
+            }
+            agent.screenSnapCaptureTarget = t
+            let label = t.privacyMenuTitle
+            await postSlackThreadReply(
+                channelId: channelId,
+                threadTs: threadTs,
+                text: "🐱 已把截屏类触发设为：**\(label)**（本机已落盘）。"
+            )
+        }
+    }
+
     // MARK: - Slack 远程点屏
 
     private func pollRemoteClickThreadReplies(token: String, slackChannelId: String, session: AgentSessionStore) async {
@@ -511,7 +575,7 @@ final class SlackSyncController: ObservableObject {
         return parts.count >= 2 && parts.contains(where: { $0.rangeOfCharacter(from: .decimalDigits) != nil })
     }
 
-    /// 使用当前会话中的主屏几何与上一张标尺图尺寸执行点击，并回到「是否继续」。
+    /// 使用当前会话中的显示器几何与上一张标尺图尺寸执行点击，并回到「是否继续」。
     private func performSlackRemoteClickFromNorm(
         pair: (Double, Double),
         sess: SlackRemoteClickSessionStore.Session,
@@ -530,16 +594,17 @@ final class SlackSyncController: ObservableObject {
             )
             try RemoteClickExecutor.performLeftClick(at: pt, accessibilityTrusted: ax)
             remoteClickSessions.setAwaitingContinue(channelId: slackChannelId, threadRootTs: parentThreadTs)
+            let lab = sess.displayShortLabelZh
             await postSlackThreadReply(
                 channelId: slackChannelId,
                 threadTs: parentThreadTs,
                 text:
-                    "🐱 已在主屏执行一次左键点击（\(String(format: "%.0f", pair.0 * 100)),\(String(format: "%.0f", pair.1 * 100)) 标尺坐标）。\n\n若要**再来一轮**（重新截屏并点下一处），请回复 **继续** 或 **再来一次**；也可 **`继续`+坐标**（如 `继续90，62`）沿用当前坐标图直接再点。结束请回复 **结束** 或 **停止**。"
+                    "🐱 已在**\(lab)**执行一次左键点击（\(String(format: "%.0f", pair.0 * 100)),\(String(format: "%.0f", pair.1 * 100)) 标尺坐标）。\n\n若要**再来一轮**（重新截屏并点下一处），请回复 **继续** 或 **再来一次**；也可 **`继续`+坐标**（如 `继续90，62`）沿用当前坐标图直接再点。结束请回复 **结束** 或 **停止**。"
             )
             if let binding = bindings.first(where: { $0.slackChannelId == slackChannelId }) {
                 session.appendSystemNoticeInChannel(
                     channelId: binding.localChannelId,
-                    text: "（Slack）远程点屏已在主屏执行一次点击；可在 Slack 线程回复「继续」多轮操作。"
+                    text: "（Slack）远程点屏已在\(lab)执行一次点击；可在 Slack 线程回复「继续」多轮操作。"
                 )
             }
             statusMessage = "Slack 远程点屏已执行。"
@@ -674,11 +739,21 @@ final class SlackSyncController: ObservableObject {
             return
         }
 
-        let displayBounds = CGDisplayBounds(CGMainDisplayID())
+        guard let agent = agentSettingsRef else { return }
+        let imgTarget = agent.effectiveCaptureTargetForRemoteClickImaging()
+        let displayBounds: CGRect
         let overlay: Data
         do {
-            let jpeg = try await ScreenCaptureService.captureMainDisplayJPEG(maxEdge: 1600, jpegQuality: 0.82)
+            displayBounds = try await ScreenCaptureService.displayBounds(for: imgTarget)
+            let jpeg = try await ScreenCaptureService.captureJPEG(for: imgTarget, maxEdge: 1600, jpegQuality: 0.82)
             overlay = RemoteClickOverlayRenderer.renderOverlayOnJPEG(jpeg)
+        } catch let e as ScreenCaptureServiceError where e == .noSecondaryDisplay {
+            await postSlackThreadReply(
+                channelId: channelId,
+                threadTs: postThreadTs,
+                text: "🐱 未检测到可用副显示器，无法按当前偏好截副屏。请改用 `!pet screen pick main` / 「截屏目标主屏」，或在本机接上副屏后再试。"
+            )
+            return
         } catch {
             await postSlackThreadReply(
                 channelId: channelId,
@@ -693,11 +768,12 @@ final class SlackSyncController: ObservableObject {
             channelId: channelId,
             threadRootTs: threadRootTs,
             displayBounds: displayBounds,
-            imagePixelSize: px
+            imagePixelSize: px,
+            displayShortLabelZh: imgTarget.shortZhLabel
         )
 
         let intro =
-            "🐱 新一张主屏坐标图（0–100 标尺）。请在本线程回复坐标；点击完成后仍可回复 **继续** 多轮，或 **结束** 退出。"
+            "🐱 新一张\(imgTarget.shortZhLabel)坐标图（0–100 标尺）。请在本线程回复坐标；点击完成后仍可回复 **继续** 多轮，或 **结束** 退出。"
 
         do {
             _ = try await SlackWebAPI.filesUpload(
@@ -752,10 +828,20 @@ final class SlackSyncController: ObservableObject {
             return
         }
 
-        let displayBounds = CGDisplayBounds(CGMainDisplayID())
+        guard let agent = agentSettingsRef else { return }
+        let imgTarget = agent.effectiveCaptureTargetForRemoteClickImaging()
+        let displayBounds: CGRect
         let jpeg: Data
         do {
-            jpeg = try await ScreenCaptureService.captureMainDisplayJPEG(maxEdge: 1600, jpegQuality: 0.82)
+            displayBounds = try await ScreenCaptureService.displayBounds(for: imgTarget)
+            jpeg = try await ScreenCaptureService.captureJPEG(for: imgTarget, maxEdge: 1600, jpegQuality: 0.82)
+        } catch let e as ScreenCaptureServiceError where e == .noSecondaryDisplay {
+            await postSlackThreadReply(
+                channelId: slackChannelId,
+                threadTs: postThreadTs,
+                text: "🐱 未检测到可用副显示器，无法按当前偏好截副屏。请发 `!pet screen pick main` / 「截屏目标主屏」，或在本机接上副屏后再发起远程点屏。"
+            )
+            return
         } catch {
             await postSlackThreadReply(
                 channelId: slackChannelId,
@@ -773,11 +859,12 @@ final class SlackSyncController: ObservableObject {
             threadRootTs: threadRoot,
             displayBounds: displayBounds,
             imagePixelSize: px,
-            overlayJPEG: nil
+            overlayJPEG: nil,
+            displayShortLabelZh: imgTarget.shortZhLabel
         )
 
         let intro =
-            "🐱 主屏坐标图（0–100 标尺，用户视角左下为原点）。请在本线程回复坐标，例如 `50,50` 或 `x=0.5 y=0.5`（支持 0–100 或 0–1）。每轮点击后会询问是否继续；回复 **继续** / **再来一次** 可重新截屏再点，回复 **结束** 退出。约 5 分钟无操作超时。"
+            "🐱 \(imgTarget.shortZhLabel)坐标图（0–100 标尺，用户视角左下为原点）。请在本线程回复坐标，例如 `50,50` 或 `x=0.5 y=0.5`（支持 0–100 或 0–1）。每轮点击后会询问是否继续；回复 **继续** / **再来一次** 可重新截屏再点，回复 **结束** 退出。约 5 分钟无操作超时。"
 
         do {
             _ = try await SlackWebAPI.filesUpload(

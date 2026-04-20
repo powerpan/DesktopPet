@@ -25,6 +25,8 @@ final class SlackRemoteClickSessionStore {
         var displayBounds: CGRect
         var imagePixelSize: CGSize
         var overlayJPEG: Data?
+        /// 与 `ScreenSnapCaptureTarget.shortZhLabel` 一致，用于 Slack 回复文案。
+        var displayShortLabelZh: String
 
         var key: String { "\(channelId)|\(threadRootTs)" }
     }
@@ -50,7 +52,8 @@ final class SlackRemoteClickSessionStore {
         threadRootTs: String,
         displayBounds: CGRect,
         imagePixelSize: CGSize,
-        overlayJPEG: Data?
+        overlayJPEG: Data?,
+        displayShortLabelZh: String
     ) {
         let now = Date()
         let s = Session(
@@ -61,7 +64,8 @@ final class SlackRemoteClickSessionStore {
             expiresAt: now.addingTimeInterval(ttlSeconds),
             displayBounds: displayBounds,
             imagePixelSize: imagePixelSize,
-            overlayJPEG: overlayJPEG
+            overlayJPEG: overlayJPEG,
+            displayShortLabelZh: displayShortLabelZh
         )
         sessions[s.key] = s
     }
@@ -80,7 +84,8 @@ final class SlackRemoteClickSessionStore {
         channelId: String,
         threadRootTs: String,
         displayBounds: CGRect,
-        imagePixelSize: CGSize
+        imagePixelSize: CGSize,
+        displayShortLabelZh: String
     ) {
         let k = "\(channelId)|\(threadRootTs)"
         guard var s = sessions[k], s.status == .awaitingContinue else { return }
@@ -88,6 +93,7 @@ final class SlackRemoteClickSessionStore {
         s.status = .awaitingCoordinate
         s.displayBounds = displayBounds
         s.imagePixelSize = imagePixelSize
+        s.displayShortLabelZh = displayShortLabelZh
         s.expiresAt = now.addingTimeInterval(ttlSeconds)
         s.overlayJPEG = nil
         sessions[k] = s

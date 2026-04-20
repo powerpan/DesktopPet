@@ -96,8 +96,12 @@ final class ScreenWatchRunner: ObservableObject {
 
         let jpeg: Data
         do {
+            let cap: ScreenSnapCaptureTarget = {
+                guard let s = agentSettings else { return .mainDisplay }
+                return s.screenSnapCaptureTarget == .off ? .mainDisplay : s.screenSnapCaptureTarget
+            }()
             // 略提高分辨率与 JPEG 质量，减轻小字号中文（如「进度条」）在缩放后的漏检；模型兜底仍用同一帧。
-            jpeg = try await ScreenCaptureService.captureMainDisplayJPEG(maxEdge: 1536, jpegQuality: 0.72)
+            jpeg = try await ScreenCaptureService.captureJPEG(for: cap, maxEdge: 1536, jpegQuality: 0.72)
         } catch {
             events.append(ScreenWatchEvent(taskId: task.id, taskTitle: task.title, kind: .error, detail: error.localizedDescription))
             return
