@@ -32,6 +32,12 @@ final class PetCareModel: ObservableObject {
     private var growthClient: AgentClient?
     private weak var growthSettings: AgentSettingsStore?
     private var aiGrowthTask: Task<Void, Never>?
+    /// 数值旁白：已进入「低值区」后不再重复，直到心情与能量均回到阈值+回差之上。
+    private var petStatInLowBand: Bool = false
+    /// 由 `AppCoordinator` 注入：请求「数值与成长旁白」触发器链路；返回是否实际进入旁白请求（用于写冷却与阈值闩锁）。
+    var onPetStatNarrativeRequest: ((String) async -> Bool)?
+    /// 防止同一次成长结算内并发多次旁白请求。
+    private var statNarrativeRequestInflight = false
 
     private var feedCooldown: TimeInterval { TimeInterval(feedCooldownSeconds) }
     private var petCooldown: TimeInterval { TimeInterval(petCooldownSeconds) }
@@ -178,6 +184,11 @@ final class PetCareModel: ObservableObject {
         }
         state = s
 
+        if !decayResult.newEvents.isEmpty {
+            maybeRequestStatNarrativeForDecayEvents(decayResult.newEvents, cfg: cfg)
+        }
+        evaluateStatNarrativeForThresholdIfNeeded(cfg: cfg)
+
         if let aiHour = decayResult.requestAIGrowthForHourStart {
             scheduleAIGrowthIfNeeded(contextHour: aiHour)
         }
@@ -212,6 +223,70 @@ final class PetCareModel: ObservableObject {
         guard journal.count > maxRows else { return }
         let sorted = journal.sorted { $0.dayKey < $1.dayKey }
         journal = Array(sorted.suffix(maxRows))
+    }
+
+    private func statNarrativeCooldownOk(cfg: PetGrowthConfig) -> Bool {
+        let mins = cfg.statNarrativeCooldownMinutes
+        guard let last = state.lastPetStatNarrativeAt else { return true }
+        return Date().timeIntervalSince(last) >= TimeInterval(mins * 60)
+    }
+
+    private func markStatNarrativeCooldown() {
+        var s = state
+        s.lastPetStatNarrativeAt = Date()
+        state = s
+        persistDebounced()
+    }
+
+    private func maybeRequestStatNarrativeForDecayEvents(_ events: [PetDecayEventRecord], cfg: PetGrowthConfig) {
+        guard cfg.statNarrativeEnabled else { return }
+        guard let hook = onPetStatNarrativeRequest else { return }
+        guard statNarrativeCooldownOk(cfg: cfg) else { return }
+        guard !statNarrativeRequestInflight else { return }
+        let lines = events.map { ev in
+            "· \(ev.reasonText)（心情 \(String(format: "%+.0f", ev.moodDelta * 100))%，能量 \(String(format: "%+.0f", ev.energyDelta * 100))%）"
+        }.joined(separator: "\n")
+        let ctx = "【成长随机事件】当前心情 \(Int(state.mood * 100))%，能量 \(Int(state.energy * 100))%。\n\(lines)"
+        statNarrativeRequestInflight = true
+        Task { @MainActor in
+            defer { self.statNarrativeRequestInflight = false }
+            let ok = await hook(ctx)
+            if ok { self.markStatNarrativeCooldown() }
+        }
+    }
+
+    private func evaluateStatNarrativeForThresholdIfNeeded(cfg: PetGrowthConfig) {
+        guard cfg.statNarrativeEnabled else {
+            petStatInLowBand = false
+            return
+        }
+        guard let hook = onPetStatNarrativeRequest else { return }
+        let tm = cfg.statNarrativeMoodThreshold
+        let te = cfg.statNarrativeEnergyThreshold
+        let h = cfg.statNarrativeRecoveryHysteresis
+        let low = state.mood <= tm || state.energy <= te
+        let recovered = state.mood >= min(1, tm + h) && state.energy >= min(1, te + h)
+        if recovered {
+            petStatInLowBand = false
+            return
+        }
+        guard low else { return }
+        if petStatInLowBand { return }
+        guard statNarrativeCooldownOk(cfg: cfg) else { return }
+        guard !statNarrativeRequestInflight else { return }
+        let ctx = """
+        【数值偏低】心情 \(Int(state.mood * 100))%（告警阈值 ≤\(Int(tm * 100))%），能量 \(Int(state.energy * 100))%（告警阈值 ≤\(Int(te * 100))%）；今日陪伴约 \(state.todayCompanionSeconds / 60) 分钟。
+        请像猫猫在向用户轻轻诉苦或撒娇，不要列技术字段。
+        """
+        statNarrativeRequestInflight = true
+        Task { @MainActor in
+            defer { self.statNarrativeRequestInflight = false }
+            let ok = await hook(ctx)
+            if ok {
+                self.petStatInLowBand = true
+                self.markStatNarrativeCooldown()
+            }
+        }
     }
 
     private func applyDecayEvent(_ ev: PetDecayEventRecord, to stateRef: inout PetCareState) {

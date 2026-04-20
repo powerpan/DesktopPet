@@ -27,6 +27,19 @@ struct PetGrowthConfig: Codable, Equatable {
     /// 两次 AI 成长事件之间最少间隔（小时）
     var aiGrowthEventsMinIntervalHours: Double
 
+    // MARK: 数值旁白自动化（阈值 / 成长事件 → 触发器「数值与成长旁白」）
+
+    /// 开启后，心情或能量进入「低值区」或发生本地成长随机事件时，可请求旁白（见触发器规则）。
+    var statNarrativeEnabled: Bool
+    /// 心情 ≤ 该值（0…1）视为偏低，与能量阈值二选一满足即进入低值区。
+    var statNarrativeMoodThreshold: Double
+    /// 能量 ≤ 该值（0…1）视为偏低。
+    var statNarrativeEnergyThreshold: Double
+    /// 心情与能量都 ≥ 阈值 + 该回差时，认为已从低值区恢复，可再次因「跌入」触发旁白。
+    var statNarrativeRecoveryHysteresis: Double
+    /// 数值旁白与成长事件旁白共用的最短间隔（分钟）。
+    var statNarrativeCooldownMinutes: Int
+
     enum CodingKeys: String, CodingKey {
         case energyDrainPerHour
         case moodDrainPerHour
@@ -37,6 +50,11 @@ struct PetGrowthConfig: Codable, Equatable {
         case randomEventDensityPercent
         case aiGrowthEventsEnabled
         case aiGrowthEventsMinIntervalHours
+        case statNarrativeEnabled
+        case statNarrativeMoodThreshold
+        case statNarrativeEnergyThreshold
+        case statNarrativeRecoveryHysteresis
+        case statNarrativeCooldownMinutes
     }
 
     init(
@@ -48,7 +66,12 @@ struct PetGrowthConfig: Codable, Equatable {
         petEnergyGain: Double,
         randomEventDensityPercent: Int,
         aiGrowthEventsEnabled: Bool,
-        aiGrowthEventsMinIntervalHours: Double
+        aiGrowthEventsMinIntervalHours: Double,
+        statNarrativeEnabled: Bool,
+        statNarrativeMoodThreshold: Double,
+        statNarrativeEnergyThreshold: Double,
+        statNarrativeRecoveryHysteresis: Double,
+        statNarrativeCooldownMinutes: Int
     ) {
         self.energyDrainPerHour = energyDrainPerHour
         self.moodDrainPerHour = moodDrainPerHour
@@ -59,6 +82,11 @@ struct PetGrowthConfig: Codable, Equatable {
         self.randomEventDensityPercent = randomEventDensityPercent
         self.aiGrowthEventsEnabled = aiGrowthEventsEnabled
         self.aiGrowthEventsMinIntervalHours = aiGrowthEventsMinIntervalHours
+        self.statNarrativeEnabled = statNarrativeEnabled
+        self.statNarrativeMoodThreshold = statNarrativeMoodThreshold
+        self.statNarrativeEnergyThreshold = statNarrativeEnergyThreshold
+        self.statNarrativeRecoveryHysteresis = statNarrativeRecoveryHysteresis
+        self.statNarrativeCooldownMinutes = statNarrativeCooldownMinutes
     }
 
     init(from decoder: Decoder) throws {
@@ -73,6 +101,15 @@ struct PetGrowthConfig: Codable, Equatable {
         aiGrowthEventsEnabled = try c.decodeIfPresent(Bool.self, forKey: .aiGrowthEventsEnabled) ?? Self.default.aiGrowthEventsEnabled
         aiGrowthEventsMinIntervalHours = try c.decodeIfPresent(Double.self, forKey: .aiGrowthEventsMinIntervalHours)
             ?? Self.default.aiGrowthEventsMinIntervalHours
+        statNarrativeEnabled = try c.decodeIfPresent(Bool.self, forKey: .statNarrativeEnabled) ?? Self.default.statNarrativeEnabled
+        statNarrativeMoodThreshold = try c.decodeIfPresent(Double.self, forKey: .statNarrativeMoodThreshold)
+            ?? Self.default.statNarrativeMoodThreshold
+        statNarrativeEnergyThreshold = try c.decodeIfPresent(Double.self, forKey: .statNarrativeEnergyThreshold)
+            ?? Self.default.statNarrativeEnergyThreshold
+        statNarrativeRecoveryHysteresis = try c.decodeIfPresent(Double.self, forKey: .statNarrativeRecoveryHysteresis)
+            ?? Self.default.statNarrativeRecoveryHysteresis
+        statNarrativeCooldownMinutes = try c.decodeIfPresent(Int.self, forKey: .statNarrativeCooldownMinutes)
+            ?? Self.default.statNarrativeCooldownMinutes
     }
 
     func encode(to encoder: Encoder) throws {
@@ -86,6 +123,11 @@ struct PetGrowthConfig: Codable, Equatable {
         try c.encode(randomEventDensityPercent, forKey: .randomEventDensityPercent)
         try c.encode(aiGrowthEventsEnabled, forKey: .aiGrowthEventsEnabled)
         try c.encode(aiGrowthEventsMinIntervalHours, forKey: .aiGrowthEventsMinIntervalHours)
+        try c.encode(statNarrativeEnabled, forKey: .statNarrativeEnabled)
+        try c.encode(statNarrativeMoodThreshold, forKey: .statNarrativeMoodThreshold)
+        try c.encode(statNarrativeEnergyThreshold, forKey: .statNarrativeEnergyThreshold)
+        try c.encode(statNarrativeRecoveryHysteresis, forKey: .statNarrativeRecoveryHysteresis)
+        try c.encode(statNarrativeCooldownMinutes, forKey: .statNarrativeCooldownMinutes)
     }
 
     static let `default` = PetGrowthConfig(
@@ -97,7 +139,12 @@ struct PetGrowthConfig: Codable, Equatable {
         petEnergyGain: 0,
         randomEventDensityPercent: 35,
         aiGrowthEventsEnabled: false,
-        aiGrowthEventsMinIntervalHours: 6
+        aiGrowthEventsMinIntervalHours: 6,
+        statNarrativeEnabled: false,
+        statNarrativeMoodThreshold: 0.35,
+        statNarrativeEnergyThreshold: 0.35,
+        statNarrativeRecoveryHysteresis: 0.05,
+        statNarrativeCooldownMinutes: 45
     )
 
     static func clamped(_ c: PetGrowthConfig) -> PetGrowthConfig {
@@ -110,6 +157,10 @@ struct PetGrowthConfig: Codable, Equatable {
         o.petEnergyGain = min(0.25, max(0, o.petEnergyGain))
         o.randomEventDensityPercent = min(100, max(0, o.randomEventDensityPercent))
         o.aiGrowthEventsMinIntervalHours = min(168, max(1, o.aiGrowthEventsMinIntervalHours))
+        o.statNarrativeMoodThreshold = min(0.95, max(0.05, o.statNarrativeMoodThreshold))
+        o.statNarrativeEnergyThreshold = min(0.95, max(0.05, o.statNarrativeEnergyThreshold))
+        o.statNarrativeRecoveryHysteresis = min(0.2, max(0.01, o.statNarrativeRecoveryHysteresis))
+        o.statNarrativeCooldownMinutes = min(24 * 60, max(5, o.statNarrativeCooldownMinutes))
         return o
     }
 }

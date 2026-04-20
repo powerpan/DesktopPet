@@ -70,19 +70,24 @@ struct TriggerRuleRow: View {
             let mx = r.routes.map(\.priority).max() ?? 0
             return " · \(n)条路由·最高优先级\(mx)"
         }()
+        let slackHint: String = {
+            guard settings.triggerSlackNotifyMasterEnabled, r.notifySlack, r.kind != .screenWatch else { return "" }
+            return " · Slack"
+        }()
         switch r.kind {
-        case .timer: return "每 \(r.timerIntervalMinutes) 分钟\(routeHint)"
-        case .randomIdle: return "空闲 ≥\(r.randomIdleSeconds)s，概率 \(Int(r.randomIdleProbability * 100))%\(routeHint)"
+        case .timer: return "每 \(r.timerIntervalMinutes) 分钟\(routeHint)\(slackHint)"
+        case .randomIdle: return "空闲 ≥\(r.randomIdleSeconds)s，概率 \(Int(r.randomIdleProbability * 100))%\(routeHint)\(slackHint)"
         case .keyboardPattern:
-            if r.routes.isEmpty, !r.keyboardPattern.isEmpty { return "模式「\(r.keyboardPattern)」" }
-            return "键盘路由\(routeHint)"
+            if r.routes.isEmpty, !r.keyboardPattern.isEmpty { return "模式「\(r.keyboardPattern)」\(slackHint)" }
+            return "键盘路由\(routeHint)\(slackHint)"
         case .frontApp:
-            if r.routes.isEmpty, !r.frontAppNameContains.isEmpty { return "前台包含「\(r.frontAppNameContains)」" }
-            return "前台路由\(routeHint)"
+            if r.routes.isEmpty, !r.frontAppNameContains.isEmpty { return "前台包含「\(r.frontAppNameContains)」\(slackHint)" }
+            return "前台路由\(routeHint)\(slackHint)"
         case .screenSnap:
             let perm = ScreenCaptureService.hasScreenRecordingPermission ? "已授权" : "未授权"
-            return "间隔≥\(r.screenSnapIntervalMinutes)分·\(perm)\(routeHint)"
-        case .careInteraction: return "饲养面板成功后·旁白\(routeHint)"
+            return "间隔≥\(r.screenSnapIntervalMinutes)分·\(perm)\(routeHint)\(slackHint)"
+        case .careInteraction: return "饲养面板成功后·旁白\(routeHint)\(slackHint)"
+        case .petStatAutomation: return "心情/能量偏低或成长事件·旁白\(routeHint)\(slackHint)"
         case .screenWatch: return "盯屏任务命中旁白"
         }
     }
@@ -101,6 +106,7 @@ struct PromptPlaceholderHelp: View {
                 Text("· {matchedCondition} — 替换为本次命中的那条旁白路由的条件摘要（例如「按键含「abc」且 空闲≥120s」），便于模型理解命中分支。")
                 Text("· {keySummary} — 仅键入摘要的短片段（与 {extra} 里可能带的摘要同源）；未开「附带键入摘要」时为空字符串。适合在模板中间单独引用摘要、而不想整段复述 {extra} 时使用。")
                 Text("· {careContext} — 仅「饲养互动」类型：喂食或戳戳成功时，由应用自动填入心情/能量变化与陪伴时长等摘要；未触发饲养操作或试跑占位时可能为空。")
+                Text("· {statContext} — 仅「数值与成长旁白」：心情/能量偏低或成长随机事件时，由应用填入结构化说明；未触发时为空。")
                 Text("· {screenCaptureMeta} — 仅「截屏」类型：应用填入时间、前台应用名、缩放与是否降级为纯文字等摘要；勿在模板中手写该占位符以外的机密内容。")
             }
             .font(.caption2)
@@ -156,6 +162,24 @@ struct TriggerRuleEditorSheet: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if rule.kind != .screenWatch {
+                    Section {
+                        Toggle("此条旁白也发到 Slack", isOn: $rule.notifySlack)
+                            .disabled(!settings.triggerSlackNotifyMasterEnabled)
+                    } header: {
+                        Text("Slack")
+                    } footer: {
+                        Text(
+                            settings.triggerSlackNotifyMasterEnabled
+                                ? "开启后，本条触发产生的旁白除气泡外，会发到「连接」里配置的 Slack 监控频道（需 Bot Token 与频道 ID）。"
+                                : "请先在「触发器」列表顶部的 Slack 区域打开「触发旁白也推送到 Slack」总开关，再为各条规则单独开启。"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
 
                 if rule.kind == .keyboardPattern, !settings.keyboardTriggerMasterEnabled {
@@ -233,7 +257,7 @@ struct TriggerRuleEditorSheet: View {
                             switch rule.kind {
                             case .keyboardPattern: return [.keyboardContains("")]
                             case .frontApp: return [.frontAppContains("")]
-                            case .timer, .randomIdle, .screenSnap, .careInteraction, .screenWatch: return [.always]
+                            case .timer, .randomIdle, .screenSnap, .careInteraction, .petStatAutomation, .screenWatch: return [.always]
                             }
                         }()
                         rule.routes.append(
@@ -292,6 +316,7 @@ struct TriggerRuleEditorSheet: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("仅在宠物窗口可见时评估。空闲秒数：无键鼠活动达到该秒数后才可能触发。")
                             Text("概率：每次抽样时掷骰，数值越大越容易触发；建议保持较低以免打扰。")
+                            Text("同一段键鼠静止期内：每条「随机空闲」规则在成功旁白一次后会暂停，直到你再次键鼠活动后才会重新参与随机判定（仍须满足冷却与最小间隔）。")
                         }
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -390,6 +415,22 @@ struct TriggerRuleEditorSheet: View {
                         Text("饲养互动")
                     } footer: {
                         Text("列表中若有多条「饲养互动」规则，仅**第一条已启用**的会收到面板事件；可在模板中用 {careContext}、{extra}、{matchedCondition} 等占位符。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                case .petStatAutomation:
+                    Section {
+                        Text("由「陪伴 → 成长」中的「数值旁白自动化」在心情/能量低于阈值或发生成长随机事件时触发。应用将说明写入 {statContext}；模型失败时会用本地兜底短句。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("成长 Tab 里另有「最短间隔」分钟数，与上方「冷却」共同限制频率；仅**第一条已启用**的本类型规则会收到事件。")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    } header: {
+                        Text("数值与成长旁白")
+                    } footer: {
+                        Text("可与 {extra}、{matchedCondition} 等占位符组合；建议语气偏撒娇、诉苦，一两句即可。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)

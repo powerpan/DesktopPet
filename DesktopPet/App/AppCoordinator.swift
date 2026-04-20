@@ -77,6 +77,10 @@ final class AppCoordinator: ObservableObject {
         wireSlackInboundAutoReply()
 
         petCareModel.configureGrowthEngine(client: agentClient, settings: agentSettingsStore)
+        petCareModel.onPetStatNarrativeRequest = { [weak self] line in
+            guard let self else { return false }
+            return await self.triggerEngine.firePetStatAutomationNarrative(contextLine: line)
+        }
         petCareModel.startCompanionTicking { [weak self] in self?.isPetVisible ?? false }
         triggerEngine.start()
 
@@ -267,6 +271,9 @@ final class AppCoordinator: ObservableObject {
         routeBus.onCloseChatOverlay = { [weak self] in
             self?.appRouter.dismissChatPanel()
         }
+        routeBus.onCloseCareOverlay = { [weak self] in
+            self?.appRouter.dismissCarePanel()
+        }
         routeBus.onPresentChatContinuingChannel = { [weak self] id in
             guard let self else { return }
             self.agentSessionStore.selectChannel(id: id)
@@ -348,6 +355,11 @@ final class AppCoordinator: ObservableObject {
             guard let self else { return }
             self.agentSessionStore.startSessionFromTrigger(text: payload.text)
             self.presentChatOverlay()
+        }
+        if payload.notifySlack {
+            Task { @MainActor in
+                await slackSyncController.postTriggerNarrativeToSlack(triggerKind: payload.triggerKind, text: payload.text)
+            }
         }
     }
 

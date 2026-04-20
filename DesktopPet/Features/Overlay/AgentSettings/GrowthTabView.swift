@@ -166,6 +166,47 @@ struct GrowthTabView: View {
             }
 
             Section {
+                Toggle("启用数值与成长旁白", isOn: statNarrativeEnabledBinding)
+                HStack {
+                    Text("心情告警阈值（≤）")
+                    Spacer()
+                    Text(String(format: "%.0f%%", petCare.growthConfig.statNarrativeMoodThreshold * 100))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                Slider(value: statNarrativeMoodThresholdBinding, in: 0.05 ... 0.95, step: 0.01)
+                HStack {
+                    Text("能量告警阈值（≤）")
+                    Spacer()
+                    Text(String(format: "%.0f%%", petCare.growthConfig.statNarrativeEnergyThreshold * 100))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                Slider(value: statNarrativeEnergyThresholdBinding, in: 0.05 ... 0.95, step: 0.01)
+                HStack {
+                    Text("恢复回差（心情与能量均须高于「阈值+回差」才解除低值闩锁）")
+                    Spacer()
+                    Text(String(format: "%.0f%%", petCare.growthConfig.statNarrativeRecoveryHysteresis * 100))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                Slider(value: statNarrativeRecoveryHysteresisBinding, in: 0.01 ... 0.2, step: 0.01)
+                Stepper(
+                    "旁白最短间隔：\(petCare.growthConfig.statNarrativeCooldownMinutes) 分钟（阈值告警与成长事件共用）",
+                    value: statNarrativeCooldownMinutesBinding,
+                    in: 5 ... 24 * 60,
+                    step: 5
+                )
+            } header: {
+                Text("数值旁白自动化")
+            } footer: {
+                Text("心情或能量低于阈值时会像「诉苦」一样请求一句旁白；发生本地或 AI 成长随机事件时也会带事件摘要请求旁白。需在「自动化 → 触发器」中启用「数值与成长旁白」规则（并配置模型）；请求失败时应用会用本地兜底句。与下方冷却共同限制频率。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Section {
                 let month = petCare.currentMonthSummary()
                 Text("本月（\(month.yearMonthKey)）有陪伴的天数：\(month.daysWithCompanion) 天")
                 Text("本月累计陪伴：\(month.totalCompanionSeconds / 60) 分钟 · 喂食 \(month.totalFeedCount) 次 · 戳戳 \(month.totalPetCount) 次 · 成长事件 \(month.totalDecayEvents) 次")
@@ -489,6 +530,61 @@ struct GrowthTabView: View {
             set: { v in
                 var c = petCare.growthConfig
                 c.aiGrowthEventsMinIntervalHours = v
+                petCare.growthConfig = PetGrowthConfig.clamped(c)
+            }
+        )
+    }
+
+    private var statNarrativeEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { petCare.growthConfig.statNarrativeEnabled },
+            set: { v in
+                var c = petCare.growthConfig
+                c.statNarrativeEnabled = v
+                petCare.growthConfig = PetGrowthConfig.clamped(c)
+            }
+        )
+    }
+
+    private var statNarrativeMoodThresholdBinding: Binding<Double> {
+        Binding(
+            get: { petCare.growthConfig.statNarrativeMoodThreshold },
+            set: { v in
+                var c = petCare.growthConfig
+                c.statNarrativeMoodThreshold = v
+                petCare.growthConfig = PetGrowthConfig.clamped(c)
+            }
+        )
+    }
+
+    private var statNarrativeEnergyThresholdBinding: Binding<Double> {
+        Binding(
+            get: { petCare.growthConfig.statNarrativeEnergyThreshold },
+            set: { v in
+                var c = petCare.growthConfig
+                c.statNarrativeEnergyThreshold = v
+                petCare.growthConfig = PetGrowthConfig.clamped(c)
+            }
+        )
+    }
+
+    private var statNarrativeRecoveryHysteresisBinding: Binding<Double> {
+        Binding(
+            get: { petCare.growthConfig.statNarrativeRecoveryHysteresis },
+            set: { v in
+                var c = petCare.growthConfig
+                c.statNarrativeRecoveryHysteresis = v
+                petCare.growthConfig = PetGrowthConfig.clamped(c)
+            }
+        )
+    }
+
+    private var statNarrativeCooldownMinutesBinding: Binding<Int> {
+        Binding(
+            get: { petCare.growthConfig.statNarrativeCooldownMinutes },
+            set: { v in
+                var c = petCare.growthConfig
+                c.statNarrativeCooldownMinutes = v
                 petCare.growthConfig = PetGrowthConfig.clamped(c)
             }
         )

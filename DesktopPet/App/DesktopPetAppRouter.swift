@@ -34,6 +34,10 @@ final class DesktopPetAppRouter {
         overlay.dismissChatPanel()
     }
 
+    func dismissCarePanel() {
+        overlay.dismissCarePanel()
+    }
+
     func presentAgentSettings(root: AnyView) {
         overlay.presentAgentSettings(root: root)
     }

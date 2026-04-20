@@ -12,6 +12,7 @@ protocol OverlayPresenting: AnyObject {
     func isCareVisible() -> Bool
     func isChatVisible() -> Bool
     func dismissChatPanel()
+    func dismissCarePanel()
     func toggleCarePanel(root: AnyView)
     func toggleChatPanel(root: AnyView)
     func presentChatPanel(root: AnyView)

@@ -31,6 +31,8 @@ final class AgentTriggerEngine: ObservableObject {
     private var tickIndex: Int = 0
     /// 截屏旁白异步管线（与 `session.isSending` 一起防止并发抓屏/请求）。
     private var screenSnapPipelineTask: Task<Void, Never>?
+    /// 随机空闲：本段键鼠静止期内每条规则最多成功触发一次，直到 `noteUserActivity` 清空。
+    private var randomIdleSpentRuleIds: Set<UUID> = []
 
     private var isPetVisible: () -> Bool
     /// 触发旁白成功后的展示（如云气泡 + 历史记录）；与手动对话频道分离。
@@ -89,6 +91,7 @@ final class AgentTriggerEngine: ObservableObject {
 
     func noteUserActivity() {
         lastUserActivityUptime = ProcessInfo.processInfo.systemUptime
+        randomIdleSpentRuleIds.removeAll()
     }
 
     func handleKeyDownForTriggers(_ event: NSEvent) {
@@ -158,11 +161,16 @@ final class AgentTriggerEngine: ObservableObject {
         let careDryRun = ruleForEval.kind == .careInteraction
             ? "（以下为设置页「立即触发」试跑，未发生真实喂食或戳戳。）"
             : nil
+        let statDryRun = ruleForEval.kind == .petStatAutomation
+            ? "（以下为设置页「立即触发」试跑。）假定心情约 30%、能量约 28%，像刚经历了一点小波折。"
+            : nil
         await firePrologue(
             trigger: ruleForEval,
             matchedRoute: matchedRoute,
             trimKeyboardBufferIfFired: false,
-            careContextAppendix: careDryRun
+            careContextAppendix: careDryRun,
+            statContextAppendix: statDryRun,
+            applyRandomIdleLatch: false
         )
     }
 
@@ -214,7 +222,9 @@ final class AgentTriggerEngine: ObservableObject {
             trigger: ruleForEval,
             matchedRoute: matchedRoute,
             trimKeyboardBufferIfFired: false,
-            careContextAppendix: trimmed
+            careContextAppendix: trimmed,
+            statContextAppendix: nil,
+            applyRandomIdleLatch: false
         )
     }
 
@@ -254,6 +264,8 @@ final class AgentTriggerEngine: ObservableObject {
                 fired = false
             case .screenWatch:
                 fired = false
+            case .petStatAutomation:
+                fired = false
             }
             if fired {
                 let matchedRoute = selectMatchedRoute(rule: rule, ctx: ctx)
@@ -263,7 +275,9 @@ final class AgentTriggerEngine: ObservableObject {
                     trigger: rule,
                     matchedRoute: matchedRoute,
                     trimKeyboardBufferIfFired: rule.kind == .keyboardPattern,
-                    careContextAppendix: nil
+                    careContextAppendix: nil,
+                    statContextAppendix: nil,
+                    applyRandomIdleLatch: true
                 )
             }
         }
@@ -375,6 +389,7 @@ final class AgentTriggerEngine: ObservableObject {
             extra: extra,
             keySummaryLine: keySummaryLine,
             careContext: nil,
+            statContext: nil,
             screenCaptureMeta: screenCaptureMeta
         )
         let personality = settings.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -419,6 +434,7 @@ final class AgentTriggerEngine: ObservableObject {
                         extra: extra + " （模型拒绝图像输入，已自动改为纯文字请求；请勿假装见过截图。）",
                         keySummaryLine: keySummaryLine,
                         careContext: nil,
+                        statContext: nil,
                         screenCaptureMeta: meta2
                     )
                     let payload2 = personality.isEmpty ? userLine2 : "\(personality)\n\n\(userLine2)"
@@ -432,7 +448,16 @@ final class AgentTriggerEngine: ObservableObject {
             }
             settings.updateTrigger(id: trigger.id) { $0.lastFiredAt = Date() }
             if let onTriggerSpeech {
-                onTriggerSpeech(TriggerSpeechPayload(text: text, triggerKind: trigger.kind, userPrompt: userPayload, requestSnapshotJPEG: jpegData))
+                let slack = settings.triggerSlackNotifyMasterEnabled && trigger.notifySlack
+                onTriggerSpeech(
+                    TriggerSpeechPayload(
+                        text: text,
+                        triggerKind: trigger.kind,
+                        userPrompt: userPayload,
+                        requestSnapshotJPEG: jpegData,
+                        notifySlack: slack
+                    )
+                )
             } else {
                 session.appendAssistant(text)
             }
@@ -454,6 +479,7 @@ final class AgentTriggerEngine: ObservableObject {
     private func evaluateRandomIdle(rule: AgentTriggerRule, ctx: TriggerEvalContext) -> Bool {
         guard ctx.tickIndex % 5 == 0 else { return false }
         guard isPetVisible() else { return false }
+        guard !randomIdleSpentRuleIds.contains(rule.id) else { return false }
         guard ctx.idle >= TimeInterval(rule.randomIdleSeconds) else { return false }
         guard Double.random(in: 0...1) < rule.randomIdleProbability else { return false }
         return true
@@ -562,6 +588,7 @@ final class AgentTriggerEngine: ObservableObject {
         extra: String,
         keySummaryLine: String,
         careContext: String? = nil,
+        statContext: String? = nil,
         screenCaptureMeta: String = ""
     ) -> String {
         let rawTemplate: String = {
@@ -573,16 +600,22 @@ final class AgentTriggerEngine: ObservableObject {
             return AgentTriggerRule.defaultPromptTemplate(for: trigger.kind)
         }()
         let care = careContext?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let stat = statContext?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let hadCareSlot = rawTemplate.contains("{careContext}")
+        let hadStatSlot = rawTemplate.contains("{statContext}")
         var merged = rawTemplate
             .replacingOccurrences(of: "{extra}", with: extra)
             .replacingOccurrences(of: "{triggerKind}", with: trigger.kind.displayName)
             .replacingOccurrences(of: "{matchedCondition}", with: matchedRoute.map { Self.describeRouteConditions($0) } ?? "")
             .replacingOccurrences(of: "{keySummary}", with: keySummaryLine)
             .replacingOccurrences(of: "{careContext}", with: care)
+            .replacingOccurrences(of: "{statContext}", with: stat)
             .replacingOccurrences(of: "{screenCaptureMeta}", with: screenCaptureMeta)
         if !care.isEmpty, !hadCareSlot {
             merged += "\n\n" + care
+        }
+        if !stat.isEmpty, !hadStatSlot {
+            merged += "\n\n" + stat
         }
         return merged
     }
@@ -627,7 +660,9 @@ final class AgentTriggerEngine: ObservableObject {
         trigger: AgentTriggerRule,
         matchedRoute: TriggerPromptRoute?,
         trimKeyboardBufferIfFired: Bool,
-        careContextAppendix: String? = nil
+        careContextAppendix: String? = nil,
+        statContextAppendix: String? = nil,
+        applyRandomIdleLatch: Bool = true
     ) async {
         session.setSending(true)
         session.lastError = nil
@@ -648,6 +683,7 @@ final class AgentTriggerEngine: ObservableObject {
             extra: extra,
             keySummaryLine: keySummaryLine,
             careContext: careContextAppendix,
+            statContext: statContextAppendix,
             screenCaptureMeta: ""
         )
         let personality = settings.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -677,13 +713,89 @@ final class AgentTriggerEngine: ObservableObject {
                 trimRecentKeyBufferAfterKeyboardFire(trigger: trigger, matchedRoute: matchedRoute)
             }
             if let onTriggerSpeech {
-                onTriggerSpeech(TriggerSpeechPayload(text: text, triggerKind: trigger.kind, userPrompt: userPayload, requestSnapshotJPEG: nil))
+                let slack = settings.triggerSlackNotifyMasterEnabled && trigger.notifySlack
+                onTriggerSpeech(
+                    TriggerSpeechPayload(
+                        text: text,
+                        triggerKind: trigger.kind,
+                        userPrompt: userPayload,
+                        requestSnapshotJPEG: nil,
+                        notifySlack: slack
+                    )
+                )
             } else {
                 session.appendAssistant(text)
             }
+            if applyRandomIdleLatch, trigger.kind == .randomIdle {
+                randomIdleSpentRuleIds.insert(trigger.id)
+            }
         } catch {
-            session.lastError = error.localizedDescription
+            if trigger.kind == .petStatAutomation, let onTriggerSpeech {
+                let fb = PetStatAutomationFallback.line(contextLine: statContextAppendix ?? "")
+                let slack = settings.triggerSlackNotifyMasterEnabled && trigger.notifySlack
+                onTriggerSpeech(
+                    TriggerSpeechPayload(
+                        text: fb,
+                        triggerKind: trigger.kind,
+                        userPrompt: userPayload,
+                        requestSnapshotJPEG: nil,
+                        notifySlack: slack
+                    )
+                )
+            } else {
+                session.lastError = error.localizedDescription
+            }
         }
         session.setSending(false)
+    }
+
+    /// 心情/能量过低或成长事件：由 `PetCareModel` 组好上下文后调用。
+    @discardableResult
+    func firePetStatAutomationNarrative(contextLine: String) async -> Bool {
+        let trimmed = contextLine.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        guard let i = settings.triggers.firstIndex(where: { $0.enabled && $0.kind == .petStatAutomation }) else { return false }
+        guard !session.isSending else { return false }
+        let now = Date()
+        var stored = settings.triggers[i]
+        if let last = stored.lastFiredAt, now.timeIntervalSince(last) < stored.cooldownSeconds {
+            return false
+        }
+        var ruleForEval = stored
+        ruleForEval.lastFiredAt = stored.lastFiredAt
+        let ctx = buildTriggerEvalContext(now: now)
+        let matchedRoute = selectMatchedRouteForForceFire(rule: ruleForEval, ctx: ctx)
+        stored.lastFiredAt = now
+        settings.triggers[i] = stored
+        await firePrologue(
+            trigger: ruleForEval,
+            matchedRoute: matchedRoute,
+            trimKeyboardBufferIfFired: false,
+            careContextAppendix: nil,
+            statContextAppendix: trimmed,
+            applyRandomIdleLatch: false
+        )
+        return true
+    }
+}
+
+// MARK: - 数值旁白本地兜底
+
+private enum PetStatAutomationFallback {
+    static func line(contextLine: String) -> String {
+        let lines = [
+            "呜呜…七七现在有点蔫，你要不要来看看我？",
+            "心情和能量都不太够用啦…求摸摸、求投喂嘛。",
+            "猫猫委屈：最近有点累，想听你哄哄我。",
+            "哼…你是不是把我忘在角落啦？我这边数值在抗议哦。",
+        ]
+        let head = lines.randomElement() ?? "七七想跟你说说话。"
+        let hint = contextLine
+            .split(whereSeparator: \.isNewline)
+            .prefix(2)
+            .joined(separator: " ")
+        let tail = hint.trimmingCharacters(in: .whitespacesAndNewlines)
+        if tail.isEmpty { return head }
+        return "\(head)\n\n（\(String(tail.prefix(200)))）"
     }
 }

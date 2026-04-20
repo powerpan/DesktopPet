@@ -13,6 +13,7 @@ final class AppRouteBus: ObservableObject {
     private(set) var agentSettingsTabSelectionIndex: Int = 0
 
     var onCloseChatOverlay: () -> Void = {}
+    var onCloseCareOverlay: () -> Void = {}
     var onPresentChatContinuingChannel: (UUID) -> Void = { _ in }
     var onPresentAgentSettingsTab: (Int) -> Void = { _ in }
     var onForceFireTriggerRuleJSON: (String) -> Void = { _ in }
@@ -21,6 +22,10 @@ final class AppRouteBus: ObservableObject {
 
     func closeChatOverlay() {
         onCloseChatOverlay()
+    }
+
+    func closeCareOverlay() {
+        onCloseCareOverlay()
     }
 
     func presentChatContinuingChannel(id: UUID) {

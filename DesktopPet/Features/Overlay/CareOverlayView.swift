@@ -17,8 +17,21 @@ struct CareOverlayView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("七七猫 · 饲养")
-                .font(.headline)
+            HStack(alignment: .top, spacing: 8) {
+                Text("七七猫 · 饲养")
+                    .font(.headline)
+                Spacer(minLength: 0)
+                Button {
+                    routeBus.closeCareOverlay()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .symbolRenderingMode(.hierarchical)
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("关闭饲养面板")
+            }
             moodBar(title: "心情", value: care.state.mood)
             moodBar(title: "能量", value: care.state.energy)
             Text("今日陪伴 \(care.state.todayCompanionSeconds / 60) 分钟")

@@ -34,6 +34,10 @@ final class ExtensionOverlayController {
         chatPanel?.orderOut(nil)
     }
 
+    func dismissCarePanel() {
+        carePanel?.orderOut(nil)
+    }
+
     func toggleCarePanel(root: AnyView) {
         if let p = carePanel, p.isVisible {
             p.orderOut(nil)

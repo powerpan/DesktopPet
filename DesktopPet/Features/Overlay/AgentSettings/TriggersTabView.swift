@@ -13,11 +13,21 @@ struct TriggersTabView: View {
     var body: some View {
         Form {
             Section {
+                Toggle("触发旁白也推送到 Slack（总开关）", isOn: $settings.triggerSlackNotifyMasterEnabled)
+            } header: {
+                Text("Slack")
+            } footer: {
+                Text("打开后，可在各条触发器编辑页开启「此条也发 Slack」；旁白仍照常显示气泡，并额外发到「连接」里填写的 Slack 监控频道（需已启用集成并配置 Bot Token）。盯屏任务仍只走任务自身的 Slack 汇报逻辑。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Section {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("触发器在满足条件时会自动请求模型写一句短旁白：写入旁白历史，并以宠窗旁云气泡展示。")
                     Text("轻点气泡会关闭气泡、以该旁白为上下文新建一个手动会话频道，并打开对话面板续聊。")
                     Text("在规则编辑页底部可点「立即触发当前触发器」，用当前表单内容向模型请求一次旁白（与自动触发相同链路），便于试跑提示语与路由。")
-                    Text("「饲养互动」在喂食/戳戳成功时请求旁白（不在此列表里自动轮询）；数值摘要写入模板占位符 {careContext}。首次升级会插入一条默认规则（默认关闭），可在编辑页打开开关。")
+                    Text("「饲养互动」在喂食/戳戳成功时请求旁白（不在此列表里自动轮询）；数值摘要写入模板占位符 {careContext}。「数值与成长旁白」在心情/能量偏低或成长随机事件时触发，上下文见 {statContext}；需在「陪伴 → 成长」打开数值旁白开关。两类规则首次升级各插入一条默认（默认关闭）。")
                     Text("每条规则有独立冷却，避免刷屏。定时与随机空闲适合日常使用；键盘与前台应用属于进阶能力，请谨慎开启。")
                 }
                 .font(.caption)
@@ -51,7 +61,7 @@ struct TriggersTabView: View {
                     }
                 }
                 Menu("添加触发器") {
-                    ForEach(AgentTriggerKind.allCases.filter { $0 != .careInteraction && $0 != .screenWatch }) { k in
+                    ForEach(AgentTriggerKind.allCases.filter { $0 != .careInteraction && $0 != .petStatAutomation && $0 != .screenWatch }) { k in
                         Button(k.displayName) {
                             settings.triggers.append(.new(kind: k))
                             if k == .keyboardPattern, !settings.keyboardTriggerMasterEnabled {
@@ -61,6 +71,9 @@ struct TriggersTabView: View {
                     }
                     Button("饲养互动") {
                         settings.triggers.append(.new(kind: .careInteraction))
+                    }
+                    Button("数值与成长旁白") {
+                        settings.triggers.append(.new(kind: .petStatAutomation))
                     }
                 }
             } header: {

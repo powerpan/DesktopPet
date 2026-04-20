@@ -110,6 +110,8 @@ struct TriggerSpeechPayload {
     var userPrompt: String?
     /// 截屏旁白：与 API 请求使用的同一张 JPEG（写入 Application Support 后再记入历史）。
     var requestSnapshotJPEG: Data?
+    /// 总开关 + 本条规则「同步 Slack」同时开启时，向监控频道推送本条旁白正文。
+    var notifySlack: Bool = false
 }
 
 enum AgentTriggerKind: String, CaseIterable, Identifiable, Codable {
@@ -122,6 +124,8 @@ enum AgentTriggerKind: String, CaseIterable, Identifiable, Codable {
     case careInteraction
     /// 盯屏任务命中后的通知旁白（不入触发器规则编辑器）。
     case screenWatch
+    /// 心情/能量低于阈值或成长随机事件时，由应用组上下文请求旁白（诉苦式短句）。
+    case petStatAutomation
 
     var id: String { rawValue }
 
@@ -134,6 +138,7 @@ enum AgentTriggerKind: String, CaseIterable, Identifiable, Codable {
         case .screenSnap: return "截屏"
         case .careInteraction: return "饲养互动"
         case .screenWatch: return "盯屏任务"
+        case .petStatAutomation: return "数值与成长旁白"
         }
     }
 
@@ -239,6 +244,11 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             用户之前拜托你「盯着屏幕」等某个条件；现在应用检测到条件可能已满足。{extra}
             请用一两句简体中文像桌宠一样提醒用户回来看看，语气开心或得意一点，不要长篇。
             """
+        case .petStatAutomation:
+            return """
+            应用检测到猫猫数值或成长事件需要向用户「撒个娇、诉个小苦」：以下为结构化摘要（含在 {statContext}）。
+            请用一两句简体中文，以桌宠口吻自然说出来：可以委屈、撒娇、求关注或轻轻抱怨，不要像报表一样复读数字与字段名；不要编造摘要里没有的事。{extra}
+            """
         }
     }
 
@@ -280,6 +290,11 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             盯屏任务条件已命中。{extra}
             请用一两句简体中文像桌宠一样喊用户回屏幕确认，可带一点点「我帮你盯着呢」的得意感。
             """
+        case .petStatAutomation:
+            return """
+            本条为数值/成长旁白。上下文摘要：{statContext}；条件概要：{matchedCondition}。{extra}
+            请用一两句简体中文像桌宠一样诉苦或撒娇，不要机械罗列数字。
+            """
         }
     }
 
@@ -312,6 +327,8 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
     var screenSnapMaxEdgePixels: Int
     /// JPEG `compressionFactor`（UI 滑条 0.55～0.85）：越大压缩越轻、画质越好、同分辨率下体积越大。
     var screenSnapJPEGQuality: Double
+    /// 在「触发器」总开关开启时，本条旁白除气泡外是否再发到 Slack 监控频道。
+    var notifySlack: Bool
 
     init(
         id: UUID,
@@ -331,7 +348,8 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         screenSnapIntervalMinutes: Int = 20,
         screenSnapOnlyWhenPetVisible: Bool = true,
         screenSnapMaxEdgePixels: Int = 1024,
-        screenSnapJPEGQuality: Double = 0.72
+        screenSnapJPEGQuality: Double = 0.72,
+        notifySlack: Bool = false
     ) {
         self.id = id
         self.enabled = enabled
@@ -351,6 +369,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         self.screenSnapOnlyWhenPetVisible = screenSnapOnlyWhenPetVisible
         self.screenSnapMaxEdgePixels = screenSnapMaxEdgePixels
         self.screenSnapJPEGQuality = screenSnapJPEGQuality
+        self.notifySlack = notifySlack
     }
 
     /// 截屏规则：成功触发之间的最短等待（秒）= max(冷却, 定时间隔)。
@@ -387,6 +406,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         screenSnapOnlyWhenPetVisible = try c.decodeIfPresent(Bool.self, forKey: .screenSnapOnlyWhenPetVisible) ?? true
         screenSnapMaxEdgePixels = try c.decodeIfPresent(Int.self, forKey: .screenSnapMaxEdgePixels) ?? 1024
         screenSnapJPEGQuality = try c.decodeIfPresent(Double.self, forKey: .screenSnapJPEGQuality) ?? 0.72
+        notifySlack = try c.decodeIfPresent(Bool.self, forKey: .notifySlack) ?? false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -409,6 +429,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         try c.encode(screenSnapOnlyWhenPetVisible, forKey: .screenSnapOnlyWhenPetVisible)
         try c.encode(screenSnapMaxEdgePixels, forKey: .screenSnapMaxEdgePixels)
         try c.encode(screenSnapJPEGQuality, forKey: .screenSnapJPEGQuality)
+        try c.encode(notifySlack, forKey: .notifySlack)
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -418,6 +439,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         case routes, defaultPromptTemplate
         case triggerTemperature, triggerMaxTokens
         case screenSnapIntervalMinutes, screenSnapOnlyWhenPetVisible, screenSnapMaxEdgePixels, screenSnapJPEGQuality
+        case notifySlack
     }
 
     /// 旧数据无 `routes` 时，从单字段生成等价路由，避免升级后行为突变。
@@ -461,7 +483,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
                 promptTemplate: def
             )
             return ([route], def)
-        case .timer, .randomIdle, .screenSnap, .careInteraction, .screenWatch:
+        case .timer, .randomIdle, .screenSnap, .careInteraction, .screenWatch, .petStatAutomation:
             let route = TriggerPromptRoute(enabled: true, priority: 0, conditions: [.always], promptTemplate: def)
             return ([route], def)
         }
@@ -474,7 +496,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         let kbd: String
         let front: String
         switch kind {
-        case .timer, .randomIdle, .screenSnap, .careInteraction, .screenWatch:
+        case .timer, .randomIdle, .screenSnap, .careInteraction, .screenWatch, .petStatAutomation:
             defaultRoutes = [TriggerPromptRoute(enabled: true, priority: 0, conditions: [.always], promptTemplate: routeTmpl)]
             kbd = ""
             front = ""
@@ -494,6 +516,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             if kind == .careInteraction { return 3 }
             if kind == .screenSnap { return 900 }
             if kind == .screenWatch { return 3600 }
+            if kind == .petStatAutomation { return 600 }
             return 120
         }()
         return AgentTriggerRule(
@@ -514,7 +537,8 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             screenSnapIntervalMinutes: 20,
             screenSnapOnlyWhenPetVisible: true,
             screenSnapMaxEdgePixels: 1024,
-            screenSnapJPEGQuality: 0.72
+            screenSnapJPEGQuality: 0.72,
+            notifySlack: false
         )
     }
 }

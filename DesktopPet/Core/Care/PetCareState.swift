@@ -29,6 +29,8 @@ struct PetCareState: Codable, Equatable {
     var recentDecayEvents: [PetDecayEventRecord]
     /// 上次成功应用 AI 成长事件的时间（用于节流）
     var lastAIGrowthEventAt: Date?
+    /// 上次触发「数值与成长旁白」自动化的时间（与 `PetGrowthConfig.statNarrativeCooldownMinutes` 配合）
+    var lastPetStatNarrativeAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case mood
@@ -41,6 +43,7 @@ struct PetCareState: Codable, Equatable {
         case companionDailyJournal
         case recentDecayEvents
         case lastAIGrowthEventAt
+        case lastPetStatNarrativeAt
     }
 
     init(
@@ -53,7 +56,8 @@ struct PetCareState: Codable, Equatable {
         lastDecayAt: Date?,
         companionDailyJournal: [PetCompanionDayStats],
         recentDecayEvents: [PetDecayEventRecord],
-        lastAIGrowthEventAt: Date?
+        lastAIGrowthEventAt: Date?,
+        lastPetStatNarrativeAt: Date? = nil
     ) {
         self.mood = mood
         self.energy = energy
@@ -65,6 +69,7 @@ struct PetCareState: Codable, Equatable {
         self.companionDailyJournal = companionDailyJournal
         self.recentDecayEvents = recentDecayEvents
         self.lastAIGrowthEventAt = lastAIGrowthEventAt
+        self.lastPetStatNarrativeAt = lastPetStatNarrativeAt
     }
 
     init(from decoder: Decoder) throws {
@@ -79,6 +84,7 @@ struct PetCareState: Codable, Equatable {
         companionDailyJournal = try c.decodeIfPresent([PetCompanionDayStats].self, forKey: .companionDailyJournal) ?? []
         recentDecayEvents = try c.decodeIfPresent([PetDecayEventRecord].self, forKey: .recentDecayEvents) ?? []
         lastAIGrowthEventAt = try c.decodeIfPresent(Date.self, forKey: .lastAIGrowthEventAt)
+        lastPetStatNarrativeAt = try c.decodeIfPresent(Date.self, forKey: .lastPetStatNarrativeAt)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -93,6 +99,7 @@ struct PetCareState: Codable, Equatable {
         try c.encode(companionDailyJournal, forKey: .companionDailyJournal)
         try c.encode(recentDecayEvents, forKey: .recentDecayEvents)
         try c.encodeIfPresent(lastAIGrowthEventAt, forKey: .lastAIGrowthEventAt)
+        try c.encodeIfPresent(lastPetStatNarrativeAt, forKey: .lastPetStatNarrativeAt)
     }
 
     static let neutral = PetCareState(
@@ -105,6 +112,7 @@ struct PetCareState: Codable, Equatable {
         lastDecayAt: nil,
         companionDailyJournal: [],
         recentDecayEvents: [],
-        lastAIGrowthEventAt: nil
+        lastAIGrowthEventAt: nil,
+        lastPetStatNarrativeAt: nil
     )
 }

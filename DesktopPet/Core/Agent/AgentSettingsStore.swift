@@ -10,6 +10,8 @@ import SwiftUI
 private enum AgentSettingsKeys {
     /// 仅一次：为旧配置插入「饲养互动」默认规则（用户可删除且不会再次自动插入）。
     static let careTriggerMigrationDone = "DesktopPet.agent.careTriggerMigrationDone"
+    /// 仅一次：插入「数值与成长旁白」默认规则。
+    static let petStatAutomationMigrationDone = "DesktopPet.agent.petStatAutomationMigrationDone"
     static let baseURL = "DesktopPet.agent.baseURL"
     static let model = "DesktopPet.agent.model"
     static let systemPrompt = "DesktopPet.agent.systemPrompt"
@@ -23,6 +25,7 @@ private enum AgentSettingsKeys {
     static let triggers = "DesktopPet.agent.triggers"
     /// 2 = 含旁白路由 `routes` / `defaultPromptTemplate` 的结构；用于首次升级后回写 UserDefaults。
     static let triggersFormatVersion = "DesktopPet.agent.triggersFormatVersion"
+    static let triggerSlackNotifyMasterEnabled = "DesktopPet.agent.triggerSlackNotifyMasterEnabled"
 }
 
 private enum ProviderStorage {
@@ -56,6 +59,8 @@ final class AgentSettingsStore: ObservableObject {
     @Published var triggerDefaultTemperature: Double
     /// 条件旁白请求的默认 max_tokens（与长对话独立）。
     @Published var triggerDefaultMaxTokens: Int
+    /// 为真时，允许各条触发器上的「同步 Slack」生效；否则全部不按 Slack 推送旁白。
+    @Published var triggerSlackNotifyMasterEnabled: Bool
     @Published var triggers: [AgentTriggerRule]
 
     private var cancellables = Set<AnyCancellable>()
@@ -81,6 +86,7 @@ final class AgentSettingsStore: ObservableObject {
         screenSnapTriggerMasterEnabled = defaults.bool(forKey: AgentSettingsKeys.screenSnapTriggerEnabled)
         triggerDefaultTemperature = defaults.object(forKey: AgentSettingsKeys.triggerDefaultTemperature) as? Double ?? 0.7
         triggerDefaultMaxTokens = defaults.object(forKey: AgentSettingsKeys.triggerDefaultMaxTokens) as? Int ?? 256
+        triggerSlackNotifyMasterEnabled = defaults.bool(forKey: AgentSettingsKeys.triggerSlackNotifyMasterEnabled)
         if let data = defaults.data(forKey: AgentSettingsKeys.triggers),
            let decoded = try? JSONDecoder().decode([AgentTriggerRule].self, from: data) {
             triggers = decoded
@@ -95,6 +101,12 @@ final class AgentSettingsStore: ObservableObject {
                 triggers.append(.new(kind: .careInteraction))
             }
             defaults.set(true, forKey: AgentSettingsKeys.careTriggerMigrationDone)
+        }
+        if !defaults.bool(forKey: AgentSettingsKeys.petStatAutomationMigrationDone) {
+            if !triggers.contains(where: { $0.kind == .petStatAutomation }) {
+                triggers.append(.new(kind: .petStatAutomation))
+            }
+            defaults.set(true, forKey: AgentSettingsKeys.petStatAutomationMigrationDone)
         }
 
         let triggersVer = defaults.integer(forKey: AgentSettingsKeys.triggersFormatVersion)
@@ -124,6 +136,9 @@ final class AgentSettingsStore: ObservableObject {
         $screenSnapTriggerMasterEnabled.dropFirst().sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.screenSnapTriggerEnabled) }.store(in: &cancellables)
         $triggerDefaultTemperature.dropFirst().debounce(for: .milliseconds(200), scheduler: DispatchQueue.main).sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.triggerDefaultTemperature) }.store(in: &cancellables)
         $triggerDefaultMaxTokens.dropFirst().debounce(for: .milliseconds(200), scheduler: DispatchQueue.main).sink { [weak self] v in self?.defaults.set(v, forKey: AgentSettingsKeys.triggerDefaultMaxTokens) }.store(in: &cancellables)
+        $triggerSlackNotifyMasterEnabled.dropFirst().sink { [weak self] v in
+            self?.defaults.set(v, forKey: AgentSettingsKeys.triggerSlackNotifyMasterEnabled)
+        }.store(in: &cancellables)
 
         $triggers
             .dropFirst()

@@ -140,6 +140,26 @@ final class SlackSyncController: ObservableObject {
         }
     }
 
+    /// 条件触发旁白：发到「连接」里配置的 Slack 监控频道（顶层消息，非线程）。
+    func postTriggerNarrativeToSlack(triggerKind: AgentTriggerKind, text: String) async {
+        guard integrationConfig.enabled else { return }
+        guard let token = KeychainStore.readSlackBotToken(), !token.isEmpty else {
+            statusMessage = "Slack 未配置 Bot Token，无法推送触发旁白。"
+            return
+        }
+        let ch = integrationConfig.monitoredChannelId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !ch.isEmpty else {
+            statusMessage = "请在「连接」填写 Slack 监控频道 ID，才能推送触发旁白。"
+            return
+        }
+        let body = "🐱 **触发旁白**（\(triggerKind.displayName)）\n\n\(text.trimmingCharacters(in: .whitespacesAndNewlines))"
+        do {
+            _ = try await SlackWebAPI.chatPostMessage(token: token, channel: ch, text: body, threadTs: nil)
+        } catch {
+            statusMessage = "Slack 触发旁白发送失败：\(error.localizedDescription)"
+        }
+    }
+
     // MARK: - Persistence
 
     private func loadPersistedState() {
