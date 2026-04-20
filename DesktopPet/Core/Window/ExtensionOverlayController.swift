@@ -4,6 +4,7 @@
 //
 
 import AppKit
+import Combine
 import SwiftUI
 
 @MainActor
@@ -19,15 +20,48 @@ final class ExtensionOverlayController {
     /// 供 `layoutTriggerBubble` 重建 SwiftUI 内容与尾巴参数。
     private var bubbleSpeechText: String = ""
     private var bubbleContinueChat: (() -> Void)?
+    private var appearanceCancellables = Set<AnyCancellable>()
 
     func attachPetWindow(_ window: NSWindow?, settings: SettingsViewModel? = nil) {
         petWindow = window
         bubbleScaleSettings = settings
+        appearanceCancellables.removeAll()
+        guard let s = settings else { return }
+        applyChromeWindowsNSAppearance()
+        Publishers.Merge(
+            s.$colorSchemePreference.map { _ in () }.eraseToAnyPublisher(),
+            s.$liquidGlassVariant.map { _ in () }.eraseToAnyPublisher()
+        )
+        .receive(on: DispatchQueue.main)
+        .sink { [weak self] _ in
+            self?.applyChromeWindowsNSAppearance()
+        }
+        .store(in: &appearanceCancellables)
+    }
+
+    private func applyChromeWindowsNSAppearance() {
+        let appearance = bubbleScaleSettings?.colorSchemePreference.nsAppearanceForAppKitWindows
+        carePanel?.appearance = appearance
+        chatPanel?.appearance = appearance
+        bubblePanel?.appearance = appearance
+        agentSettingsWindow?.appearance = appearance
     }
 
     private var bubbleFontScale: Double {
         guard let s = bubbleScaleSettings?.triggerBubbleFontScale else { return 1.0 }
         return PetConfig.clampedTriggerBubbleFontScale(s)
+    }
+
+    private var bubbleLiquidGlassChrome: Bool {
+        bubbleScaleSettings?.isLiquidGlassChromeEnabled ?? true
+    }
+
+    private var bubbleLiquidGlassVariant: DesktopPetLiquidGlassVariant {
+        bubbleScaleSettings?.liquidGlassVariant ?? .regular
+    }
+
+    private var bubbleResolvedColorScheme: ColorScheme? {
+        bubbleScaleSettings?.colorSchemePreference.resolvedPreferredColorScheme
     }
 
     func isCareVisible() -> Bool {
@@ -53,6 +87,7 @@ final class ExtensionOverlayController {
         }
         ensureCarePanel()
         carePanel?.contentView = NSHostingView(rootView: root)
+        applyChromeWindowsNSAppearance()
         layoutCarePanel()
         carePanel?.orderFrontRegardless()
     }
@@ -69,6 +104,7 @@ final class ExtensionOverlayController {
     func presentChatPanel(root: AnyView) {
         ensureChatPanel()
         chatPanel?.contentView = NSHostingView(rootView: root)
+        applyChromeWindowsNSAppearance()
         layoutChatPanel()
         NSApp.activate(ignoringOtherApps: true)
         chatPanel?.makeKeyAndOrderFront(nil)
@@ -77,6 +113,7 @@ final class ExtensionOverlayController {
     func presentAgentSettings(root: AnyView) {
         if let w = agentSettingsWindow {
             w.contentView = NSHostingView(rootView: root)
+            applyChromeWindowsNSAppearance()
             w.makeKeyAndOrderFront(nil)
             return
         }
@@ -93,6 +130,7 @@ final class ExtensionOverlayController {
         w.contentView = NSHostingView(rootView: root)
         w.center()
         agentSettingsWindow = w
+        applyChromeWindowsNSAppearance()
         w.makeKeyAndOrderFront(nil)
     }
 
@@ -195,9 +233,12 @@ final class ExtensionOverlayController {
             bubbleFontScale: bubbleFontScale,
             tailEdge: .bottom,
             tailAlongOffset: 0,
+            liquidGlassChromeEnabled: bubbleLiquidGlassChrome,
+            liquidGlassVariant: bubbleLiquidGlassVariant,
             onTapDismiss: tapDismiss,
             onLongPressContinueChat: longPressContinue
         )
+        .preferredColorScheme(bubbleResolvedColorScheme)
         let hosting = NSHostingView(rootView: provisional)
         hosting.setFrameSize(NSSize(width: 360, height: 400))
         hosting.wantsLayer = true
@@ -205,6 +246,7 @@ final class ExtensionOverlayController {
         hosting.layer?.backgroundColor = NSColor.clear.cgColor
         hosting.layer?.masksToBounds = false
         panel.contentView = hosting
+        applyChromeWindowsNSAppearance()
         panel.alphaValue = 1
         panel.orderFrontRegardless()
         layoutTriggerBubble()
@@ -296,9 +338,12 @@ final class ExtensionOverlayController {
             bubbleFontScale: bubbleFontScale,
             tailEdge: tailEdge,
             tailAlongOffset: tailAlong0,
+            liquidGlassChromeEnabled: bubbleLiquidGlassChrome,
+            liquidGlassVariant: bubbleLiquidGlassVariant,
             onTapDismiss: tapDismiss,
             onLongPressContinueChat: longPressContinue
         )
+        .preferredColorScheme(bubbleResolvedColorScheme)
         let hosting = NSHostingView(rootView: measureView)
         hosting.setFrameSize(NSSize(width: 400, height: 400))
         hosting.layoutSubtreeIfNeeded()
@@ -330,9 +375,12 @@ final class ExtensionOverlayController {
             bubbleFontScale: bubbleFontScale,
             tailEdge: tailEdge,
             tailAlongOffset: tailAlong2,
+            liquidGlassChromeEnabled: bubbleLiquidGlassChrome,
+            liquidGlassVariant: bubbleLiquidGlassVariant,
             onTapDismiss: tapDismiss,
             onLongPressContinueChat: longPressContinue
         )
+        .preferredColorScheme(bubbleResolvedColorScheme)
         let hostFinal = NSHostingView(rootView: refined)
         hostFinal.frame = NSRect(x: 0, y: 0, width: w2, height: h2)
         hostFinal.autoresizingMask = [.width, .height]
@@ -341,6 +389,7 @@ final class ExtensionOverlayController {
         hostFinal.layer?.backgroundColor = NSColor.clear.cgColor
         hostFinal.layer?.masksToBounds = false
         panel.contentView = hostFinal
+        applyChromeWindowsNSAppearance()
         panel.setFrame(NSRect(origin: origin2, size: NSSize(width: w2, height: h2)), display: true)
     }
 }

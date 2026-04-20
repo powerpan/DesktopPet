@@ -8,6 +8,7 @@ import SwiftUI
 struct CareOverlayView: View {
     @EnvironmentObject private var care: PetCareModel
     @EnvironmentObject private var settings: AgentSettingsStore
+    @EnvironmentObject private var petMenuSettings: SettingsViewModel
     @EnvironmentObject private var routeBus: AppRouteBus
     @State private var toast: String?
 
@@ -95,7 +96,11 @@ struct CareOverlayView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .desktopPetPanelLiquidGlass(
+            cornerRadius: 14,
+            liquidGlassEnabled: petMenuSettings.isLiquidGlassChromeEnabled,
+            glassVariant: petMenuSettings.liquidGlassVariant
+        )
     }
 
     private func moodBar(title: String, value: Double) -> some View {

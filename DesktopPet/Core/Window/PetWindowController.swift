@@ -5,6 +5,7 @@
 
 import AppKit
 import Combine
+import QuartzCore
 import SwiftUI
 
 @MainActor
@@ -41,6 +42,40 @@ final class PetWindowController: NSWindowController {
             window.setFrameOrigin(f.origin)
         }
 
+        root.refreshHostedSwiftUIDisplay()
+
+        applyPetWindowNSAppearance()
+        settings.$colorSchemePreference
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.applyPetWindowNSAppearance()
+            }
+            .store(in: &cancellables)
+
+        settings.$liquidGlassVariant
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.passthroughRoot?.refreshHostedSwiftUIDisplay()
+            }
+            .store(in: &cancellables)
+
+        settings.$isLiquidGlassChromeEnabled
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.passthroughRoot?.refreshHostedSwiftUIDisplay()
+            }
+            .store(in: &cancellables)
+
+        Publishers.Merge(
+            NotificationCenter.default.publisher(for: NSWindow.didChangeScreenNotification, object: window),
+            NotificationCenter.default.publisher(for: NSWindow.didChangeBackingPropertiesNotification, object: window)
+        )
+        .debounce(for: .milliseconds(40), scheduler: DispatchQueue.main)
+        .sink { [weak self] _ in
+            self?.passthroughRoot?.refreshHostedSwiftUIDisplay()
+        }
+        .store(in: &cancellables)
+
         settings.$petScale
             .receive(on: DispatchQueue.main)
             .sink { [weak self] scale in
@@ -54,6 +89,10 @@ final class PetWindowController: NSWindowController {
                 self?.petScaleResizeAnchorScreen = nil
             }
             .store(in: &cancellables)
+    }
+
+    private func applyPetWindowNSAppearance() {
+        window?.appearance = settings.colorSchemePreference.nsAppearanceForAppKitWindows
     }
 
     private func applyWindowSize(forScale scale: Double) {
@@ -84,6 +123,7 @@ final class PetWindowController: NSWindowController {
 
         let newFrame = NSRect(origin: origin, size: newSize)
         window.setFrame(newFrame, display: true, animate: false)
+        passthroughRoot?.refreshHostedSwiftUIDisplay()
     }
 
     required init?(coder: NSCoder) {
@@ -103,15 +143,15 @@ final class PetWindowController: NSWindowController {
 
     func nudgePatrolStep(in visibleFrame: CGRect) {
         guard let window else { return }
-        var frame = window.frame
+        let sz = window.frame.size
         let margin = CGFloat(
             min(max(settings.patrolEdgeMargin, PetConfig.patrolEdgeMarginMin), PetConfig.patrolEdgeMarginMax)
         )
-        let sz = frame.size
-        let frontBiasP = min(100, max(0, settings.patrolFrontWindowBiasPercent))
+        let k = min(100, max(0, settings.patrolFrontWindowBiasPercent))
+        /// 每 tick 掷骰：`k/100` 概率在「前台区域」矩形（与调试红框同源）内对原点均匀随机；否则强制落在红外。
+        let pInRed = Double(k) / 100.0
 
-        // 原先只从 3 个角点 + 偶发「贴前台窗上沿」里抽，可放置区域很大时仍像「总在几个老地方」；改为在合法矩形内**均匀随机**，并尽量与上次原点拉开距离。
-        var raw = ScreenGeometry.randomPatrolWindowOrigin(
+        let raw = ScreenGeometry.randomPatrolWindowOrigin(
             windowSize: sz,
             in: visibleFrame,
             margin: margin,
@@ -124,24 +164,71 @@ final class PetWindowController: NSWindowController {
         let minY = visibleFrame.minY + margin
         let maxX = visibleFrame.maxX - sz.width - margin
         let maxY = visibleFrame.maxY - sz.height - margin
-        if maxX >= minX, maxY >= minY,
-           Double.random(in: 0...1) < Double(frontBiasP) / 100.0,
-           let front = ScreenGeometry.approximateFrontmostAppWindowFrame(excludingPID: myPID),
-           visibleFrame.intersects(front) {
-            let jitterX = CGFloat.random(in: -56 ... 56)
-            let jitterY = CGFloat.random(in: -20 ... 20)
-            let fx = min(max(front.midX - sz.width / 2 + jitterX, minX), maxX)
-            let fy = min(max(front.maxY - sz.height * 0.12 + jitterY, minY), maxY)
-            let t = CGFloat.random(in: 0.38 ... 0.62)
-            raw = CGPoint(
-                x: raw.x * (1 - t) + fx * t,
-                y: raw.y * (1 - t) + fy * t
-            )
+        let minDist = max(28, min(sz.width, sz.height) * 0.12)
+
+        var blended = raw
+        if maxX >= minX, maxY >= minY {
+            let red = ScreenGeometry.patrolObstacleForAvoidance(patrolVisibleFrame: visibleFrame, excludingPID: myPID)
+            let roll = Double.random(in: 0...1)
+            if roll < pInRed, let region = red {
+                blended = ScreenGeometry.randomPatrolWindowOriginInsideRect(
+                    windowSize: sz,
+                    inside: region,
+                    in: visibleFrame,
+                    margin: margin,
+                    lastOrigin: lastPatrolOrigin,
+                    minDistanceFromLast: minDist
+                )
+            } else if let region = red {
+                let avoid = ScreenGeometry.randomPatrolWindowOriginOutsideFrontRect(
+                    windowSize: sz,
+                    in: visibleFrame,
+                    margin: margin,
+                    lastOrigin: lastPatrolOrigin,
+                    minDistanceFromLast: minDist,
+                    obstacle: region,
+                    clearance: 8,
+                    allowPartialFallback: false
+                )
+                blended = avoid
+                let petBlended = CGRect(origin: blended, size: sz)
+                let block = region.insetBy(dx: -8, dy: -8)
+                if petBlended.intersects(block) {
+                    blended = ScreenGeometry.patrolClampOriginClearOfObstacle(
+                        windowSize: sz,
+                        origin: blended,
+                        in: visibleFrame,
+                        margin: margin,
+                        obstacle: region,
+                        clearance: 8
+                    )
+                }
+            } else {
+                blended = raw
+            }
         }
 
-        frame.origin = ScreenGeometry.clampedOrigin(sz, origin: raw, in: visibleFrame, margin: margin)
-        lastPatrolOrigin = frame.origin
-        window.setFrame(frame, display: true, animate: true)
+        let newOrigin = ScreenGeometry.clampedOrigin(sz, origin: blended, in: visibleFrame, margin: margin)
+        lastPatrolOrigin = newOrigin
+        var nextFrame = window.frame
+        let prevOrigin = nextFrame.origin
+        nextFrame.origin = newOrigin
+        let travel = hypot(newOrigin.x - prevOrigin.x, newOrigin.y - prevOrigin.y)
+        guard travel > 0.5 else { return }
+
+        // 保留平滑移动：`setFrame(..., animate: true)` 在部分系统上与透明窗 `glassEffect` 合成偶发冲突；
+        // 用 `NSAnimationContext` 走 `animator()`，在动画结束后再刷新 Hosting，减轻「像退回磨砂」且不牺牲位移动画。
+        let duration = min(0.48, max(0.2, travel / 720))
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = duration
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            window.animator().setFrame(nextFrame, display: true)
+        }, completionHandler: { [weak self] in
+            self?.passthroughRoot?.refreshHostedSwiftUIDisplay()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) { [weak self] in
+                self?.passthroughRoot?.refreshHostedSwiftUIDisplay()
+            }
+        })
     }
 
     func setPetVisible(_ visible: Bool) {

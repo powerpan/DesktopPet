@@ -52,7 +52,11 @@ struct PetSpriteView: View {
             .environment(\.petCardLayoutInnerWidth, deskMirrorLayoutWidth)
             // 明确正方形 + 顶部对齐：不要用 maxHeight .infinity 撑满竖向，否则子视图会被挤到可视区外，底部圆角像「缺一块」。
             .frame(width: side, height: side, alignment: .top)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .desktopPetPanelLiquidGlass(
+                cornerRadius: cornerRadius,
+                liquidGlassEnabled: settings.isLiquidGlassChromeEnabled,
+                glassVariant: settings.liquidGlassVariant
+            )
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .allowsHitTesting(!settings.isClickThroughEnabled)

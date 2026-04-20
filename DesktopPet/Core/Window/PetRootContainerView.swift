@@ -62,4 +62,13 @@ final class PetRootContainerView: NSView {
         // 外圈会一直挡住下层窗口（与穿透开关无关）。拖窗请点在精灵卡片材质区（穿透关闭时）。
         return hostingView.hitTest(local)
     }
+
+    /// 透明 `NSPanel` 上 SwiftUI `glassEffect` 在窗口经 CoreAnimation 位移动画或长时间停留后，偶发停在旧合成状态（看起来像退回 `.ultraThinMaterial`）；跨屏拖动会触发重绘因而暂时恢复。此处强制 `NSHostingView` 与 layer 失效以拉齐合成。
+    func refreshHostedSwiftUIDisplay() {
+        hostingView.needsLayout = true
+        hostingView.needsDisplay = true
+        hostingView.layoutSubtreeIfNeeded()
+        hostingView.layer?.setNeedsDisplay()
+        layer?.setNeedsDisplay()
+    }
 }

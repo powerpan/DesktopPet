@@ -55,6 +55,10 @@ final class AppCoordinator: ObservableObject {
 
     private var petWindowController: PetWindowController?
     private var onboardingWindow: NSWindow?
+    private let patrolLandingDebugOverlay = PatrolLandingDebugOverlayController()
+    private var patrolLandingDebugRefreshTimer: Timer?
+    /// 最近一次巡逻 tick 的 `visibleFrame`；供调试遮罩与 `nudgePatrolStep` 使用同一裁剪，避免主/副随机模式下红框与真实避障不一致。
+    private var lastPatrolVisibleFrameForDebug: CGRect?
     private var cancellables = Set<AnyCancellable>()
     /// 空闲一段时间后触发「进入睡眠」
     private var idleSleepTimer: Timer?
@@ -66,9 +70,11 @@ final class AppCoordinator: ObservableObject {
 
     func start() {
         preparePetWindow()
+        wireOnboardingWindowAppearance()
         wirePermissionAndInput()
         wireSettingsToWindow()
         wirePatrol()
+        wirePatrolLandingDebugOverlay()
         wireMouse()
         wireActivationRefresh()
         wirePetWindowOverlayNotifications()
@@ -120,6 +126,9 @@ final class AppCoordinator: ObservableObject {
 
     func stop() {
         appRouter.dismissTriggerBubble()
+        patrolLandingDebugRefreshTimer?.invalidate()
+        patrolLandingDebugRefreshTimer = nil
+        patrolLandingDebugOverlay.hide()
         patrolScheduler.stop()
         mouseTracker.stop()
         globalInput.stop()
@@ -146,7 +155,9 @@ final class AppCoordinator: ObservableObject {
             CareOverlayView()
                 .environmentObject(petCareModel)
                 .environmentObject(agentSettingsStore)
+                .environmentObject(settingsViewModel)
                 .environmentObject(routeBus)
+                .preferredColorScheme(settingsViewModel.colorSchemePreference.resolvedPreferredColorScheme)
         ))
     }
 
@@ -173,10 +184,12 @@ final class AppCoordinator: ObservableObject {
             ChatOverlayView()
                 .environmentObject(agentSessionStore)
                 .environmentObject(agentSettingsStore)
+                .environmentObject(settingsViewModel)
                 .environmentObject(deskMirrorModel)
                 .environmentObject(routeBus)
                 .environmentObject(multimodalAttachmentLimitsStore)
                 .environment(\.desktopPetAgentClient, agentClient)
+                .preferredColorScheme(settingsViewModel.colorSchemePreference.resolvedPreferredColorScheme)
         )
     }
 
@@ -198,8 +211,11 @@ final class AppCoordinator: ObservableObject {
 
     func presentOnboardingWindow() {
         if onboardingWindow == nil {
-            let view = AccessibilityOnboardingView(permissionManager: permissionManager)
-                .environmentObject(routeBus)
+            let view = AccessibilityOnboardingHostView(
+                settings: settingsViewModel,
+                permissionManager: permissionManager
+            )
+            .environmentObject(routeBus)
             let hosting = NSHostingView(rootView: view)
             let rect = NSRect(x: 0, y: 0, width: 500, height: 360)
             let window = NSWindow(
@@ -209,6 +225,7 @@ final class AppCoordinator: ObservableObject {
                 defer: false
             )
             window.title = "DesktopPet 权限"
+            window.appearance = settingsViewModel.colorSchemePreference.nsAppearanceForAppKitWindows
             window.contentView = hosting
             window.center()
             window.isReleasedWhenClosed = false
@@ -364,6 +381,15 @@ final class AppCoordinator: ObservableObject {
         }
     }
 
+    private func wireOnboardingWindowAppearance() {
+        settingsViewModel.$colorSchemePreference
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] pref in
+                self?.onboardingWindow?.appearance = pref.nsAppearanceForAppKitWindows
+            }
+            .store(in: &cancellables)
+    }
+
     private func wirePermissionAndInput() {
         permissionManager.$isGranted
             .removeDuplicates()
@@ -480,6 +506,7 @@ final class AppCoordinator: ObservableObject {
             guard self.isPetVisible else { return }
             self.stateMachine.handle(.patrolRequested)
             let patrolFrame = ScreenGeometry.visibleFrameForPatrol(mode: self.settingsViewModel.patrolRegionMode)
+            self.lastPatrolVisibleFrameForDebug = patrolFrame
             self.petWindowController?.nudgePatrolStep(in: patrolFrame)
             self.bumpActivity()
             Task { @MainActor in
@@ -498,6 +525,7 @@ final class AppCoordinator: ObservableObject {
                     self.patrolScheduler.start(interval: self.settingsViewModel.patrolIntervalSeconds)
                 } else {
                     self.patrolScheduler.stop()
+                    self.lastPatrolVisibleFrameForDebug = nil
                 }
             }
             .store(in: &cancellables)
@@ -512,6 +540,85 @@ final class AppCoordinator: ObservableObject {
                 self.patrolScheduler.start(interval: self.settingsViewModel.patrolIntervalSeconds)
             }
             .store(in: &cancellables)
+    }
+
+    private func wirePatrolLandingDebugOverlay() {
+        let pubs: [AnyPublisher<Void, Never>] = [
+            settingsViewModel.$testingModeEnabled.map { _ in () }.eraseToAnyPublisher(),
+            settingsViewModel.$patrolLandingDebugOverlayEnabled.map { _ in () }.eraseToAnyPublisher(),
+            settingsViewModel.$patrolFrontWindowBiasPercent.map { _ in () }.eraseToAnyPublisher(),
+            settingsViewModel.$isPatrolEnabled.map { _ in () }.eraseToAnyPublisher(),
+            settingsViewModel.$patrolRegionMode.map { _ in () }.eraseToAnyPublisher(),
+            settingsViewModel.$patrolEdgeMargin.map { _ in () }.eraseToAnyPublisher(),
+            settingsViewModel.$petScale.map { _ in () }.eraseToAnyPublisher(),
+            settingsViewModel.$colorSchemePreference.map { _ in () }.eraseToAnyPublisher(),
+            settingsViewModel.$liquidGlassVariant.map { _ in () }.eraseToAnyPublisher()
+        ]
+        Publishers.MergeMany(pubs)
+            .debounce(for: .milliseconds(120), scheduler: DispatchQueue.main)
+            .sink { [weak self] in
+                self?.syncPatrolLandingDebugOverlay()
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.syncPatrolLandingDebugOverlay()
+            }
+            .store(in: &cancellables)
+
+        syncPatrolLandingDebugOverlay()
+    }
+
+    private func syncPatrolLandingDebugOverlay() {
+        let s = settingsViewModel
+        let active =
+            s.testingModeEnabled
+            && s.patrolLandingDebugOverlayEnabled
+            && s.patrolFrontWindowBiasPercent == 0
+            && s.isPatrolEnabled
+        if !active {
+            patrolLandingDebugRefreshTimer?.invalidate()
+            patrolLandingDebugRefreshTimer = nil
+            patrolLandingDebugOverlay.hide()
+            return
+        }
+        applyPatrolLandingDebugSnapshot()
+        if patrolLandingDebugRefreshTimer == nil {
+            let t = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    self?.applyPatrolLandingDebugSnapshot()
+                }
+            }
+            RunLoop.main.add(t, forMode: .common)
+            patrolLandingDebugRefreshTimer = t
+        }
+    }
+
+    private func applyPatrolLandingDebugSnapshot() {
+        let s = settingsViewModel
+        guard
+            s.testingModeEnabled,
+            s.patrolLandingDebugOverlayEnabled,
+            s.patrolFrontWindowBiasPercent == 0,
+            s.isPatrolEnabled
+        else {
+            patrolLandingDebugOverlay.hide()
+            return
+        }
+        guard let snap = PatrolLandingDebugSnapshot.build(
+            patrolRegionMode: s.patrolRegionMode,
+            patrolEdgeMargin: s.patrolEdgeMargin,
+            petScale: s.petScale,
+            lastPatrolVisibleFrame: lastPatrolVisibleFrameForDebug,
+            petWindowFrame: petWindowController?.window?.frame,
+            excludingPID: ProcessInfo.processInfo.processIdentifier
+        ) else {
+            patrolLandingDebugOverlay.hide()
+            return
+        }
+        patrolLandingDebugOverlay.update(snapshot: snap)
     }
 
     private func wireMouse() {
@@ -563,5 +670,17 @@ final class AppCoordinator: ObservableObject {
         guard permissionManager.isGranted else { return }
         onboardingWindow?.close()
         onboardingWindow = nil
+    }
+}
+
+private struct AccessibilityOnboardingHostView: View {
+    @ObservedObject var settings: SettingsViewModel
+    let permissionManager: AccessibilityPermissionManager
+    @EnvironmentObject private var routeBus: AppRouteBus
+
+    var body: some View {
+        AccessibilityOnboardingView(permissionManager: permissionManager)
+            .environmentObject(routeBus)
+            .preferredColorScheme(settings.colorSchemePreference.resolvedPreferredColorScheme)
     }
 }

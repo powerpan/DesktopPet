@@ -22,6 +22,10 @@ struct TriggerSpeechBubbleView: View {
     var tailEdge: TriggerBubbleTailEdge = .bottom
     /// 沿附着边方向的偏移（pt）：上/下边为水平偏移（相对气泡宽度中心），左/右边为垂直偏移（相对高度中心）。
     var tailAlongOffset: CGFloat = 0
+    /// 与系统设置「液态玻璃效果」一致；由 `ExtensionOverlayController` 注入。
+    var liquidGlassChromeEnabled: Bool = true
+    /// 与「液态玻璃风格」一致；由 `ExtensionOverlayController` 注入。
+    var liquidGlassVariant: DesktopPetLiquidGlassVariant = .regular
     /// 轻点气泡：仅收起（由外层 `ExtensionOverlayController` 调用 `dismissTriggerBubble`）。
     var onTapDismiss: () -> Void = {}
     /// 长按约 1 秒后：收起并续聊（外层先 `dismissTriggerBubble` 再 `presentChatOverlay` 等）；为 `nil` 时与轻点相同只收起。
@@ -135,10 +139,11 @@ struct TriggerSpeechBubbleView: View {
         .padding(.horizontal, 12)
         .padding(.top, 10)
         .padding(.bottom, 8)
-        .background {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.ultraThinMaterial)
-        }
+        .desktopPetPanelLiquidGlass(
+            cornerRadius: 18,
+            liquidGlassEnabled: liquidGlassChromeEnabled,
+            glassVariant: liquidGlassVariant
+        )
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -189,39 +194,42 @@ struct TriggerSpeechBubbleView: View {
     }
 
     private var tailDown: some View {
-        TailShapeDown()
-            .fill(.ultraThinMaterial)
-            .overlay {
-                TailShapeDown()
-                    .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
-            }
+        triggerBubbleTail(TailShapeDown(), width: tailW, height: tailH)
     }
 
     private var tailUp: some View {
-        TailShapeUp()
-            .fill(.ultraThinMaterial)
-            .overlay {
-                TailShapeUp()
-                    .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
-            }
+        triggerBubbleTail(TailShapeUp(), width: tailW, height: tailH)
     }
 
     private var tailRight: some View {
-        TailShapeRight()
-            .fill(.ultraThinMaterial)
-            .overlay {
-                TailShapeRight()
-                    .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
-            }
+        triggerBubbleTail(TailShapeRight(), width: tailH, height: tailW)
     }
 
     private var tailLeft: some View {
-        TailShapeLeft()
-            .fill(.ultraThinMaterial)
-            .overlay {
-                TailShapeLeft()
-                    .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
+        triggerBubbleTail(TailShapeLeft(), width: tailH, height: tailW)
+    }
+
+    /// 与气泡主体一致：macOS 26+ 用 `glassEffect`，否则磨砂 / 不透明白底。
+    @ViewBuilder
+    private func triggerBubbleTail<S: Shape>(_ shape: S, width: CGFloat, height: CGFloat) -> some View {
+        ZStack {
+            if !liquidGlassChromeEnabled {
+                shape.fill(Color(nsColor: .windowBackgroundColor))
+            } else if #available(macOS 26.0, *) {
+                Color.clear
+                    .frame(width: width, height: height)
+                    .background {
+                        if liquidGlassVariant == .clear {
+                            shape.fill(Color.primary.opacity(0.1))
+                        }
+                    }
+                    .glassEffect(liquidGlassVariant.swiftUIPanelGlass, in: shape)
+            } else {
+                shape.fill(.ultraThinMaterial)
             }
+            shape.stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
+        }
+        .frame(width: width, height: height)
     }
 }
 

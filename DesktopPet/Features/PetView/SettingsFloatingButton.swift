@@ -7,6 +7,8 @@ import SwiftUI
 
 struct SettingsFloatingButton: View {
     @Binding var isClickThrough: Bool
+    var liquidGlassChromeEnabled: Bool
+    var liquidGlassVariant: DesktopPetLiquidGlassVariant
 
     var body: some View {
         Button {
@@ -17,7 +19,10 @@ struct SettingsFloatingButton: View {
                 .frame(width: 22, height: 22)
         }
         .buttonStyle(.plain)
-        .background(.regularMaterial, in: Circle())
+        .desktopPetControlLiquidGlass(
+            liquidGlassEnabled: liquidGlassChromeEnabled,
+            glassVariant: liquidGlassVariant
+        )
         .contentShape(Rectangle())
         .help(isClickThrough ? "点击：关闭穿透（可拖宠物）" : "点击：开启穿透（点击穿透到下层）")
         .padding(.top, 3)

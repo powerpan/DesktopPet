@@ -20,11 +20,14 @@
 		C1000000000000000000000C /* HitTestPassthroughView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000000C /* HitTestPassthroughView.swift */; };
 		C1000000000000000000000D /* PetWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000000D /* PetWindow.swift */; };
 		C1000000000000000000000E /* PetWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000000E /* PetWindowController.swift */; };
+		C10000000000000000000070 /* PatrolLandingDebugOverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000070 /* PatrolLandingDebugOverlayController.swift */; };
+		C10000000000000000000071 /* DesktopPetChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000071 /* DesktopPetChrome.swift */; };
 		C1000000000000000000000F /* PetContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000000F /* PetContainerView.swift */; };
 		C10000000000000000000010 /* PetSpriteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000010 /* PetSpriteView.swift */; };
 		C10000000000000000000011 /* SettingsFloatingButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000011 /* SettingsFloatingButton.swift */; };
 		C10000000000000000000012 /* SettingsPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000012 /* SettingsPanelView.swift */; };
 		C10000000000000000000013 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000013 /* SettingsViewModel.swift */; };
+		C10000000000000000000072 /* DesktopPetColorSchemePreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000072 /* DesktopPetColorSchemePreference.swift */; };
 		C10000000000000000000014 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000014 /* Logger.swift */; };
 		C1000000000000000000003D /* InlineMarkdownBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003D /* InlineMarkdownBubble.swift */; };
 		C10000000000000000000015 /* ScreenGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000015 /* ScreenGeometry.swift */; };
@@ -134,11 +137,14 @@
 		B10000000000000000000000C /* HitTestPassthroughView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HitTestPassthroughView.swift; sourceTree = "<group>"; };
 		B10000000000000000000000D /* PetWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetWindow.swift; sourceTree = "<group>"; };
 		B10000000000000000000000E /* PetWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetWindowController.swift; sourceTree = "<group>"; };
+		B100000000000000000000070 /* PatrolLandingDebugOverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PatrolLandingDebugOverlayController.swift; sourceTree = "<group>"; };
+		B100000000000000000000071 /* DesktopPetChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPetChrome.swift; sourceTree = "<group>"; };
 		B10000000000000000000000F /* PetContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetContainerView.swift; sourceTree = "<group>"; };
 		B100000000000000000000010 /* PetSpriteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetSpriteView.swift; sourceTree = "<group>"; };
 		B100000000000000000000011 /* SettingsFloatingButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsFloatingButton.swift; sourceTree = "<group>"; };
 		B100000000000000000000012 /* SettingsPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPanelView.swift; sourceTree = "<group>"; };
 		B100000000000000000000013 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
+		B100000000000000000000072 /* DesktopPetColorSchemePreference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPetColorSchemePreference.swift; sourceTree = "<group>"; };
 		B100000000000000000000014 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		B10000000000000000000003D /* InlineMarkdownBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InlineMarkdownBubble.swift; sourceTree = "<group>"; };
 		B100000000000000000000015 /* ScreenGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenGeometry.swift; sourceTree = "<group>"; };
@@ -319,6 +325,7 @@
 			children = (
 				B100000000000000000000014 /* Logger.swift */,
 				B100000000000000000000015 /* ScreenGeometry.swift */,
+				B100000000000000000000071 /* DesktopPetChrome.swift */,
 				B10000000000000000000003D /* InlineMarkdownBubble.swift */,
 			);
 			path = Utils;
@@ -378,6 +385,7 @@
 				B100000000000000000000017 /* PetRootContainerView.swift */,
 				B10000000000000000000000D /* PetWindow.swift */,
 				B10000000000000000000000E /* PetWindowController.swift */,
+				B100000000000000000000070 /* PatrolLandingDebugOverlayController.swift */,
 				B10000000000000000000002E /* ExtensionOverlayController.swift */,
 			);
 			path = Window;
@@ -400,6 +408,7 @@
 			children = (
 				B100000000000000000000012 /* SettingsPanelView.swift */,
 				B100000000000000000000013 /* SettingsViewModel.swift */,
+				B100000000000000000000072 /* DesktopPetColorSchemePreference.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -581,6 +590,7 @@
 				C1000000000000000000000C /* HitTestPassthroughView.swift in Sources */,
 				C1000000000000000000000D /* PetWindow.swift in Sources */,
 				C1000000000000000000000E /* PetWindowController.swift in Sources */,
+				C10000000000000000000070 /* PatrolLandingDebugOverlayController.swift in Sources */,
 				C1000000000000000000000F /* PetContainerView.swift in Sources */,
 				C10000000000000000000010 /* PetSpriteView.swift in Sources */,
 				C10000000000000000000023 /* DeskMirrorTextView.swift in Sources */,
@@ -588,9 +598,11 @@
 				C10000000000000000000011 /* SettingsFloatingButton.swift in Sources */,
 				C10000000000000000000012 /* SettingsPanelView.swift in Sources */,
 				C10000000000000000000013 /* SettingsViewModel.swift in Sources */,
+				C10000000000000000000072 /* DesktopPetColorSchemePreference.swift in Sources */,
 				C10000000000000000000014 /* Logger.swift in Sources */,
 				C1000000000000000000003D /* InlineMarkdownBubble.swift in Sources */,
 				C10000000000000000000015 /* ScreenGeometry.swift in Sources */,
+				C10000000000000000000071 /* DesktopPetChrome.swift in Sources */,
 				C10000000000000000000017 /* PetRootContainerView.swift in Sources */,
 				C10000000000000000000018 /* AnimationDriver.swift in Sources */,
 				C10000000000000000000019 /* AccessibilityOnboardingView.swift in Sources */,

@@ -16,6 +16,7 @@ private struct PendingLocalAttachment: Identifiable {
 struct ChatOverlayView: View {
     @EnvironmentObject private var session: AgentSessionStore
     @EnvironmentObject private var agentSettings: AgentSettingsStore
+    @EnvironmentObject private var petMenuSettings: SettingsViewModel
     @EnvironmentObject private var deskMirror: DeskMirrorModel
     @EnvironmentObject private var routeBus: AppRouteBus
     @EnvironmentObject private var multimodalLimits: MultimodalAttachmentLimitsStore
@@ -130,7 +131,11 @@ struct ChatOverlayView: View {
             .padding(10)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .desktopPetPanelLiquidGlass(
+            cornerRadius: 14,
+            liquidGlassEnabled: petMenuSettings.isLiquidGlassChromeEnabled,
+            glassVariant: petMenuSettings.liquidGlassVariant
+        )
         .fileImporter(
             isPresented: $showFileImporter,
             allowedContentTypes: Self.importerTypes,

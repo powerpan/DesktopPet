@@ -20,10 +20,13 @@ struct PetContainerView: View {
                     isClickThrough: Binding(
                         get: { settings.isClickThroughEnabled },
                         set: { settings.isClickThroughEnabled = $0 }
-                    )
+                    ),
+                    liquidGlassChromeEnabled: settings.isLiquidGlassChromeEnabled,
+                    liquidGlassVariant: settings.liquidGlassVariant
                 )
             }
             .animation(.easeInOut(duration: 0.2), value: settings.petScale)
+            .preferredColorScheme(settings.colorSchemePreference.resolvedPreferredColorScheme)
     }
 }
 

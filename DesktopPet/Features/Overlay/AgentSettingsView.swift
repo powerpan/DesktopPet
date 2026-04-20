@@ -7,6 +7,7 @@ import SwiftUI
 
 struct AgentSettingsView: View {
     @EnvironmentObject private var routeBus: AppRouteBus
+    @EnvironmentObject private var petMenuSettings: SettingsViewModel
 
     /// 上次停留的工作台分区（0…4），跨重启保留。
     @AppStorage("DesktopPet.ui.agentSettingsSelectedTab") private var selectedSettingsTab = 0
@@ -57,5 +58,6 @@ struct AgentSettingsView: View {
         .onChange(of: routeBus.agentSettingsTabSelectionRevision) { _, _ in
             selectedSettingsTab = routeBus.agentSettingsTabSelectionIndex
         }
+        .preferredColorScheme(petMenuSettings.colorSchemePreference.resolvedPreferredColorScheme)
     }
 }
