@@ -20,6 +20,19 @@ struct SettingsPanelView: View {
             Toggle("启用鼠标穿透", isOn: $viewModel.isClickThroughEnabled)
             Toggle("桌前按键镜像（文字）", isOn: $viewModel.isDeskKeyMirrorEnabled)
             Toggle("启用巡逻", isOn: $viewModel.isPatrolEnabled)
+            if viewModel.isPatrolEnabled {
+                Picker("巡逻区域", selection: $viewModel.patrolRegionMode) {
+                    ForEach(PatrolRegionMode.allCases) { mode in
+                        Text(mode.pickerLabel).tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
+                Text("仅副屏：多块外接时每次随机选其中一块非主屏；若未检测到外接显示器则退回主屏。主屏 + 副屏：每次巡逻在已连接屏幕中随机选一屏。")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             HStack {
                 Text("宠物缩放")
                 Slider(value: $viewModel.petScale, in: PetConfig.petScaleMin...PetConfig.petScaleMax, step: 0.1)

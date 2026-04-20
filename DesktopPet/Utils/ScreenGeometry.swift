@@ -6,6 +6,26 @@
 import AppKit
 import CoreGraphics
 
+/// 启用巡逻时，宠物随机落点所限制的显示器范围（菜单栏「DesktopPet」设置）。
+enum PatrolRegionMode: String, CaseIterable, Identifiable, Codable {
+    /// 仅在 `NSScreen.main` 的可见桌面内巡逻。
+    case mainOnly = "main"
+    /// 仅在外接等非主屏上巡逻；若无外接屏则退回主屏。
+    case secondaryOnly = "secondary"
+    /// 每次巡逻 tick 在已连接显示器中随机选一屏的可见区（主 + 副）。
+    case mainAndSecondary = "all"
+
+    var id: String { rawValue }
+
+    var pickerLabel: String {
+        switch self {
+        case .mainOnly: return "仅主屏"
+        case .secondaryOnly: return "仅副屏"
+        case .mainAndSecondary: return "主屏 + 副屏"
+        }
+    }
+}
+
 enum ScreenGeometry {
     /// 返回「包含当前鼠标」的屏幕的 visibleFrame（排除菜单栏与 Dock）
     static func visibleFrameContainingMouse() -> CGRect {
@@ -20,6 +40,26 @@ enum ScreenGeometry {
             return screen.visibleFrame
         }
         return NSScreen.main?.visibleFrame ?? screens.first?.visibleFrame ?? .zero
+    }
+
+    /// 巡逻用：按设置选取一块「可见桌面」`visibleFrame`（不含菜单栏与 Dock）。
+    static func visibleFrameForPatrol(mode: PatrolRegionMode) -> CGRect {
+        let screens = NSScreen.screens
+        guard !screens.isEmpty else { return .zero }
+        let main = NSScreen.main ?? screens[0]
+        let nonMain = screens.filter { $0 !== main }
+
+        switch mode {
+        case .mainOnly:
+            return main.visibleFrame
+        case .secondaryOnly:
+            if let s = nonMain.randomElement() ?? nonMain.first {
+                return s.visibleFrame
+            }
+            return main.visibleFrame
+        case .mainAndSecondary:
+            return (screens.randomElement() ?? main).visibleFrame
+        }
     }
 
     static func clampedPoint(_ point: CGPoint, in frame: CGRect) -> CGPoint {

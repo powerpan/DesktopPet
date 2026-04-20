@@ -1,6 +1,6 @@
 //
 // SettingsViewModel.swift
-// 设置状态与 UserDefaults 持久化：穿透、巡逻、缩放；缩放读出后夹紧到与 Slider 一致的范围。
+// 设置状态与 UserDefaults 持久化：穿透、巡逻（含区域）、缩放；缩放读出后夹紧到与 Slider 一致的范围。
 //
 
 import Combine
@@ -10,6 +10,8 @@ import SwiftUI
 private enum SettingsKeys {
     static let clickThrough = "DesktopPet.settings.clickThrough"
     static let patrol = "DesktopPet.settings.patrol"
+    /// `PatrolRegionMode.rawValue`
+    static let patrolRegion = "DesktopPet.settings.patrolRegion"
     static let scale = "DesktopPet.settings.petScale"
     static let deskKeyMirror = "DesktopPet.settings.deskKeyMirror"
     /// 为真时：智能体工作台等处显示更偏开发与试跑的说明；为假时面向日常用户、七七口吻。
@@ -20,6 +22,8 @@ private enum SettingsKeys {
 final class SettingsViewModel: ObservableObject {
     @Published var isClickThroughEnabled: Bool
     @Published var isPatrolEnabled: Bool
+    /// 启用巡逻时：随机落点限制在主屏、仅副屏或主+副中随机一屏。
+    @Published var patrolRegionMode: PatrolRegionMode
     @Published var petScale: Double
     /// 桌前文字镜像：是否把全局按键映射到宠物卡片示意键盘（仅内存展示；敏感场景请在设置中关闭）。
     @Published var isDeskKeyMirrorEnabled: Bool
@@ -40,6 +44,12 @@ final class SettingsViewModel: ObservableObject {
             isPatrolEnabled = true
         } else {
             isPatrolEnabled = defaults.bool(forKey: SettingsKeys.patrol)
+        }
+
+        if let raw = defaults.string(forKey: SettingsKeys.patrolRegion), let m = PatrolRegionMode(rawValue: raw) {
+            patrolRegionMode = m
+        } else {
+            patrolRegionMode = .mainAndSecondary
         }
 
         let rawPetScale: Double
@@ -70,6 +80,13 @@ final class SettingsViewModel: ObservableObject {
             .dropFirst()
             .sink { [weak self] value in
                 self?.defaults.set(value, forKey: SettingsKeys.patrol)
+            }
+            .store(in: &cancellables)
+
+        $patrolRegionMode
+            .dropFirst()
+            .sink { [weak self] value in
+                self?.defaults.set(value.rawValue, forKey: SettingsKeys.patrolRegion)
             }
             .store(in: &cancellables)
 

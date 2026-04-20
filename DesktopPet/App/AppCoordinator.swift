@@ -469,7 +469,8 @@ final class AppCoordinator: ObservableObject {
             // 隐藏时不再移动窗口，避免不可见仍在「巡逻」
             guard self.isPetVisible else { return }
             self.stateMachine.handle(.patrolRequested)
-            self.petWindowController?.nudgePatrolStep(in: ScreenGeometry.visibleFrameContainingMouse())
+            let patrolFrame = ScreenGeometry.visibleFrameForPatrol(mode: self.settingsViewModel.patrolRegionMode)
+            self.petWindowController?.nudgePatrolStep(in: patrolFrame)
             self.bumpActivity()
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 450_000_000)
