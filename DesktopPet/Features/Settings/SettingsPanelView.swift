@@ -40,6 +40,21 @@ struct SettingsPanelView: View {
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
+            HStack {
+                Text("旁白气泡字体")
+                Slider(
+                    value: $viewModel.triggerBubbleFontScale,
+                    in: PetConfig.triggerBubbleFontScaleMin...PetConfig.triggerBubbleFontScaleMax,
+                    step: 0.05
+                )
+                Text(String(format: "%.2fx", viewModel.triggerBubbleFontScale))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            MarkdownInlineText(source: AgentSettingsUICopy.settingsPanelBubbleFontCaption(testing: viewModel.testingModeEnabled))
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity, alignment: .leading)
             Toggle("启用测试", isOn: $viewModel.testingModeEnabled)
             Section {
                 MarkdownInlineText(source: AgentSettingsUICopy.settingsPanelTestingToggleFooter(testing: viewModel.testingModeEnabled))

@@ -13,6 +13,8 @@ private enum SettingsKeys {
     /// `PatrolRegionMode.rawValue`
     static let patrolRegion = "DesktopPet.settings.patrolRegion"
     static let scale = "DesktopPet.settings.petScale"
+    /// 条件触发旁白气泡正文字号相对 callout 的倍数（与 `petScale` 独立），默认 1.0。
+    static let triggerBubbleFontScale = "DesktopPet.settings.triggerBubbleFontScale"
     static let deskKeyMirror = "DesktopPet.settings.deskKeyMirror"
     /// 为真时：智能体工作台等处显示更偏开发与试跑的说明；为假时面向日常用户、七七口吻。
     static let testingModeUI = "DesktopPet.settings.testingModeUI"
@@ -25,6 +27,8 @@ final class SettingsViewModel: ObservableObject {
     /// 启用巡逻时：随机落点限制在主屏、仅副屏、主+副随机一屏，或「焦点屏」（跟前台应用所在显示器）。
     @Published var patrolRegionMode: PatrolRegionMode
     @Published var petScale: Double
+    /// 条件触发云朵气泡内正文字号倍数（与 `petScale` 独立）；**1.0** 为系统 callout 基准，与此前未单独调字体时一致。
+    @Published var triggerBubbleFontScale: Double
     /// 桌前文字镜像：是否把全局按键映射到宠物卡片示意键盘（仅内存展示；敏感场景请在设置中关闭）。
     @Published var isDeskKeyMirrorEnabled: Bool
     /// 菜单栏「系统设置 → DesktopPet」中的「启用测试」：打开后工作台文案更长、更偏技术说明，并显示试跑类入口。
@@ -60,6 +64,14 @@ final class SettingsViewModel: ObservableObject {
         }
         petScale = min(max(rawPetScale, PetConfig.petScaleMin), PetConfig.petScaleMax)
 
+        let rawBubbleFont: Double
+        if defaults.object(forKey: SettingsKeys.triggerBubbleFontScale) == nil {
+            rawBubbleFont = PetConfig.triggerBubbleFontScaleMin
+        } else {
+            rawBubbleFont = defaults.double(forKey: SettingsKeys.triggerBubbleFontScale)
+        }
+        triggerBubbleFontScale = PetConfig.clampedTriggerBubbleFontScale(rawBubbleFont)
+
         if defaults.object(forKey: SettingsKeys.deskKeyMirror) == nil {
             isDeskKeyMirrorEnabled = true
         } else {
@@ -94,6 +106,14 @@ final class SettingsViewModel: ObservableObject {
             .dropFirst()
             .sink { [weak self] value in
                 self?.defaults.set(value, forKey: SettingsKeys.scale)
+            }
+            .store(in: &cancellables)
+
+        $triggerBubbleFontScale
+            .dropFirst()
+            .sink { [weak self] value in
+                let v = PetConfig.clampedTriggerBubbleFontScale(value)
+                self?.defaults.set(v, forKey: SettingsKeys.triggerBubbleFontScale)
             }
             .store(in: &cancellables)
 

@@ -9,9 +9,9 @@ enum AgentSettingsUICopy {
 
     static func settingsPanelHeaderLine1(testing: Bool) -> String {
         if testing {
-            return "此处为 macOS 系统设置中的「DesktopPet」面板，只调整桌宠窗口本身：穿透、巡逻、缩放与桌镜。"
+            return "此处为 macOS 系统设置中的「DesktopPet」面板，只调整桌宠窗口本身：穿透、巡逻、宠物缩放、旁白气泡字号与桌镜。"
         }
-        return "这里是系统里的「DesktopPet」小面板，只管桌宠窗口本身：要不要鼠标穿透、要不要巡逻、宠物有多大、桌镜文字开关——像给七七整理小窝一样简单。"
+        return "这里是系统里的「DesktopPet」小面板，只管桌宠窗口本身：要不要鼠标穿透、要不要巡逻、宠物有多大、旁白气泡字大不大、桌镜文字开关——像给七七整理小窝一样简单。"
     }
 
     static func settingsPanelHeaderLine2(testing: Bool) -> String {
@@ -19,6 +19,14 @@ enum AgentSettingsUICopy {
             return "模型、API Key、Slack、会话、触发器、盯屏等请在菜单栏 **「打开智能体工作台…」**（独立窗口）；Slack 在「连接」分区配置。"
         }
         return "连模型、写对话、养七七、自动化和 Slack，都在菜单栏点 **「打开智能体工作台…」** 那个独立窗口里；Slack 去「连接」页找就好。"
+    }
+
+    /// 系统设置「条件旁白气泡字体」滑条下的说明（与宠物缩放独立）。
+    static func settingsPanelBubbleFontCaption(testing: Bool) -> String {
+        if testing {
+            return "与「宠物缩放」解耦：仅影响条件触发时云朵气泡内**正文**相对系统 callout 的倍数；**1.0** 与未引入本滑条前的字号一致。范围 \(String(format: "%.1f", PetConfig.triggerBubbleFontScaleMin))～\(String(format: "%.1f", PetConfig.triggerBubbleFontScaleMax))×。"
+        }
+        return "这条只管**旁白气泡里的字**有多大，跟上面「宠物缩放」不是一回事。**1.0** 就是以前默认那种大小；想大一点再往右拖就好。"
     }
 
     static func settingsPanelTestingToggleFooter(testing: Bool) -> String {

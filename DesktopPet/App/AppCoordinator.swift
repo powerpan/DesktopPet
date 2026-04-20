@@ -460,6 +460,16 @@ final class AppCoordinator: ObservableObject {
                 self?.petWindowController?.setPassthrough(enabled)
             }
             .store(in: &cancellables)
+
+        Publishers.Merge(
+            settingsViewModel.$petScale.dropFirst().map { _ in },
+            settingsViewModel.$triggerBubbleFontScale.dropFirst().map { _ in }
+        )
+        .receive(on: DispatchQueue.main)
+        .sink { [weak self] in
+            self?.appRouter.repositionOverlaysIfNeeded()
+        }
+        .store(in: &cancellables)
     }
 
     private func wirePatrol() {

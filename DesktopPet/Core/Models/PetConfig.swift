@@ -11,7 +11,7 @@ struct PetConfig {
     var patrolInterval: TimeInterval
     var idleToSleepInterval: TimeInterval
 
-    /// 窗口需容纳 SwiftUI 卡片区（见 `petCanvasLayoutPoints`）再乘以最大缩放 `petScaleMax`，故默认给足边距。
+    /// 窗口需容纳 SwiftUI 卡片区（见 `petCanvasLayoutPoints`）再乘以最大缩放 `petScaleMax`，故默认给足边距（当前最大 1.6×）。
     static let `default` = PetConfig(
         windowSize: CGSize(width: 400, height: 400),
         patrolInterval: 12,
@@ -21,9 +21,18 @@ struct PetConfig {
     /// SwiftUI 中宠物卡片基准边长（略小于原 220pt，降低对周边可点区域的影响）。
     static let petCanvasLayoutPoints: CGFloat = 176
 
-    /// 设置里「宠物缩放」滑条范围；上限 1.2 使整窗最大约等于此前 1.2× 时的体量，不再拉到 1.8。
+    /// 设置里「宠物缩放」滑条范围（与旁白气泡字号独立）。
     static let petScaleMin: Double = 0.6
-    static let petScaleMax: Double = 1.2
+    static let petScaleMax: Double = 1.6
+
+    /// 系统设置里「条件旁白气泡字体」相对 callout 基准的倍数范围；**1.0 与原先未单独调字体时一致**。
+    static let triggerBubbleFontScaleMin: Double = 1.0
+    static let triggerBubbleFontScaleMax: Double = 1.6
+
+    /// 将气泡字体倍数夹紧到合法区间（用于 `SettingsViewModel` 与 `TriggerSpeechBubbleView`）。
+    static func clampedTriggerBubbleFontScale(_ value: Double) -> Double {
+        min(max(value, triggerBubbleFontScaleMin), triggerBubbleFontScaleMax)
+    }
 
     /// 相对早期 220pt 卡片，整体再乘此系数；**滑条在 1.0 时**视觉与窗口约等于「以前滑条 0.6」的外框（不是把默认滑条改成 0.6）。
     static let visualBaselineFactor: CGFloat = 0.6
@@ -41,13 +50,4 @@ struct PetConfig {
         return max(72, ceil(visualSide + slack))
     }
 
-    /// 触发旁白云气泡内正文字号相对 `petScale == 1` 的倍数：`petScale ≤ 1` 为 1；在 `(1, petScaleMax]` 内线性的略放大（与设置里 1.0～1.2 放大联动）。
-    static func triggerBubbleTextSizeMultiplier(scale: Double) -> Double {
-        let s = min(max(scale, petScaleMin), petScaleMax)
-        guard s > 1.0 else { return 1.0 }
-        let span = petScaleMax - 1.0
-        guard span > 0 else { return 1.0 }
-        let t = (s - 1.0) / span
-        return 1.0 + t * 0.12
-    }
 }

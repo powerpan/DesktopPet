@@ -17,8 +17,8 @@ enum TriggerBubbleTailEdge: Int, CaseIterable, Equatable, Sendable {
 
 struct TriggerSpeechBubbleView: View {
     let text: String
-    /// 与设置里「宠物缩放」一致；≤1.0 时气泡正文字号与现网一致，(1, 1.2] 略放大。
-    var petScale: Double = 1.0
+    /// 与设置里「条件旁白气泡字体」倍数一致（与宠物窗口缩放独立）；**1.0** 为系统 callout 基准，与此前未单独调字体时一致。
+    var bubbleFontScale: Double = 1.0
     var tailEdge: TriggerBubbleTailEdge = .bottom
     /// 沿附着边方向的偏移（pt）：上/下边为水平偏移（相对气泡宽度中心），左/右边为垂直偏移（相对高度中心）。
     var tailAlongOffset: CGFloat = 0
@@ -30,7 +30,7 @@ struct TriggerSpeechBubbleView: View {
     private let tailH: CGFloat = 8
 
     private var textSizeMultiplier: CGFloat {
-        CGFloat(PetConfig.triggerBubbleTextSizeMultiplier(scale: petScale))
+        CGFloat(PetConfig.clampedTriggerBubbleFontScale(bubbleFontScale))
     }
 
     /// 略放宽换行宽，避免放大字号后过早折行。
