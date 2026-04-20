@@ -8,6 +8,7 @@ import SwiftUI
 struct GrowthTabView: View {
     @EnvironmentObject private var settings: AgentSettingsStore
     @EnvironmentObject private var petCare: PetCareModel
+    @EnvironmentObject private var petMenuSettings: SettingsViewModel
     @Environment(\.desktopPetAgentClient) private var desktopPetAgentClient: AgentClient?
 
     @State private var growthDebugRandomPreview: String?
@@ -58,7 +59,7 @@ struct GrowthTabView: View {
             } header: {
                 Text("猫猫互动")
             } footer: {
-                Text("喂食：5 分钟～24 小时（用「小时 + 分钟」选择；满 24 小时时分钟固定为 00）。戳戳：5～600 秒。会写入本机偏好，重启后仍生效；冷却中是否立刻按新值生效取决于距离上次操作的时间。")
+                MarkdownInlineText(source: AgentSettingsUICopy.growthCatInteractFooter(testing: petMenuSettings.testingModeEnabled))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -159,7 +160,7 @@ struct GrowthTabView: View {
             } header: {
                 Text("成长参数")
             } footer: {
-                Text("每小时衰减在宠物隐藏时也会累计。喂食/戳戳增量为 0～1 刻度上的一次成功加成（默认与旧版一致：喂食 +12% 心情、+15% 能量；戳戳 +6% 心情、能量 0%）。若距离上次结算已超过 3 小时（例如久未打开应用），只会按小时补扣心情/能量，不会补抽随机事件；回到 3 小时内后恢复按密度抽样（午间等时段略更容易）。密度 100% 且时段加权最高时，「每小时最多一次」随机尝试的成功概率上限约 90%。开启 AI 后，部分事件会请求模型生成 JSON（失败则自动用本地事件）；会消耗 API。")
+                MarkdownInlineText(source: AgentSettingsUICopy.growthParamsFooter(testing: petMenuSettings.testingModeEnabled))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -200,7 +201,7 @@ struct GrowthTabView: View {
             } header: {
                 Text("数值旁白自动化")
             } footer: {
-                Text("心情或能量低于阈值时会像「诉苦」一样请求一句旁白；发生本地或 AI 成长随机事件时也会带事件摘要请求旁白。需在「自动化 → 触发器」中启用「数值与成长旁白」规则（并配置模型）；请求失败时应用会用本地兜底句。与下方冷却共同限制频率。")
+                MarkdownInlineText(source: AgentSettingsUICopy.growthStatNarrativeFooter(testing: petMenuSettings.testingModeEnabled))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -227,7 +228,7 @@ struct GrowthTabView: View {
             } header: {
                 Text("统计预览")
             } footer: {
-                Text("陪伴时长仅在宠物窗口可见时累计；统计按本机日历日写入。")
+                MarkdownInlineText(source: AgentSettingsUICopy.growthStatsPreviewFooter(testing: petMenuSettings.testingModeEnabled))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -266,58 +267,60 @@ struct GrowthTabView: View {
             } header: {
                 Text("最近成长事件")
             } footer: {
-                Text("事件会轻微调整心情/能量并记入当日统计；列表最多保留 80 条。")
+                MarkdownInlineText(source: AgentSettingsUICopy.growthRecentEventsFooter(testing: petMenuSettings.testingModeEnabled))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            Section {
-                if let d = petCare.state.lastDecayAt {
-                    Text("lastDecayAt（本机时区 · 毫秒精度）")
+            if petMenuSettings.testingModeEnabled {
+                Section {
+                    if let d = petCare.state.lastDecayAt {
+                        Text("lastDecayAt（本机时区 · 毫秒精度）")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Text(growthDebugLocalISO8601(d))
+                            .font(.caption.monospacedDigit())
+                            .textSelection(.enabled)
+                        Text("Unix 秒：\(Int64(d.timeIntervalSince1970))")
+                            .font(.caption.monospacedDigit())
+                            .textSelection(.enabled)
+                        let gap = Date().timeIntervalSince(d)
+                        Text("距今：\(formatGrowthDebugSeconds(gap))（\(gap <= 3 * 3600 ? "≤3 小时：真实结算可掷随机" : ">3 小时：真实结算仅固定衰减")）")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("lastDecayAt：nil（尚未写入锚点）")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text("当前心情 \(String(format: "%.3f", petCare.state.mood)) · 能量 \(String(format: "%.3f", petCare.state.energy))（仅展示）")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
-                    Text(growthDebugLocalISO8601(d))
-                        .font(.caption.monospacedDigit())
-                        .textSelection(.enabled)
-                    Text("Unix 秒：\(Int64(d.timeIntervalSince1970))")
-                        .font(.caption.monospacedDigit())
-                        .textSelection(.enabled)
-                    let gap = Date().timeIntervalSince(d)
-                    Text("距今：\(formatGrowthDebugSeconds(gap))（\(gap <= 3 * 3600 ? "≤3 小时：真实结算可掷随机" : ">3 小时：真实结算仅固定衰减")）")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("lastDecayAt：nil（尚未写入锚点）")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Text("当前心情 \(String(format: "%.3f", petCare.state.mood)) · 能量 \(String(format: "%.3f", petCare.state.energy))（仅展示）")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                Toggle("试跑使用 AI（默认开：每次点击都请求模型）", isOn: $growthDebugRandomTestUseAI)
+                    Toggle("试跑使用 AI（默认开：每次点击都请求模型）", isOn: $growthDebugRandomTestUseAI)
+                        .disabled(growthDebugRandomTestBusy)
+                    Button("随机事件试跑（不改数值 / 不改 lastDecayAt）") {
+                        runGrowthDebugRandomTest()
+                    }
                     .disabled(growthDebugRandomTestBusy)
-                Button("随机事件试跑（不改数值 / 不改 lastDecayAt）") {
-                    runGrowthDebugRandomTest()
-                }
-                .disabled(growthDebugRandomTestBusy)
-                if growthDebugRandomTestBusy {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-                if let growthDebugRandomPreview {
-                    Text(growthDebugRandomPreview)
+                    if growthDebugRandomTestBusy {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    if let growthDebugRandomPreview {
+                        Text(growthDebugRandomPreview)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                    }
+                } header: {
+                    Text("调试")
+                } footer: {
+                    MarkdownInlineText(source: AgentSettingsUICopy.growthDebugSectionFooter(testing: petMenuSettings.testingModeEnabled))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-            } header: {
-                Text("调试")
-            } footer: {
-                Text("关闭「试跑使用 AI」时，只调用本地事件池与随机数；打开时每次点击都会向当前 Base URL / 模型发一次 JSON 试跑请求（不写回状态）。两种模式均不修改 lastDecayAt 与心情/能量。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .formStyle(.grouped)

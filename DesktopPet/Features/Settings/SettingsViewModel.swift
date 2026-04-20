@@ -12,6 +12,8 @@ private enum SettingsKeys {
     static let patrol = "DesktopPet.settings.patrol"
     static let scale = "DesktopPet.settings.petScale"
     static let deskKeyMirror = "DesktopPet.settings.deskKeyMirror"
+    /// 为真时：智能体工作台等处显示更偏开发与试跑的说明；为假时面向日常用户、七七口吻。
+    static let testingModeUI = "DesktopPet.settings.testingModeUI"
 }
 
 @MainActor
@@ -21,6 +23,8 @@ final class SettingsViewModel: ObservableObject {
     @Published var petScale: Double
     /// 桌前文字镜像：是否把全局按键映射到宠物卡片示意键盘（仅内存展示；敏感场景请在设置中关闭）。
     @Published var isDeskKeyMirrorEnabled: Bool
+    /// 菜单栏「系统设置 → DesktopPet」中的「启用测试」：打开后工作台文案更长、更偏技术说明，并显示试跑类入口。
+    @Published var testingModeEnabled: Bool
 
     private var cancellables = Set<AnyCancellable>()
     private let defaults = UserDefaults.standard
@@ -38,18 +42,21 @@ final class SettingsViewModel: ObservableObject {
             isPatrolEnabled = defaults.bool(forKey: SettingsKeys.patrol)
         }
 
+        let rawPetScale: Double
+        if defaults.object(forKey: SettingsKeys.scale) == nil {
+            rawPetScale = 1.0
+        } else {
+            rawPetScale = defaults.double(forKey: SettingsKeys.scale)
+        }
+        petScale = min(max(rawPetScale, PetConfig.petScaleMin), PetConfig.petScaleMax)
+
         if defaults.object(forKey: SettingsKeys.deskKeyMirror) == nil {
             isDeskKeyMirrorEnabled = true
         } else {
             isDeskKeyMirrorEnabled = defaults.bool(forKey: SettingsKeys.deskKeyMirror)
         }
 
-        if defaults.object(forKey: SettingsKeys.scale) == nil {
-            petScale = 1.0
-        } else {
-            petScale = defaults.double(forKey: SettingsKeys.scale)
-        }
-        petScale = min(max(petScale, PetConfig.petScaleMin), PetConfig.petScaleMax)
+        testingModeEnabled = defaults.object(forKey: SettingsKeys.testingModeUI) as? Bool ?? false
 
         // 跳过首帧，避免 init 时把默认值再写回磁盘
         $isClickThroughEnabled
@@ -77,6 +84,13 @@ final class SettingsViewModel: ObservableObject {
             .dropFirst()
             .sink { [weak self] value in
                 self?.defaults.set(value, forKey: SettingsKeys.deskKeyMirror)
+            }
+            .store(in: &cancellables)
+
+        $testingModeEnabled
+            .dropFirst()
+            .sink { [weak self] value in
+                self?.defaults.set(value, forKey: SettingsKeys.testingModeUI)
             }
             .store(in: &cancellables)
     }

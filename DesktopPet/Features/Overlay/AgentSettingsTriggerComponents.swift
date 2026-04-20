@@ -11,6 +11,7 @@ struct TriggerRuleRow: View {
     @EnvironmentObject private var settings: AgentSettingsStore
     @EnvironmentObject private var session: AgentSessionStore
     @EnvironmentObject private var routeBus: AppRouteBus
+    @EnvironmentObject private var petMenuSettings: SettingsViewModel
     @State private var editing: AgentTriggerRule?
     @State private var showEditor = false
 
@@ -47,6 +48,7 @@ struct TriggerRuleRow: View {
                     .environmentObject(settings)
                     .environmentObject(session)
                     .environmentObject(routeBus)
+                    .environmentObject(petMenuSettings)
             }
         }
         .onChange(of: showEditor) { _, open in
@@ -95,23 +97,25 @@ struct TriggerRuleRow: View {
 
 /// 旁白请求模板中占位符的说明（默认模板与单条路由模板共用）。
 struct PromptPlaceholderHelp: View {
+    var testingMode: Bool
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("占位符（须一字不差、含花括号）可在模板任意位置插入；未写的占位符不会出现在最终发给模型的文字里。")
+            MarkdownInlineText(source: AgentSettingsUICopy.promptPlaceholderIntro(testing: testingMode))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 4) {
-                Text("· {extra} — 由应用自动拼好的一段「场景说明」：固定带有「（系统触发：某某类型）」；若你在「隐私」里打开了「附带键入摘要」，也会把截断后的键位摘要接在这同一段后面。建议保留，方便模型知道是谁在触发。")
-                Text("· {triggerKind} — 替换为当前规则的类型中文名，例如「键盘模式」「定时」「随机空闲」。")
-                Text("· {matchedCondition} — 替换为本次命中的那条旁白路由的条件摘要（例如「按键含「abc」且 空闲≥120s」），便于模型理解命中分支。")
-                Text("· {keySummary} — 仅键入摘要的短片段（与 {extra} 里可能带的摘要同源）；未开「附带键入摘要」时为空字符串。适合在模板中间单独引用摘要、而不想整段复述 {extra} 时使用。")
-                Text("· {careContext} — 仅「饲养互动」类型：喂食或戳戳成功时，由应用自动填入心情/能量变化与陪伴时长等摘要；未触发饲养操作或试跑占位时可能为空。")
-                Text("· {statContext} — 仅「数值与成长旁白」：心情/能量偏低或成长随机事件时，由应用填入结构化说明；未触发时为空。")
-                Text("· {screenCaptureMeta} — 仅「截屏」类型：应用填入时间、前台应用名、缩放与是否降级为纯文字等摘要；勿在模板中手写该占位符以外的机密内容。")
+                ForEach(Array(AgentSettingsUICopy.promptPlaceholderBullets(testing: testingMode).enumerated()), id: \.offset) { _, line in
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text("·")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        MarkdownInlineText(source: line, font: .caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-            Text("示例：「用户可能刚输入了敏感内容。{extra} 请用两句简体中文温柔提醒。」若不写任何占位符，则整段模板会原样作为 user 消息发送。")
+            MarkdownInlineText(source: AgentSettingsUICopy.promptPlaceholderExample(testing: testingMode))
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
@@ -120,19 +124,8 @@ struct PromptPlaceholderHelp: View {
 }
 
 /// 截屏 JPEG 滑条：与 `NSBitmapImageRep` 的 `compressionFactor` 同源，数值越大压缩越轻、细节越好、同分辨率下字节越大。
-func screenSnapJPEGQualityLiveCaption(_ quality: Double) -> String {
-    let v = min(0.85, max(0.55, quality))
-    let band: String
-    if v < 0.62 {
-        band = "压缩偏强：上传更快、更省流量，界面小字与细边更容易出现马赛克。"
-    } else if v < 0.72 {
-        band = "折中：体积与清晰度较均衡，多数截屏旁白够用。"
-    } else if v < 0.80 {
-        band = "偏清晰：文字与边缘更利落，请求体与耗时通常增加。"
-    } else {
-        band = "接近上限：尽量保细节，JPEG 与 Base64 请求体会明显变大。"
-    }
-    return "当前 \(String(format: "%.2f", v))（约 \(String(format: "%.0f", v * 100))% 强度）— \(band)"
+func screenSnapJPEGQualityLiveCaption(_ quality: Double, testing: Bool) -> String {
+    AgentSettingsUICopy.screenSnapJPEGQualityBand(quality: quality, testing: testing)
 }
 
 struct TriggerRuleEditorSheet: View {
@@ -140,6 +133,7 @@ struct TriggerRuleEditorSheet: View {
     @EnvironmentObject private var settings: AgentSettingsStore
     @EnvironmentObject private var session: AgentSessionStore
     @EnvironmentObject private var routeBus: AppRouteBus
+    @EnvironmentObject private var petMenuSettings: SettingsViewModel
     @Binding var isPresented: Bool
     @State private var editingRouteIndex: Int?
     @State private var showKeyboardMasterOffOnFinish = false
@@ -158,7 +152,7 @@ struct TriggerRuleEditorSheet: View {
                 } header: {
                     Text("基本")
                 } footer: {
-                    Text("冷却：两次触发之间的最短间隔（秒）。触发一次后会进入冷却，期间即使条件仍满足也不会再请求。")
+                    MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorBasicFooter(testing: petMenuSettings.testingModeEnabled))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -171,22 +165,21 @@ struct TriggerRuleEditorSheet: View {
                     } header: {
                         Text("Slack")
                     } footer: {
-                        Text(
-                            settings.triggerSlackNotifyMasterEnabled
-                                ? "开启后，本条触发产生的旁白除气泡外，会发到「连接」里配置的 Slack 监控频道（需 Bot Token 与频道 ID）。"
-                                : "请先在「触发器」列表顶部的 Slack 区域打开「触发旁白也推送到 Slack」总开关，再为各条规则单独开启。"
+                        MarkdownInlineText(
+                            source: AgentSettingsUICopy.triggerEditorSlackFooter(
+                                masterOn: settings.triggerSlackNotifyMasterEnabled,
+                                testing: petMenuSettings.testingModeEnabled
+                            )
                         )
-                        .font(.caption)
                         .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
 
                 if rule.kind == .keyboardPattern, !settings.keyboardTriggerMasterEnabled {
                     Section {
                         Label {
-                            Text("「隐私」Tab 中的「允许键盘模式触发」总开关当前为关闭，本键盘规则不会匹配按键。请切换到「隐私」阅读风险提示后打开开关。")
-                                .font(.callout)
+                            MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorKeyboardBlockedCallout(testing: petMenuSettings.testingModeEnabled), font: .callout)
+                                .foregroundStyle(.primary)
                         } icon: {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundStyle(.orange)
@@ -200,11 +193,11 @@ struct TriggerRuleEditorSheet: View {
                     TextEditor(text: $rule.defaultPromptTemplate)
                         .font(.body)
                         .frame(minHeight: 72)
-                    PromptPlaceholderHelp()
+                    PromptPlaceholderHelp(testingMode: petMenuSettings.testingModeEnabled)
                 } header: {
                     Text("默认旁白请求（无路由命中）")
                 } footer: {
-                    Text("发给模型的一条 user 消息（user role）。当没有任何旁白路由的条件被满足时，使用本模板。整段留空则使用应用内置默认句式。")
+                    MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorDefaultTemplateFooter(testing: petMenuSettings.testingModeEnabled))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -212,7 +205,7 @@ struct TriggerRuleEditorSheet: View {
 
                 Section {
                     if rule.routes.isEmpty {
-                        Text("尚未配置路由：将使用上方默认模板；键盘类还可回退到下方「旧版单一模式串」。")
+                        MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorRoutesEmptyHint(testing: petMenuSettings.testingModeEnabled))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -281,8 +274,8 @@ struct TriggerRuleEditorSheet: View {
                     Text("旁白路由（优先级高先匹配）")
                 } footer: {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("每条路由内多个条件为 AND。键盘类路由至少包含一个「按键包含」且子串非空，否则不会匹配。同一次触发只选用一条路由的提示语。")
-                        Text("删除：点每行右侧废纸篓；macOS 分组表单里左滑删除往往不可用。")
+                        MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorRoutesFooterLine1(testing: petMenuSettings.testingModeEnabled))
+                        MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorRoutesFooterLine2(testing: petMenuSettings.testingModeEnabled))
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -296,7 +289,7 @@ struct TriggerRuleEditorSheet: View {
                     } header: {
                         Text("定时")
                     } footer: {
-                        Text("从上一次触发完成起算，每隔这么多分钟最多触发一次（仍受冷却下限约束）。")
+                        MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorTimerFooter(testing: petMenuSettings.testingModeEnabled))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -314,17 +307,15 @@ struct TriggerRuleEditorSheet: View {
                         Text("随机空闲")
                     } footer: {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("仅在宠物窗口可见时评估。空闲秒数：无键鼠活动达到该秒数后才可能触发。")
-                            Text("概率：每次抽样时掷骰，数值越大越容易触发；建议保持较低以免打扰。")
-                            Text("同一段键鼠静止期内：每条「随机空闲」规则在成功旁白一次后会暂停，直到你再次键鼠活动后才会重新参与随机判定（仍须满足冷却与最小间隔）。")
+                            ForEach(Array(AgentSettingsUICopy.triggerEditorRandomIdleFooterLines(testing: petMenuSettings.testingModeEnabled).enumerated()), id: \.offset) { _, line in
+                                MarkdownInlineText(source: line)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 case .keyboardPattern:
                     Section {
-                        Text("仅匹配模式串（最近按键缓冲），不保存全文日志。需打开「隐私」中的总开关。")
+                        MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorKeyboardCompatInline(testing: petMenuSettings.testingModeEnabled))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         TextField("旧版单一模式串（仅当上方「路由表」为空时生效）", text: $rule.keyboardPattern)
@@ -332,11 +323,11 @@ struct TriggerRuleEditorSheet: View {
                         Text("键盘模式（兼容）")
                     } footer: {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("推荐在「旁白路由」里为不同子串配置不同提示语；优先级数字越大越先匹配。此处旧字段仅在路由表为空时作为单条子串回退；大小写敏感。需已授予辅助功能。")
+                            MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorKeyboardCompatFooterLine1(testing: petMenuSettings.testingModeEnabled))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             if !settings.keyboardTriggerMasterEnabled {
-                                Text("总开关关闭时引擎不会评估键盘子串；请务必到「隐私」打开「允许键盘模式触发」。")
+                                MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorKeyboardCompatFooterMasterOff(testing: petMenuSettings.testingModeEnabled))
                                     .font(.caption)
                                     .foregroundStyle(.orange)
                             }
@@ -349,7 +340,7 @@ struct TriggerRuleEditorSheet: View {
                     } header: {
                         Text("前台应用（兼容）")
                     } footer: {
-                        Text("推荐在「旁白路由」里用「前台包含」条件写多条。此处旧字段仅在路由表为空时回退；切换应用时大小写不敏感匹配本地化名称。")
+                        MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorFrontAppFooter(testing: petMenuSettings.testingModeEnabled))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -369,8 +360,7 @@ struct TriggerRuleEditorSheet: View {
                             }
                         }
                         Stepper("成功旁白最短间隔（分钟）: \(rule.screenSnapIntervalMinutes)", value: $rule.screenSnapIntervalMinutes, in: 5 ... 24 * 60)
-                        Text("与下方「冷却」取**更长**者作为实际上限。")
-                            .font(.caption2)
+                        MarkdownInlineText(source: "与下方「冷却」取**更长**者作为实际上限。", font: .caption2)
                             .foregroundStyle(.tertiary)
                         Toggle("仅宠物窗口可见时自动触发", isOn: $rule.screenSnapOnlyWhenPetVisible)
                         Picker("截图长边上界", selection: $rule.screenSnapMaxEdgePixels) {
@@ -386,51 +376,49 @@ struct TriggerRuleEditorSheet: View {
                                 .font(.caption.monospacedDigit())
                                 .frame(width: 40, alignment: .trailing)
                         }
-                        Text(screenSnapJPEGQualityLiveCaption(rule.screenSnapJPEGQuality))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        MarkdownInlineText(
+                            source: screenSnapJPEGQualityLiveCaption(rule.screenSnapJPEGQuality, testing: petMenuSettings.testingModeEnabled),
+                            font: .caption2
+                        )
+                        .foregroundStyle(.secondary)
                     } header: {
                         Text("截屏")
                     } footer: {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("冷却下限请使用上方「基本」中的「冷却（秒）」；与「成功旁白最短间隔」取**更长**者作为实际上限。")
-                            Text("JPEG 质量系数（0.55～0.85）：与 macOS 编码 JPEG 时的 compressionFactor 一致，表示有损压缩的轻重，不是分辨率。系数越高，同一截屏下画质越好、文件越大、上传越慢、API 请求体越大；越低则相反。与上方「长边上界」共同影响模型能否看清屏上小字。")
-                            Text("自动触发需打开「隐私」中的截屏档位（截取主屏或截取副屏），并授予屏幕录制。所选显示器经 ScreenCaptureKit 抓取后按「长边上界」缩放再 JPEG 编码（最大 2048px），仅在内存中上传；长边越大越利于认字，但请求体与耗时通常也会增加。")
-                            Text("若模型不支持图像，应用会在收到 HTTP 400 时自动改为纯文字再请求一次。")
+                            ForEach(Array(AgentSettingsUICopy.triggerEditorScreenSnapFooterLines(testing: petMenuSettings.testingModeEnabled).enumerated()), id: \.offset) { _, line in
+                                MarkdownInlineText(source: line)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 case .careInteraction:
                     Section {
-                        Text("由饲养面板的「喂食」「戳戳」在**成功生效**后触发（动作处于冷却失败时不会请求模型）。应用会把当前心情、能量、今日陪伴时长及本次数值变化写入旁白模板的 {careContext}。")
+                        MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorCareInline1(testing: petMenuSettings.testingModeEnabled))
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text("冷却：两次饲养旁白请求之间的最短间隔；与喂食 4 小时、戳戳 30 秒的动作冷却无关，用于防止连点造成重复请求。")
+                        MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorCareInline2(testing: petMenuSettings.testingModeEnabled))
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     } header: {
                         Text("饲养互动")
                     } footer: {
-                        Text("列表中若有多条「饲养互动」规则，仅**第一条已启用**的会收到面板事件；可在模板中用 {careContext}、{extra}、{matchedCondition} 等占位符。")
+                        MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorCareFooter(testing: petMenuSettings.testingModeEnabled))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 case .petStatAutomation:
                     Section {
-                        Text("由「陪伴 → 成长」中的「数值旁白自动化」在心情/能量低于阈值或发生成长随机事件时触发。应用将说明写入 {statContext}；模型失败时会用本地兜底短句。")
+                        MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorPetStatInline1(testing: petMenuSettings.testingModeEnabled))
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text("成长 Tab 里另有「最短间隔」分钟数，与上方「冷却」共同限制频率；仅**第一条已启用**的本类型规则会收到事件。")
+                        MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorPetStatInline2(testing: petMenuSettings.testingModeEnabled))
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     } header: {
                         Text("数值与成长旁白")
                     } footer: {
-                        Text("可与 {extra}、{matchedCondition} 等占位符组合；建议语气偏撒娇、诉苦，一两句即可。")
+                        MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorPetStatFooter(testing: petMenuSettings.testingModeEnabled))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -500,28 +488,30 @@ struct TriggerRuleEditorSheet: View {
                 } header: {
                     Text("旁白生成参数（本条）")
                 } footer: {
-                    Text("关闭开关时使用「触发器」Tab 的默认温度与 max_tokens。从气泡进入长对话后，发送消息仍使用「连接」Tab 的设置。")
+                    MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorPerRuleGenFooter(testing: petMenuSettings.testingModeEnabled))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                Section {
-                    Button("立即触发当前触发器") {
-                        postForceFireTriggerNotification()
+                if petMenuSettings.testingModeEnabled {
+                    Section {
+                        Button("立即触发当前触发器") {
+                            postForceFireTriggerNotification()
+                        }
+                        .disabled(
+                            session.isSending
+                                || (rule.kind == .screenSnap
+                                    && (!settings.screenSnapTriggerMasterEnabled || !ScreenCaptureService.hasScreenRecordingPermission))
+                        )
+                    } header: {
+                        Text("试跑")
+                    } footer: {
+                        MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorTryRunFooter(testing: petMenuSettings.testingModeEnabled))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .disabled(
-                        session.isSending
-                            || (rule.kind == .screenSnap
-                                && (!settings.screenSnapTriggerMasterEnabled || !ScreenCaptureService.hasScreenRecordingPermission))
-                    )
-                } header: {
-                    Text("试跑")
-                } footer: {
-                    Text("使用当前编辑页中的表单内容（含未点「完成」的修改）向模型请求一次旁白；成功后会出现旁白气泡并写入「旁白历史」与「发给模型的请求」。截屏类在成功收到模型回复后才更新「上次触发」。路由会先按当前环境匹配；若无命中则回退第一条启用路由。截屏试跑需打开隐私总开关并已授予屏幕录制；正在发送时按钮不可用。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .formStyle(.grouped)
@@ -531,6 +521,7 @@ struct TriggerRuleEditorSheet: View {
             )) {
                 if let i = editingRouteIndex, rule.routes.indices.contains(i) {
                     TriggerPromptRouteEditorSheet(rule: $rule, routeIndex: i)
+                        .environmentObject(petMenuSettings)
                         .frame(minWidth: 440, minHeight: 520)
                 }
             }
@@ -563,7 +554,7 @@ struct TriggerRuleEditorSheet: View {
                 }
                 Button("留在编辑页", role: .cancel) {}
             } message: {
-                Text("「隐私」Tab 中的「允许键盘模式触发」仍为关闭，键盘规则不会生效。若要启用匹配，请切换到「隐私」阅读说明并打开总开关。")
+                MarkdownInlineText(source: AgentSettingsUICopy.triggerEditorKeyboardSaveAlertMessage(testing: petMenuSettings.testingModeEnabled))
             }
         }
         .frame(minWidth: 400, minHeight: 360)
@@ -645,6 +636,7 @@ struct TriggerPromptRouteEditorSheet: View {
     @Binding var rule: AgentTriggerRule
     let routeIndex: Int
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var petMenuSettings: SettingsViewModel
     @State private var draft: TriggerPromptRoute
 
     init(rule: Binding<AgentTriggerRule>, routeIndex: Int) {
@@ -667,11 +659,11 @@ struct TriggerPromptRouteEditorSheet: View {
                     TextEditor(text: $draft.promptTemplate)
                         .font(.body)
                         .frame(minHeight: 120)
-                    PromptPlaceholderHelp()
+                    PromptPlaceholderHelp(testingMode: petMenuSettings.testingModeEnabled)
                 } header: {
                     Text("本路由发给模型的 user 模板")
                 } footer: {
-                    Text("若本路由模板整段留空，触发时会回退到上方的「默认旁白请求」模板。")
+                    MarkdownInlineText(source: AgentSettingsUICopy.triggerRouteTemplateFooter(testing: petMenuSettings.testingModeEnabled))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -679,7 +671,7 @@ struct TriggerPromptRouteEditorSheet: View {
 
                 Section {
                     if draft.conditions.isEmpty {
-                        Text("无条件：等价于「始终」匹配（键盘类规则请勿留空条件，请添加「按键包含」）。")
+                        MarkdownInlineText(source: AgentSettingsUICopy.triggerRouteUnconditionalHint(testing: petMenuSettings.testingModeEnabled))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -700,7 +692,7 @@ struct TriggerPromptRouteEditorSheet: View {
                 } header: {
                     Text("条件（同一路由内为 AND）")
                 } footer: {
-                    Text("键盘类触发器：至少保留一个「按键包含」且子串非空，否则该路由不会参与匹配。")
+                    MarkdownInlineText(source: AgentSettingsUICopy.triggerRouteConditionsFooter(testing: petMenuSettings.testingModeEnabled))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)

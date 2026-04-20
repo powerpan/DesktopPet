@@ -12,11 +12,9 @@ struct SettingsPanelView: View {
     var body: some View {
         Form {
             Section {
-                Text("此处为 macOS 系统设置中的「DesktopPet」面板，只调整桌宠窗口本身：穿透、巡逻、缩放与桌镜。")
-                    .font(.caption)
+                MarkdownInlineText(source: AgentSettingsUICopy.settingsPanelHeaderLine1(testing: viewModel.testingModeEnabled))
                     .foregroundStyle(.secondary)
-                Text("模型、API Key、Slack、会话、触发器、盯屏等请在菜单栏 **「打开智能体工作台…」**（独立窗口）；Slack 在「连接」分区配置。")
-                    .font(.caption)
+                MarkdownInlineText(source: AgentSettingsUICopy.settingsPanelHeaderLine2(testing: viewModel.testingModeEnabled))
                     .foregroundStyle(.secondary)
             }
             Toggle("启用鼠标穿透", isOn: $viewModel.isClickThroughEnabled)
@@ -29,6 +27,11 @@ struct SettingsPanelView: View {
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
+            Toggle("启用测试", isOn: $viewModel.testingModeEnabled)
+            Section {
+                MarkdownInlineText(source: AgentSettingsUICopy.settingsPanelTestingToggleFooter(testing: viewModel.testingModeEnabled))
+                    .foregroundStyle(.secondary)
+            }
             Section {
                 Button("打开智能体工作台…") {
                     coordinator.presentAgentSettingsWindow()
@@ -36,13 +39,12 @@ struct SettingsPanelView: View {
             } header: {
                 Text("智能体与自动化")
             } footer: {
-                Text("与上方面板分离：工作台含连接（含 Slack）、对话、陪伴、自动化与集成（盯屏）。")
-                    .font(.caption)
+                MarkdownInlineText(source: AgentSettingsUICopy.settingsPanelAgentWorkshopFooter(testing: viewModel.testingModeEnabled))
                     .foregroundStyle(.secondary)
             }
         }
         .padding()
-        .frame(width: 340)
+        .frame(minWidth: 400, idealWidth: 480, maxWidth: 640)
     }
 }
 

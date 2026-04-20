@@ -10,6 +10,7 @@ struct ScreenWatchTaskEditorSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var screenWatchTasks: ScreenWatchTaskStore
+    @EnvironmentObject private var petMenuSettings: SettingsViewModel
 
     @State private var title: String = ""
     @State private var ocrText: String = ""
@@ -60,7 +61,7 @@ struct ScreenWatchTaskEditorSheet: View {
 
                 Section {
                     if isSlackAutomatedTask {
-                        Text("此任务来自 Slack 自动盯屏，仅支持 OCR 与模型兜底，不包含进度条亮度启发式；保存时会移除已误存的进度条件。")
+                        MarkdownInlineText(source: AgentSettingsUICopy.screenWatchSlackAutomatedNotice(testing: petMenuSettings.testingModeEnabled))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -83,7 +84,7 @@ struct ScreenWatchTaskEditorSheet: View {
                                         .foregroundStyle(.tertiary)
                                 }
                             }
-                            Text("把整条进度条框进矩形。算法取该区域最左 1/5 与最右 1/5 的平均亮度（约 0=黑、1=白）。常见「从左往右填满」时：未完成往往左右一边更亮、差较大；走完后整条颜色接近一致，差会变小。当「左右平均亮度差的绝对值」≤ 下方阈值时，判定为接近/已完成。")
+                            MarkdownInlineText(source: AgentSettingsUICopy.watchProgressBarAlgorithmPrimary(testing: petMenuSettings.testingModeEnabled))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -99,7 +100,7 @@ struct ScreenWatchTaskEditorSheet: View {
                                         .foregroundStyle(.secondary)
                                 }
                             }
-                            Text("默认 0.08：左右平均亮度最多相差约 8 个百分点即视为「够均匀」。阈值越大越容易满足（更早触发）；越小越严格。为避免 0% 时整条底轨已很均匀而误判，会先要求在本任务运行期间出现过一次「左右明显不对称」，再接受「够均匀」；若从接近 100% 才开始盯屏，可能一直不满足，请配合 OCR 或模型兜底。")
+                            MarkdownInlineText(source: AgentSettingsUICopy.watchProgressBarAlgorithmSecondary(testing: petMenuSettings.testingModeEnabled))
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -123,7 +124,7 @@ struct ScreenWatchTaskEditorSheet: View {
                                 .multilineTextAlignment(.trailing)
                             Text("秒（0…59）").font(.caption).foregroundStyle(.secondary)
                         }
-                        Text("两次旁白/命中之间的最短等待，避免条件一直为真时连续刷屏。")
+                        MarkdownInlineText(source: AgentSettingsUICopy.screenWatchRepeatFooterHint(testing: petMenuSettings.testingModeEnabled))
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                             .frame(maxWidth: .infinity, alignment: .leading)

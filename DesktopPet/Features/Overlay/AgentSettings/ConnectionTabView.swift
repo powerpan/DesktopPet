@@ -9,6 +9,7 @@ struct ConnectionTabView: View {
     @EnvironmentObject private var settings: AgentSettingsStore
     @EnvironmentObject private var session: AgentSessionStore
     @EnvironmentObject private var slackSync: SlackSyncController
+    @EnvironmentObject private var petMenuSettings: SettingsViewModel
 
     @State private var apiKeyDraft: String = ""
     @State private var keychainMessage: String?
@@ -37,7 +38,7 @@ struct ConnectionTabView: View {
             } header: {
                 Text("模型配置")
             } footer: {
-                Text("每一套服务商各自保存 Base URL、模型 id 与 API Key。切换时会载入该套已保存的地址与模型；请为当前选中的服务商单独粘贴并保存 Key。")
+                MarkdownInlineText(source: AgentSettingsUICopy.connectionProviderFooter(testing: petMenuSettings.testingModeEnabled))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -50,14 +51,11 @@ struct ConnectionTabView: View {
                 Text("服务端（当前：\(settings.activeAPIProvider.pickerLabel)）")
             } footer: {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Base URL：OpenAI 兼容 Chat Completions 的根地址，须含 https://，**不要**手动拼 `/v1/chat/completions`（应用会自动追加）。")
-                    Text("DeepSeek 示例：https://api.deepseek.com")
-                    Text("通义千问（DashScope 兼容模式）示例：https://dashscope.aliyuncs.com/compatible-mode；模型如 qwen-vl-plus（截屏多模态）、qwen-turbo 等以控制台为准。")
-                    Text("自定义：可填其它兼容网关；模型 id 填对方文档中的名称。")
+                    ForEach(Array(AgentSettingsUICopy.connectionServerFooterLines(testing: petMenuSettings.testingModeEnabled).enumerated()), id: \.offset) { _, line in
+                        MarkdownInlineText(source: line)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Section {
@@ -84,7 +82,7 @@ struct ConnectionTabView: View {
             } header: {
                 Text("API Key（钥匙串 · \(settings.activeAPIProvider.pickerLabel)）")
             } footer: {
-                Text("仅保存在本机钥匙串，不会写入 UserDefaults 或明文文件；各服务商使用不同钥匙串账户，互不影响。保存后若对话里仍提示未配置，可先关闭再打开对话面板刷新状态。")
+                MarkdownInlineText(source: AgentSettingsUICopy.connectionKeyFooter(testing: petMenuSettings.testingModeEnabled))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -173,7 +171,7 @@ struct ConnectionTabView: View {
             } header: {
                 Text("Slack")
             } footer: {
-                Text("在 Slack 频道发送 `!pet new 标题` 可新建本地会话并绑定。首次连接某频道会跳过历史回放，仅同步之后的新消息。出站会同步当前绑定频道内你发送的 user/assistant 消息。")
+                MarkdownInlineText(source: AgentSettingsUICopy.connectionSlackFooter(testing: petMenuSettings.testingModeEnabled))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -192,12 +190,11 @@ struct ConnectionTabView: View {
                 Text("生成参数")
             } footer: {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("温度：越高回答越随机、越有创意；越低越保守、越稳定。一般聊天约 0.6～0.9。")
-                    Text("max_tokens：模型单次回复最多生成的 token 数（约等于字数上限）；越大越耗额度与等待时间。")
+                    ForEach(Array(AgentSettingsUICopy.connectionGenerationFooterLines(testing: petMenuSettings.testingModeEnabled).enumerated()), id: \.offset) { _, line in
+                        MarkdownInlineText(source: line)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .formStyle(.grouped)

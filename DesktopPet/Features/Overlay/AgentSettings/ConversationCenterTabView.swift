@@ -6,12 +6,14 @@
 import SwiftUI
 
 struct ConversationCenterTabView: View {
+    @EnvironmentObject private var petMenuSettings: SettingsViewModel
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("对话与内容")
                     .font(.title3.weight(.semibold))
-                Text("频道、历史与清理在此；下方「人格」影响长对话与条件旁白的语气。")
+                MarkdownInlineText(source: AgentSettingsUICopy.conversationCenterSubtitle(testing: petMenuSettings.testingModeEnabled))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 SessionHistoryTabView()

@@ -95,6 +95,7 @@
 		C10000000000000000000059 /* AgentSettingsWorkspaceTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000059 /* AgentSettingsWorkspaceTab.swift */; };
 		C1000000000000000000005A /* ConversationCenterTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005A /* ConversationCenterTabView.swift */; };
 		C1000000000000000000005B /* AutomationCenterTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005B /* AutomationCenterTabView.swift */; };
+		C10000000000000000000069 /* AgentSettingsUICopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000069 /* AgentSettingsUICopy.swift */; };
 		C3D4E5F60718293A4B5C6D7E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8F /* ContentView.swift */; };
 		E5F60718293A4B5C6D7E8F90 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F60718293A4B5C6D7E8F90AB /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -122,6 +123,7 @@
 		B100000000000000000000059 /* AgentSettingsWorkspaceTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSettingsWorkspaceTab.swift; sourceTree = "<group>"; };
 		B10000000000000000000005A /* ConversationCenterTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationCenterTabView.swift; sourceTree = "<group>"; };
 		B10000000000000000000005B /* AutomationCenterTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationCenterTabView.swift; sourceTree = "<group>"; };
+		B100000000000000000000069 /* AgentSettingsUICopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSettingsUICopy.swift; sourceTree = "<group>"; };
 		B100000000000000000000005 /* MouseTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseTracker.swift; sourceTree = "<group>"; };
 		B100000000000000000000006 /* InteractionEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractionEvent.swift; sourceTree = "<group>"; };
 		B100000000000000000000007 /* PetConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetConfig.swift; sourceTree = "<group>"; };
@@ -465,6 +467,7 @@
 				B100000000000000000000055 /* PrivacyTabView.swift */,
 				B100000000000000000000056 /* GrowthTabView.swift */,
 				B100000000000000000000057 /* IntegrationsTabView.swift */,
+				B100000000000000000000069 /* AgentSettingsUICopy.swift */,
 			);
 			path = AgentSettings;
 			sourceTree = "<group>";
@@ -611,6 +614,7 @@
 				C10000000000000000000059 /* AgentSettingsWorkspaceTab.swift in Sources */,
 				C1000000000000000000005A /* ConversationCenterTabView.swift in Sources */,
 				C1000000000000000000005B /* AutomationCenterTabView.swift in Sources */,
+				C10000000000000000000069 /* AgentSettingsUICopy.swift in Sources */,
 				C10000000000000000000051 /* ConnectionTabView.swift in Sources */,
 				C10000000000000000000052 /* SessionHistoryTabView.swift in Sources */,
 				C10000000000000000000053 /* PersonaTabView.swift in Sources */,

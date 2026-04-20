@@ -46,9 +46,11 @@ struct ChatOverlayView: View {
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
-                    Text("支持图片与常见文本类文件（多模态）；大小上限在智能体工作台 **集成** 中配置。Slack 入站附件使用同一套限额。")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                    MarkdownInlineText(
+                        source: "支持图片与常见文本类文件（多模态）；大小上限在智能体工作台 **集成** 中配置。Slack 入站附件使用同一套限额。",
+                        font: .caption2
+                    )
+                    .foregroundStyle(.tertiary)
                 }
                 Spacer(minLength: 0)
                 Button {

@@ -13,6 +13,7 @@ struct IntegrationsTabView: View {
     @EnvironmentObject private var multimodalLimits: MultimodalAttachmentLimitsStore
     @EnvironmentObject private var screenWatchTasks: ScreenWatchTaskStore
     @EnvironmentObject private var screenWatchEvents: ScreenWatchEventStore
+    @EnvironmentObject private var petMenuSettings: SettingsViewModel
 
     @State private var watchNewTitle: String = ""
     @State private var watchOCRText: String = ""
@@ -32,7 +33,7 @@ struct IntegrationsTabView: View {
         Form {
             Section {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("同时作用于对话面板「+」上传与 Slack 入站附件；超出限额时不会在 Slack 调用模型，并在对应线程回复原因。")
+                    MarkdownInlineText(source: AgentSettingsUICopy.integrationsMultimodalIntro(testing: petMenuSettings.testingModeEnabled))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text("单张图片最大：\(String(format: "%.1f", Double(multimodalLimits.maxImageAttachmentBytes) / 1_048_576)) MB")
@@ -63,26 +64,28 @@ struct IntegrationsTabView: View {
             } header: {
                 Text("多模态附件限额")
             } footer: {
-                Text("Slack 侧需为 Bot 配置 **files:read**（及可访问 files.slack.com 私有下载链接），否则无法下载频道内图片/文件。")
+                MarkdownInlineText(source: AgentSettingsUICopy.integrationsMultimodalFooter(testing: petMenuSettings.testingModeEnabled))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                Text("在监控频道发送 **`!pet click`** / **`!pet 点屏`**，或整句以中文触发词开头（例如 **远程点屏**、**远程点击**、**帮点一下屏幕**、**猫猫远程点屏**、**屏幕远程点击** 等；关键词后请接空格、逗号或句号，不要写成「远程点屏谢谢」这种紧接其它汉字，以免误触）。应用会按「隐私」里截屏档位或 Slack 记录的显示器偏好截取**主屏或副屏**，并上传带 0–100 标尺的坐标图（需 **屏幕录制** + Bot **files:write**；上传失败时仍会提示你用文字回复坐标）。在**同一线程**回复坐标，例如 **`50,50`** 或 **`x=0.5 y=0.5`**（支持 0–100 或 0–1；越界会提示错误）。每轮点击后可在该线程回复 **继续** / **再来一次** 以重新截屏并再点，回复 **结束** / **停止** 退出。**执行点击需要「辅助功能」权限**（系统设置 → 隐私与安全性 → 辅助功能）。约 5 分钟无操作超时。\n\n**远程改截屏档位**：`!pet screen off` / `main` / `secondary`（总开关非「关」时生效）；总开关为「关」时**不能**用 Slack 远程改为「开」，但可发 **`!pet screen pick main`** / **`pick secondary`** 或中文「**截屏目标主屏**」「**截屏目标副屏**」仅记录下次按哪块屏截（供远程点屏等）。")
+                MarkdownInlineText(source: AgentSettingsUICopy.integrationsRemoteClickBody(testing: petMenuSettings.testingModeEnabled))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                Text("端到端自测建议：① 发 `!pet click` 见线程内坐标图；② 回 `50,50` 点击后应提示是否继续；③ 回 **继续** 应再发一张坐标图；④ 回 **结束** 应退出会话；⑤ 回 `x=120` 类越界应报错且不点击；⑥ 关闭辅助功能后应仅回帖提示授权。")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                if petMenuSettings.testingModeEnabled {
+                    MarkdownInlineText(source: AgentSettingsUICopy.integrationsRemoteClickSelfTest(testing: true))
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             } header: {
                 Text("Slack 远程点屏")
             }
 
             Section {
-                Text("需已授予「屏幕录制」权限。本地 OCR / 进度条亮度启发式优先；可选多模态模型 YES/NO 兜底（消耗 API）。")
+                MarkdownInlineText(source: AgentSettingsUICopy.integrationsWatchTasksIntro(testing: petMenuSettings.testingModeEnabled))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 TextField("新任务标题", text: $watchNewTitle)
@@ -104,7 +107,7 @@ struct IntegrationsTabView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    Text("秒为钟表意义上的 0…59；总间隔最长 24 小时。仅当本地条件未全部满足时才会请求模型。")
+                    MarkdownInlineText(source: AgentSettingsUICopy.integrationsVisionCooldownClockHint(testing: petMenuSettings.testingModeEnabled))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -129,7 +132,7 @@ struct IntegrationsTabView: View {
                                 .foregroundStyle(.tertiary)
                         }
                     }
-                    Text("把整条进度条框进矩形。算法取该区域最左 1/5 与最右 1/5 的平均亮度（约 0=黑、1=白）。常见「从左往右填满」时：未完成往往左右一边更亮、差较大；走完后整条颜色接近一致，差会变小。当「左右平均亮度差的绝对值」≤ 下方阈值时，判定为接近/已完成。")
+                    MarkdownInlineText(source: AgentSettingsUICopy.watchProgressBarAlgorithmPrimary(testing: petMenuSettings.testingModeEnabled))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -147,7 +150,7 @@ struct IntegrationsTabView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    Text("默认 0.08：左右平均亮度最多相差约 8 个百分点即视为「够均匀」。阈值越大越容易满足（更早触发）；越小越严格。为避免 0% 时整条底轨已很均匀而误判，会先要求在本任务运行期间出现过一次「左右明显不对称」，再接受「够均匀」；若从接近 100% 才开始盯屏，可能一直不满足，请配合 OCR 或模型兜底。")
+                    MarkdownInlineText(source: AgentSettingsUICopy.watchProgressBarAlgorithmSecondary(testing: petMenuSettings.testingModeEnabled))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -169,7 +172,7 @@ struct IntegrationsTabView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    Text("可重复时两次命中之间的最短等待，避免条件一直为真时连续旁白。")
+                    MarkdownInlineText(source: AgentSettingsUICopy.integrationsWatchRepeatCooldownHint(testing: petMenuSettings.testingModeEnabled))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -243,7 +246,7 @@ struct IntegrationsTabView: View {
             } header: {
                 Text("盯屏任务")
             } footer: {
-                Text("启用进度条启发式时，请在主屏拖拽框选区域（Esc 取消）；无需手填数字。模型兜底在本地未命中时才会调用。已添加的任务可点「编辑」修改条件、兜底说明、是否重复使用及间隔。")
+                MarkdownInlineText(source: AgentSettingsUICopy.integrationsWatchTasksFooter(testing: petMenuSettings.testingModeEnabled))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -283,6 +286,7 @@ struct IntegrationsTabView: View {
         .sheet(item: $screenWatchEditorPresentation) { item in
             ScreenWatchTaskEditorSheet(taskId: item.id)
                 .environmentObject(screenWatchTasks)
+                .environmentObject(petMenuSettings)
                 .frame(minWidth: 480, minHeight: 560)
         }
     }

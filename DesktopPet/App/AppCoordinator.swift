@@ -191,6 +191,7 @@ final class AppCoordinator: ObservableObject {
                 .environmentObject(screenWatchEventStore)
                 .environmentObject(multimodalAttachmentLimitsStore)
                 .environmentObject(routeBus)
+                .environmentObject(settingsViewModel)
                 .environment(\.desktopPetAgentClient, agentClient)
         ))
     }
