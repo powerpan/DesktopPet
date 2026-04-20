@@ -14,6 +14,8 @@ enum PatrolRegionMode: String, CaseIterable, Identifiable, Codable {
     case secondaryOnly = "secondary"
     /// 每次巡逻 tick 在已连接显示器中随机选一屏的可见区（主 + 副）。
     case mainAndSecondary = "all"
+    /// 前台应用（排除本应用）主窗口中心落在哪块屏，就在该屏 `visibleFrame` 内巡逻；取不到前台窗时退回「含鼠标的屏」，再退回主屏。
+    case focusScreen = "focus"
 
     var id: String { rawValue }
 
@@ -22,6 +24,7 @@ enum PatrolRegionMode: String, CaseIterable, Identifiable, Codable {
         case .mainOnly: return "仅主屏"
         case .secondaryOnly: return "仅副屏"
         case .mainAndSecondary: return "主屏 + 副屏"
+        case .focusScreen: return "焦点屏"
         }
     }
 }
@@ -65,7 +68,34 @@ enum ScreenGeometry {
             return primary.visibleFrame
         case .mainAndSecondary:
             return (screens.randomElement() ?? primary).visibleFrame
+        case .focusScreen:
+            let myPID = ProcessInfo.processInfo.processIdentifier
+            if let front = approximateFrontmostAppWindowFrame(excludingPID: myPID),
+               let screen = screenContainingWindowFrame(front, screens: screens) {
+                return screen.visibleFrame
+            }
+            let mouseVF = visibleFrameContainingMouse()
+            if !mouseVF.isEmpty { return mouseVF }
+            return primary.visibleFrame
         }
+    }
+
+    /// Quartz / AppKit 全局坐标下，用窗口外框与哪块 `NSScreen.frame` 相交面积最大判定归属屏；无相交则用中心点落在的屏。
+    private static func screenContainingWindowFrame(_ windowFrame: CGRect, screens: [NSScreen]) -> NSScreen? {
+        guard !screens.isEmpty else { return nil }
+        var best: NSScreen?
+        var bestArea: CGFloat = 0
+        for s in screens {
+            let inter = windowFrame.intersection(s.frame)
+            let a = max(0, inter.width) * max(0, inter.height)
+            if a > bestArea {
+                bestArea = a
+                best = s
+            }
+        }
+        if let best, bestArea > 0 { return best }
+        let c = CGPoint(x: windowFrame.midX, y: windowFrame.midY)
+        return screens.first { $0.frame.contains(c) }
     }
 
     static func clampedPoint(_ point: CGPoint, in frame: CGRect) -> CGPoint {

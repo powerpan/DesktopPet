@@ -14,8 +14,8 @@ final class DesktopPetAppRouter {
         self.overlay = overlay
     }
 
-    func attachPetWindow(_ window: NSWindow?) {
-        overlay.attachPetWindow(window)
+    func attachPetWindow(_ window: NSWindow?, settings: SettingsViewModel? = nil) {
+        overlay.attachPetWindow(window, settings: settings)
     }
 
     func toggleCarePanel(root: AnyView) {

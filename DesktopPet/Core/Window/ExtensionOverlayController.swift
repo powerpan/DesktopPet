@@ -9,6 +9,8 @@ import SwiftUI
 @MainActor
 final class ExtensionOverlayController {
     private weak var petWindow: NSWindow?
+    /// 用于触发气泡内文字随「宠物缩放」略放大（仅读 `petScale`）。
+    private weak var bubbleScaleSettings: SettingsViewModel?
     private var carePanel: NSPanel?
     private var chatPanel: NSPanel?
     private var bubblePanel: NSPanel?
@@ -18,8 +20,14 @@ final class ExtensionOverlayController {
     private var bubbleSpeechText: String = ""
     private var bubbleContinueChat: (() -> Void)?
 
-    func attachPetWindow(_ window: NSWindow?) {
+    func attachPetWindow(_ window: NSWindow?, settings: SettingsViewModel? = nil) {
         petWindow = window
+        bubbleScaleSettings = settings
+    }
+
+    private var bubblePetScale: Double {
+        guard let s = bubbleScaleSettings?.petScale else { return 1.0 }
+        return min(max(s, PetConfig.petScaleMin), PetConfig.petScaleMax)
     }
 
     func isCareVisible() -> Bool {
@@ -171,7 +179,7 @@ final class ExtensionOverlayController {
             cont?()
         }
         // 先用默认尾巴测量 intrinsic，再由 layoutTriggerBubble 选象限并替换为最终视图。
-        let provisional = TriggerSpeechBubbleView(text: trimmed, tailEdge: .bottom, tailAlongOffset: 0, onTap: tap)
+        let provisional = TriggerSpeechBubbleView(text: trimmed, petScale: bubblePetScale, tailEdge: .bottom, tailAlongOffset: 0, onTap: tap)
         let hosting = NSHostingView(rootView: provisional)
         hosting.setFrameSize(NSSize(width: 360, height: 400))
         hosting.wantsLayer = true
@@ -271,6 +279,7 @@ final class ExtensionOverlayController {
         }
         let measureView = TriggerSpeechBubbleView(
             text: bubbleSpeechText,
+            petScale: bubblePetScale,
             tailEdge: tailEdge,
             tailAlongOffset: tailAlong0,
             onTap: tap
@@ -303,6 +312,7 @@ final class ExtensionOverlayController {
         )
         let refined = TriggerSpeechBubbleView(
             text: bubbleSpeechText,
+            petScale: bubblePetScale,
             tailEdge: tailEdge,
             tailAlongOffset: tailAlong2,
             onTap: tap

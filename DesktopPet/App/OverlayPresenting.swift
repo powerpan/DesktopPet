@@ -8,7 +8,7 @@ import SwiftUI
 
 @MainActor
 protocol OverlayPresenting: AnyObject {
-    func attachPetWindow(_ window: NSWindow?)
+    func attachPetWindow(_ window: NSWindow?, settings: SettingsViewModel?)
     func isCareVisible() -> Bool
     func isChatVisible() -> Bool
     func dismissChatPanel()

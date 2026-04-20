@@ -239,30 +239,36 @@ struct GrowthTabView: View {
                     Text("暂无记录")
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(petCare.state.recentDecayEvents.prefix(15)) { ev in
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack {
-                                Text(ev.source == .ai ? "AI" : "本地")
-                                    .font(.caption2.weight(.semibold))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(ev.source == .ai ? Color.blue.opacity(0.15) : Color.gray.opacity(0.15), in: Capsule())
-                                Text(ev.reasonCode)
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
-                                Spacer()
-                                Text(shortDate(ev.occurredAt))
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(petCare.state.recentDecayEvents) { ev in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack {
+                                        Text(ev.source == .ai ? "AI" : "本地")
+                                            .font(.caption2.weight(.semibold))
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(ev.source == .ai ? Color.blue.opacity(0.15) : Color.gray.opacity(0.15), in: Capsule())
+                                        Text(ev.reasonCode)
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                        Spacer()
+                                        Text(shortDate(ev.occurredAt))
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    Text(ev.reasonText)
+                                        .font(.caption)
+                                    Text("心情 \(signedPct(ev.moodDelta)) · 能量 \(signedPct(ev.energyDelta))")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.vertical, 2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            Text(ev.reasonText)
-                                .font(.caption)
-                            Text("心情 \(signedPct(ev.moodDelta)) · 能量 \(signedPct(ev.energyDelta))")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 2)
                     }
+                    .frame(maxHeight: 300)
                 }
             } header: {
                 Text("最近成长事件")

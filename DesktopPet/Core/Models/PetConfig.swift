@@ -40,4 +40,14 @@ struct PetConfig {
         let slack: CGFloat = 14
         return max(72, ceil(visualSide + slack))
     }
+
+    /// 触发旁白云气泡内正文字号相对 `petScale == 1` 的倍数：`petScale ≤ 1` 为 1；在 `(1, petScaleMax]` 内线性的略放大（与设置里 1.0～1.2 放大联动）。
+    static func triggerBubbleTextSizeMultiplier(scale: Double) -> Double {
+        let s = min(max(scale, petScaleMin), petScaleMax)
+        guard s > 1.0 else { return 1.0 }
+        let span = petScaleMax - 1.0
+        guard span > 0 else { return 1.0 }
+        let t = (s - 1.0) / span
+        return 1.0 + t * 0.12
+    }
 }

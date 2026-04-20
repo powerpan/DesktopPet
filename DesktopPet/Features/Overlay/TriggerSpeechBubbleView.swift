@@ -17,15 +17,34 @@ enum TriggerBubbleTailEdge: Int, CaseIterable, Equatable, Sendable {
 
 struct TriggerSpeechBubbleView: View {
     let text: String
+    /// 与设置里「宠物缩放」一致；≤1.0 时气泡正文字号与现网一致，(1, 1.2] 略放大。
+    var petScale: Double = 1.0
     var tailEdge: TriggerBubbleTailEdge = .bottom
     /// 沿附着边方向的偏移（pt）：上/下边为水平偏移（相对气泡宽度中心），左/右边为垂直偏移（相对高度中心）。
     var tailAlongOffset: CGFloat = 0
     /// 轻点气泡：通常先关气泡，再在回调里打开聊天等（由外层 `ExtensionOverlayController` 编排）。
     var onTap: () -> Void = {}
 
-    private let textMaxWidth: CGFloat = 300
+    private let textMaxWidthBase: CGFloat = 300
     private let tailW: CGFloat = 16
     private let tailH: CGFloat = 8
+
+    private var textSizeMultiplier: CGFloat {
+        CGFloat(PetConfig.triggerBubbleTextSizeMultiplier(scale: petScale))
+    }
+
+    /// 略放宽换行宽，避免放大字号后过早折行。
+    private var textMaxWidth: CGFloat {
+        min(320, textMaxWidthBase + 24 * max(0, textSizeMultiplier - 1))
+    }
+
+    private var bodyFontSize: CGFloat {
+        NSFont.preferredFont(forTextStyle: .callout, options: [:]).pointSize * textSizeMultiplier
+    }
+
+    private var scrollMaxHeight: CGFloat {
+        min(280, 220 * textSizeMultiplier)
+    }
 
     private var useScroll: Bool {
         text.count > 200 || text.components(separatedBy: .newlines).count > 6
@@ -83,7 +102,7 @@ struct TriggerSpeechBubbleView: View {
                 ScrollView {
                     textBlock
                 }
-                .frame(maxHeight: 220)
+                .frame(maxHeight: scrollMaxHeight)
             } else {
                 textBlock
             }
@@ -107,7 +126,7 @@ struct TriggerSpeechBubbleView: View {
     private var fittedTextWidth: CGFloat {
         let sizingText = InlineMarkdownBubble.plainForSizing(text)
         guard !sizingText.isEmpty else { return 1 }
-        let font = NSFont.preferredFont(forTextStyle: .callout, options: [:])
+        let font = NSFont.systemFont(ofSize: bodyFontSize)
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineBreakMode = .byWordWrapping
         let attrs: [NSAttributedString.Key: Any] = [.font: font, .paragraphStyle: paragraph]
@@ -137,7 +156,7 @@ struct TriggerSpeechBubbleView: View {
 
     private var textBlock: some View {
         Text(InlineMarkdownBubble.attributedDisplayString(text))
-            .font(.callout)
+            .font(.system(size: bodyFontSize))
             .foregroundStyle(.primary)
             .multilineTextAlignment(.leading)
             .frame(width: fittedTextWidth, alignment: .leading)

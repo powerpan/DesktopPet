@@ -22,7 +22,7 @@ private enum SettingsKeys {
 final class SettingsViewModel: ObservableObject {
     @Published var isClickThroughEnabled: Bool
     @Published var isPatrolEnabled: Bool
-    /// 启用巡逻时：随机落点限制在主屏、仅副屏或主+副中随机一屏。
+    /// 启用巡逻时：随机落点限制在主屏、仅副屏、主+副随机一屏，或「焦点屏」（跟前台应用所在显示器）。
     @Published var patrolRegionMode: PatrolRegionMode
     @Published var petScale: Double
     /// 桌前文字镜像：是否把全局按键映射到宠物卡片示意键盘（仅内存展示；敏感场景请在设置中关闭）。

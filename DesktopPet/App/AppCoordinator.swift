@@ -239,7 +239,7 @@ final class AppCoordinator: ObservableObject {
         )
         controller.showWindow(nil)
         petWindowController = controller
-        appRouter.attachPetWindow(controller.window)
+        appRouter.attachPetWindow(controller.window, settings: settingsViewModel)
     }
 
     private func wirePetWindowOverlayNotifications() {
