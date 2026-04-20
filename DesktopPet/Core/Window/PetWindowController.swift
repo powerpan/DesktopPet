@@ -110,8 +110,10 @@ final class PetWindowController: NSWindowController {
         ]
 
         let myPID = ProcessInfo.processInfo.processIdentifier
+        // 前台窗口若在巡逻区域外（例如在副屏），不要把目标点加进来，否则 clamp 后常贴在主屏边缘、看起来像「往副屏跑」。
         if Double.random(in: 0...1) < 0.5,
-           let front = ScreenGeometry.approximateFrontmostAppWindowFrame(excludingPID: myPID) {
+           let front = ScreenGeometry.approximateFrontmostAppWindowFrame(excludingPID: myPID),
+           visibleFrame.intersects(front) {
             let targetX = front.midX - frame.width / 2
             let targetY = front.maxY - frame.height * 0.12
             candidates.append(CGPoint(x: targetX, y: targetY))

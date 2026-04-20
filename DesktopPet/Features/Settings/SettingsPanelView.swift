@@ -27,7 +27,7 @@ struct SettingsPanelView: View {
                     }
                 }
                 .pickerStyle(.menu)
-                Text("仅副屏：多块外接时每次随机选其中一块非主屏；若未检测到外接显示器则退回主屏。主屏 + 副屏：每次巡逻在已连接屏幕中随机选一屏。")
+                Text("「仅主屏」指系统设置里作主显示器的那一块（显示器排列里带白条图标的那屏）。仅副屏：多块外接时每次随机选其中一块非主显示器；无外接则退回主显示器。主屏 + 副屏：每次巡逻在已连接屏幕中随机选一屏。")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity, alignment: .leading)

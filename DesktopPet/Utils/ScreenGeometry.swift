@@ -8,7 +8,7 @@ import CoreGraphics
 
 /// 启用巡逻时，宠物随机落点所限制的显示器范围（菜单栏「DesktopPet」设置）。
 enum PatrolRegionMode: String, CaseIterable, Identifiable, Codable {
-    /// 仅在 `NSScreen.main` 的可见桌面内巡逻。
+    /// 仅在系统「主显示器」的可见桌面内巡逻（`NSScreen.screens` 首屏，与系统设置里标白条的显示器一致；不用 `NSScreen.main` 以免与菜单栏/焦点屏混淆）。
     case mainOnly = "main"
     /// 仅在外接等非主屏上巡逻；若无外接屏则退回主屏。
     case secondaryOnly = "secondary"
@@ -27,6 +27,12 @@ enum PatrolRegionMode: String, CaseIterable, Identifiable, Codable {
 }
 
 enum ScreenGeometry {
+    /// 系统排列中的主显示器：`NSScreen.screens` 首项（Apple 文档中为 primary）；单屏时即该屏。
+    static func systemPrimaryScreen(from screens: [NSScreen]) -> NSScreen {
+        if let first = screens.first { return first }
+        return NSScreen.main!
+    }
+
     /// 返回「包含当前鼠标」的屏幕的 visibleFrame（排除菜单栏与 Dock）
     static func visibleFrameContainingMouse() -> CGRect {
         let mousePoint = NSEvent.mouseLocation
@@ -46,19 +52,19 @@ enum ScreenGeometry {
     static func visibleFrameForPatrol(mode: PatrolRegionMode) -> CGRect {
         let screens = NSScreen.screens
         guard !screens.isEmpty else { return .zero }
-        let main = NSScreen.main ?? screens[0]
-        let nonMain = screens.filter { $0 !== main }
+        let primary = systemPrimaryScreen(from: screens)
+        let nonPrimary = screens.filter { $0 !== primary }
 
         switch mode {
         case .mainOnly:
-            return main.visibleFrame
+            return primary.visibleFrame
         case .secondaryOnly:
-            if let s = nonMain.randomElement() ?? nonMain.first {
+            if let s = nonPrimary.randomElement() ?? nonPrimary.first {
                 return s.visibleFrame
             }
-            return main.visibleFrame
+            return primary.visibleFrame
         case .mainAndSecondary:
-            return (screens.randomElement() ?? main).visibleFrame
+            return (screens.randomElement() ?? primary).visibleFrame
         }
     }
 
