@@ -139,8 +139,35 @@ final class ExtensionOverlayController {
         let pf = win.frame
         let w: CGFloat = min(320, max(220, pf.width))
         let h: CGFloat = 200
-        let origin = NSPoint(x: pf.midX - w / 2, y: pf.minY - h - 8)
-        panel.setFrame(NSRect(origin: origin, size: NSSize(width: w, height: h)), display: true)
+        let vf = win.screen?.visibleFrame ?? ScreenGeometry.visibleFrameContainingMouse()
+        let edgeGap: CGFloat = 8
+        let margin: CGFloat = 10
+
+        let xCentered = pf.midX - w / 2
+        /// 默认：饲养窗在宠窗**下方**（与原先一致）。
+        let belowOrigin = NSPoint(x: xCentered, y: pf.minY - h - edgeGap)
+        let belowFits = belowOrigin.y >= vf.minY + margin
+        /// 避让：下方会进 Dock / 屏外时，改挂到宠窗**上方**。
+        let aboveOrigin = NSPoint(x: xCentered, y: pf.maxY + edgeGap)
+        let aboveFits = aboveOrigin.y + h <= vf.maxY - margin
+
+        let originRaw: NSPoint
+        if belowFits {
+            originRaw = belowOrigin
+        } else if aboveFits {
+            originRaw = aboveOrigin
+        } else {
+            // 上下都紧张时仍优先「下方」逻辑，再由 `clampedOrigin` 压进可见区。
+            originRaw = belowOrigin
+        }
+
+        let clamped = ScreenGeometry.clampedOrigin(
+            NSSize(width: w, height: h),
+            origin: originRaw,
+            in: vf,
+            margin: margin
+        )
+        panel.setFrame(NSRect(origin: clamped, size: NSSize(width: w, height: h)), display: true)
     }
 
     private func layoutChatPanel() {
