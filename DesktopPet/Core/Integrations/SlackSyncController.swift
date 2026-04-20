@@ -354,7 +354,7 @@ final class SlackSyncController: ObservableObject {
             await postSlackThreadReply(
                 channelId: slackChannelId,
                 threadTs: threadTs,
-                text: SlackPetHelpCommand.integrationHelpText
+                text: SlackPetHelpCommand.integrationHelpMarkdown()
             )
             statusMessage = "已在 Slack 回复帮助说明。"
             return
@@ -482,11 +482,11 @@ final class SlackSyncController: ObservableObject {
         switch parsed {
         case .remotePickOnly(let pick):
             agent.screenSnapSlackRemoteDisplayPick = pick
-            let label = pick == .mainDisplay ? "主屏" : "副屏"
+            let label = pick.zhShortLabel
             let tail: String
             if agent.screenSnapCaptureTarget == .off {
                 tail =
-                    "当前 Mac 上「截屏类触发」仍为**关**，**不能**通过 Slack 远程改为「开」；自动截屏与菜单栏截屏旁白不会执行。\n\n已记录：远程点屏等会优先按 **\(label)** 截取（需屏幕录制权限）。若要启用自动截屏，请在装有 DesktopPet 的 Mac 上打开：**智能体工作台 → 自动化 → 隐私**，选择「截取主屏」或「截取副屏」。"
+                    "当前 Mac 上「截屏类触发」仍为**关**，**不能**通过 Slack 远程改为「开」；自动截屏与菜单栏截屏旁白不会执行。\n\n已记录：远程点屏等会优先按 **\(label)** 截取（需屏幕录制权限）。若要启用自动截屏，请在装有 DesktopPet 的 Mac 上打开：**智能体工作台 → 自动化 → 隐私**，选择「截取主屏」「截取副屏」或「截取焦点屏」。"
             } else {
                 tail =
                     "当前本机已选择「\(agent.screenSnapCaptureTarget.privacyMenuTitle)」；自动截屏按该档位执行。本偏好仍会在你将来改回「关」时，供远程点屏等使用。"
@@ -503,11 +503,11 @@ final class SlackSyncController: ObservableObject {
                     threadTs: threadTs,
                     text:
                         """
-                        🐱 当前 Mac 上「截屏类触发」为**关**，**不能通过 Slack 远程改为「截取主屏 / 截取副屏」**（避免在你不知情时打开截屏与多模态上传）。
+                        🐱 当前 Mac 上「截屏类触发」为**关**，**不能通过 Slack 远程改为「截取主屏 / 截取副屏 / 截取焦点屏」**（避免在你不知情时打开截屏与多模态上传）。
 
-                        请在本机 **智能体工作台 → 自动化 → 隐私** 中手动选择「截取主屏」或「截取副屏」。
+                        请在本机 **智能体工作台 → 自动化 → 隐私** 中手动选择「截取主屏」「截取副屏」或「截取焦点屏」。
 
-                        你仍可在总开关为关时，用 Slack **仅选择显示器**：`!pet screen pick main` / `!pet screen pick secondary`，或发「**截屏目标主屏**」「**截屏目标副屏**」，供远程点屏等按该屏截取。
+                        你仍可在总开关为关时，用 Slack **仅选择显示器**：`!pet screen pick main` / `pick secondary` / `pick focus`，或发「**截屏目标主屏**」「**截屏目标副屏**」「**截屏目标焦点屏**」，供远程点屏等按该屏截取。
                         """
                 )
                 return

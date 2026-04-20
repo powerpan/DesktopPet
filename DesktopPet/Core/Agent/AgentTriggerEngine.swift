@@ -328,7 +328,8 @@ final class AgentTriggerEngine: ObservableObject {
 
         let maxEdge = Self.clampedScreenSnapMaxEdge(rule.screenSnapMaxEdgePixels)
         let q = Self.clampedJPEGQuality(rule.screenSnapJPEGQuality)
-        let cap = settings.screenSnapCaptureTarget
+        let privacy = settings.screenSnapCaptureTarget
+        let cap = rule.screenSnapDisplayChoice.resolvedCaptureTarget(privacy: privacy)
         let jpeg: Data
         do {
             jpeg = try await ScreenCaptureService.captureJPEG(for: cap, maxEdge: maxEdge, jpegQuality: CGFloat(q))
@@ -442,7 +443,8 @@ final class AgentTriggerEngine: ObservableObject {
                         jpegByteCount: jpegData.count,
                         maxEdge: Self.clampedScreenSnapMaxEdge(trigger.screenSnapMaxEdgePixels),
                         degraded: true,
-                        captureDisplayPhrase: settings.screenSnapCaptureTarget.metaDisplayPhrase
+                        captureDisplayPhrase: trigger.screenSnapDisplayChoice
+                            .resolvedCaptureTarget(privacy: settings.screenSnapCaptureTarget).metaDisplayPhrase
                     )
                     let userLine2 = renderUserPrompt(
                         trigger: trigger,

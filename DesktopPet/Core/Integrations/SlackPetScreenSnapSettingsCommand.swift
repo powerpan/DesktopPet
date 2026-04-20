@@ -24,6 +24,7 @@ enum SlackPetScreenSnapSettingsCommand {
             let rest = String(t.dropFirst("!pet screen pick".count)).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             if rest == "main" || rest == "primary" { return .remotePickOnly(.mainDisplay) }
             if rest == "secondary" || rest == "sub" || rest == "2" { return .remotePickOnly(.secondaryDisplay) }
+            if rest == "focus" { return .remotePickOnly(.focusDisplay) }
             if rest == "主" || rest == "主屏" { return .remotePickOnly(.mainDisplay) }
             if rest == "副" || rest == "副屏" { return .remotePickOnly(.secondaryDisplay) }
             return nil
@@ -35,6 +36,7 @@ enum SlackPetScreenSnapSettingsCommand {
             if rest == "off" || rest == "关" || rest == "关闭" { return .setCaptureTarget(.off) }
             if rest == "main" || rest == "primary" { return .setCaptureTarget(.mainDisplay) }
             if rest == "secondary" || rest == "sub" || rest == "2" { return .setCaptureTarget(.secondaryDisplay) }
+            if rest == "focus" { return .setCaptureTarget(.focusDisplay) }
             if rest == "主" || rest == "主屏" { return .setCaptureTarget(.mainDisplay) }
             if rest == "副" || rest == "副屏" { return .setCaptureTarget(.secondaryDisplay) }
             if ["on", "开", "打开", "启用"].contains(rest) { return .setCaptureTarget(.mainDisplay) }
@@ -46,8 +48,10 @@ enum SlackPetScreenSnapSettingsCommand {
         for p in pickMainPhrases where matchesWholeOrPrefixKeyword(t, phrase: p) { return .remotePickOnly(.mainDisplay) }
         let pickSecPhrases = ["截屏目标副屏", "远程截屏副屏", "点屏目标副屏", "远程点屏副屏", "slack截屏副屏", "slack 截屏副屏"]
         for p in pickSecPhrases where matchesWholeOrPrefixKeyword(t, phrase: p) { return .remotePickOnly(.secondaryDisplay) }
+        let pickFocusPhrases = ["截屏目标焦点屏", "远程截屏焦点屏", "点屏目标焦点屏", "远程点屏焦点屏"]
+        for p in pickFocusPhrases where matchesWholeOrPrefixKeyword(t, phrase: p) { return .remotePickOnly(.focusDisplay) }
 
-        // 中文：写总档位（关 / 主 / 副）
+        // 中文：写总档位（关 / 主 / 副 / 焦点）
         let offPhrases = ["截屏关", "关闭截屏", "截屏总开关关", "关闭截屏总开关", "截屏关闭"]
         for p in offPhrases where matchesWholeOrPrefixKeyword(t, phrase: p) { return .setCaptureTarget(.off) }
 
@@ -56,6 +60,9 @@ enum SlackPetScreenSnapSettingsCommand {
 
         let secPhrases = ["截取副屏", "截屏副屏", "截屏改副屏", "截屏切换到副屏", "截屏总开关副屏", "副屏截屏"]
         for p in secPhrases where matchesWholeOrPrefixKeyword(t, phrase: p) { return .setCaptureTarget(.secondaryDisplay) }
+
+        let focusPhrases = ["截取焦点屏", "截屏焦点屏", "截屏改焦点屏", "截屏切换到焦点屏", "截屏总开关焦点屏", "焦点屏截屏"]
+        for p in focusPhrases where matchesWholeOrPrefixKeyword(t, phrase: p) { return .setCaptureTarget(.focusDisplay) }
 
         return nil
     }

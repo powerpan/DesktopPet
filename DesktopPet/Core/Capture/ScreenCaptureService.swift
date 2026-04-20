@@ -98,7 +98,40 @@ enum ScreenCaptureService {
                 throw ScreenCaptureServiceError.noSecondaryDisplay
             }
             return d
+        case .focusDisplay:
+            return try resolveFocusSCDisplay(content: content, mainDisplayID: mainID)
         }
+    }
+
+    /// 与巡逻「焦点屏」一致：前台（非本应用）大窗与哪块 `CGDisplayBounds` 相交面积最大；否则鼠标所在显示；再退回主显示器。
+    private static func resolveFocusSCDisplay(content: SCShareableContent, mainDisplayID: CGDirectDisplayID) throws -> SCDisplay {
+        let myPID = ProcessInfo.processInfo.processIdentifier
+        if let front = ScreenGeometry.approximateFrontmostAppWindowFrame(excludingPID: myPID) {
+            var best: SCDisplay?
+            var bestArea: CGFloat = 0
+            for d in content.displays {
+                let b = CGDisplayBounds(d.displayID)
+                let inter = front.intersection(b)
+                let a = max(0, inter.width) * max(0, inter.height)
+                if a > bestArea {
+                    bestArea = a
+                    best = d
+                }
+            }
+            if let best, bestArea > 0 { return best }
+            let c = CGPoint(x: front.midX, y: front.midY)
+            if let d = content.displays.first(where: { CGDisplayBounds($0.displayID).contains(c) }) {
+                return d
+            }
+        }
+        let mouse = NSEvent.mouseLocation
+        if let d = content.displays.first(where: { CGDisplayBounds($0.displayID).contains(mouse) }) {
+            return d
+        }
+        guard let d = content.displays.first(where: { $0.displayID == mainDisplayID }) ?? content.displays.first else {
+            throw ScreenCaptureServiceError.noDisplay
+        }
+        return d
     }
 
     private static func resolveCGDisplayID(for target: ScreenSnapCaptureTarget) async throws -> CGDirectDisplayID {

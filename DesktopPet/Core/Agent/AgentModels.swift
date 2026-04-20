@@ -327,6 +327,8 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
     var screenSnapMaxEdgePixels: Int
     /// JPEG `compressionFactor`（UI 滑条 0.55～0.85）：越大压缩越轻、画质越好、同分辨率下体积越大。
     var screenSnapJPEGQuality: Double
+    /// 截取哪块物理显示器；「跟随自动化」与「隐私」页截屏总档位一致。
+    var screenSnapDisplayChoice: ScreenSnapTriggerDisplayChoice
     /// 在「触发器」总开关开启时，本条旁白除气泡外是否再发到 Slack 监控频道。
     var notifySlack: Bool
 
@@ -349,6 +351,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         screenSnapOnlyWhenPetVisible: Bool = true,
         screenSnapMaxEdgePixels: Int = 1024,
         screenSnapJPEGQuality: Double = 0.72,
+        screenSnapDisplayChoice: ScreenSnapTriggerDisplayChoice = .followAgentPrivacy,
         notifySlack: Bool = false
     ) {
         self.id = id
@@ -369,6 +372,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         self.screenSnapOnlyWhenPetVisible = screenSnapOnlyWhenPetVisible
         self.screenSnapMaxEdgePixels = screenSnapMaxEdgePixels
         self.screenSnapJPEGQuality = screenSnapJPEGQuality
+        self.screenSnapDisplayChoice = screenSnapDisplayChoice
         self.notifySlack = notifySlack
     }
 
@@ -406,6 +410,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         screenSnapOnlyWhenPetVisible = try c.decodeIfPresent(Bool.self, forKey: .screenSnapOnlyWhenPetVisible) ?? true
         screenSnapMaxEdgePixels = try c.decodeIfPresent(Int.self, forKey: .screenSnapMaxEdgePixels) ?? 1024
         screenSnapJPEGQuality = try c.decodeIfPresent(Double.self, forKey: .screenSnapJPEGQuality) ?? 0.72
+        screenSnapDisplayChoice = try c.decodeIfPresent(ScreenSnapTriggerDisplayChoice.self, forKey: .screenSnapDisplayChoice) ?? .followAgentPrivacy
         notifySlack = try c.decodeIfPresent(Bool.self, forKey: .notifySlack) ?? false
     }
 
@@ -429,6 +434,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         try c.encode(screenSnapOnlyWhenPetVisible, forKey: .screenSnapOnlyWhenPetVisible)
         try c.encode(screenSnapMaxEdgePixels, forKey: .screenSnapMaxEdgePixels)
         try c.encode(screenSnapJPEGQuality, forKey: .screenSnapJPEGQuality)
+        try c.encode(screenSnapDisplayChoice, forKey: .screenSnapDisplayChoice)
         try c.encode(notifySlack, forKey: .notifySlack)
     }
 
@@ -439,6 +445,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
         case routes, defaultPromptTemplate
         case triggerTemperature, triggerMaxTokens
         case screenSnapIntervalMinutes, screenSnapOnlyWhenPetVisible, screenSnapMaxEdgePixels, screenSnapJPEGQuality
+        case screenSnapDisplayChoice
         case notifySlack
     }
 
@@ -538,6 +545,7 @@ struct AgentTriggerRule: Identifiable, Equatable, Codable {
             screenSnapOnlyWhenPetVisible: true,
             screenSnapMaxEdgePixels: 1024,
             screenSnapJPEGQuality: 0.72,
+            screenSnapDisplayChoice: .followAgentPrivacy,
             notifySlack: false
         )
     }

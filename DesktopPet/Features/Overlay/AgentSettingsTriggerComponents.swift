@@ -87,7 +87,7 @@ struct TriggerRuleRow: View {
             return "前台路由\(routeHint)\(slackHint)"
         case .screenSnap:
             let perm = ScreenCaptureService.hasScreenRecordingPermission ? "已授权" : "未授权"
-            return "间隔≥\(r.screenSnapIntervalMinutes)分·\(perm)\(routeHint)\(slackHint)"
+            return "间隔≥\(r.screenSnapIntervalMinutes)分·\(r.screenSnapDisplayChoice.compactListLabel)·\(perm)\(routeHint)\(slackHint)"
         case .careInteraction: return "饲养面板成功后·旁白\(routeHint)\(slackHint)"
         case .petStatAutomation: return "心情/能量偏低或成长事件·旁白\(routeHint)\(slackHint)"
         case .screenWatch: return "盯屏任务命中旁白"
@@ -359,6 +359,12 @@ struct TriggerRuleEditorSheet: View {
                                 NSWorkspace.shared.open(url)
                             }
                         }
+                        Picker("截取显示器", selection: $rule.screenSnapDisplayChoice) {
+                            ForEach(ScreenSnapTriggerDisplayChoice.allCases) { ch in
+                                Text(ch.pickerLabel).tag(ch)
+                            }
+                        }
+                        .pickerStyle(.menu)
                         Stepper("成功旁白最短间隔（分钟）: \(rule.screenSnapIntervalMinutes)", value: $rule.screenSnapIntervalMinutes, in: 5 ... 24 * 60)
                         MarkdownInlineText(source: "与下方「冷却」取**更长**者作为实际上限。", font: .caption2)
                             .foregroundStyle(.tertiary)

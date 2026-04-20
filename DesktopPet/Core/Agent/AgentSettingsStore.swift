@@ -57,7 +57,7 @@ final class AgentSettingsStore: ObservableObject {
     @Published var attachKeySummary: Bool
     /// 键盘模式触发总开关（仍受每条 trigger 控制）
     @Published var keyboardTriggerMasterEnabled: Bool
-    /// 截屏类自动化总档位：关 / 主屏 / 副屏（「隐私」下拉与 Slack 指令）。
+    /// 截屏类自动化总档位：关 / 主屏 / 副屏 / 焦点屏（「隐私」下拉与 Slack 指令）。
     @Published var screenSnapCaptureTarget: ScreenSnapCaptureTarget
     /// 总开关为「关」时，Slack 仅可写入此项，供远程点屏等按偏好选择物理屏。
     @Published var screenSnapSlackRemoteDisplayPick: ScreenSnapSlackRemoteDisplayPick?
@@ -262,7 +262,11 @@ final class AgentSettingsStore: ObservableObject {
     func effectiveCaptureTargetForRemoteClickImaging() -> ScreenSnapCaptureTarget {
         if screenSnapCaptureTarget != .off { return screenSnapCaptureTarget }
         if let p = screenSnapSlackRemoteDisplayPick {
-            return p == .mainDisplay ? .mainDisplay : .secondaryDisplay
+            switch p {
+            case .mainDisplay: return .mainDisplay
+            case .secondaryDisplay: return .secondaryDisplay
+            case .focusDisplay: return .focusDisplay
+            }
         }
         return .mainDisplay
     }
