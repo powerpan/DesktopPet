@@ -73,20 +73,6 @@ DesktopPet/
 - **设置**：「关闭按键镜像」等见 `SettingsViewModel` / 设置面板；无权限时桌镜区有降级文案。
 - **素材来源与许可**：当前 PNG 命名对齐参考工程 BongoCat 的 `keyboard/resources`；**分发前请自行确认** Live2D / 第三方素材是否允许随应用使用。
 
-## 已实现行为（相对上一版骨架）
-
-- 启动后由 `AppCoordinator` 创建宠物窗口；无独立 `WindowGroup` 主窗口，避免与桌宠双窗口干扰。
-- 全局 `keyDown` 单路监听；`⌘K` 与「敲击」反馈分流。
-- 巡逻定时器在可见桌面范围内随机移动宠物窗口；约一半概率尝试贴近**当前前台其他应用窗口**上沿（基于 `CGWindowListCopyWindowInfo`，无额外权限时亦常可用）。
-- 鼠标靠近仍可唤醒睡眠态等逻辑，但**不再**对精灵层做水平位移，避免画面随光标晃动。
-- 连续打字会略**缩短敲击态**停留时间，反馈更跟手。
-- 睡眠态下不再重设「进入睡眠」的空闲计时器，避免无意义重复触发。
-- 空闲约 `PetConfig.default.idleToSleepInterval` 秒后进入睡眠状态；键鼠或巡逻可唤醒。
-- 设置项（穿透、巡逻、缩放）持久化。
-- 辅助功能：`AXIsProcessTrusted` 诊断文案、`tccutil` 与签名自检说明；未授权时延迟登记 TCC 列表与多次重检；`PetWindow` 允许必要时成为 key 以避免 `makeKeyWindow` 控制台告警。
-- **桌前镜像**：`DeskMirrorTextView` 整幅 `cover` / `nohand_cover` 与爪印、鼠标方向 PNG 同比例叠放；`DeskMirrorKeyImage` 负责 Bundle 路径与宽高比；`DeskMirrorModel` 维护物理高亮、展示层延迟与鼠标方向防抖。
-- **饲养 / 智能体 / 叠加窗**：由 `ExtensionOverlayController` 锚定在宠窗旁；`AppCoordinator` 编排 `PetCareModel`、`AgentTriggerEngine`、`FrontmostAppWatcher` 与键鼠活动采样；`⌘K` 与桌镜主流程保持独立。
-
 ## 扩展功能（饲养与智能体）
 
 以下能力**不替代**桌镜主卡片，叠加面板锚定在宠物窗口旁，可通过菜单栏独立显隐。
@@ -122,7 +108,7 @@ xcodebuild -scheme DesktopPet -configuration Debug -derivedDataPath ./build/Deri
 | 文档 | 说明 |
 |------|------|
 | [`docs/requirements.md`](docs/requirements.md) | 需求文档（PRD） |
-| [`docs/TODO.md`](docs/TODO.md) | 待办与后续工作 |
+| [`docs/TODO.md`](docs/TODO.md) | **未完成**事项与后续工作（已实现内容不再在此重复罗列） |
 | [`docs/TODO_AGENT_AND_CARE.md`](docs/TODO_AGENT_AND_CARE.md) | 饲养、智能体、叠加 UI、触发器与合规对照 |
 | [`docs/SCREEN_SNAP_TRIGGER_SPEC.md`](docs/SCREEN_SNAP_TRIGGER_SPEC.md) | 截屏触发规格 |
 | [`docs/UI_CONVENTIONS.md`](docs/UI_CONVENTIONS.md) | UI 约定 |

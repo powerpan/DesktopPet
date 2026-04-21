@@ -42,9 +42,10 @@
 
 ## 2. AgentClient / API 契约（P1）
 
-### 2.1 现状
+### 2.1 实现现状（以代码为准）
 
-- `completeChat(..., messages: [[String: String]], ...)` 仅支持 `role` + 字符串 `content`，无法满足多模态。
+- `AgentClient` 已提供 **`completeChat(..., userMessages: [AgentAPIChatUserMessage], ...)`**：`AgentAPIChatUserMessage` 可含多段 `AgentAPIChatContentPart`（`text` / `imageJPEG` / `imageData`），序列化为 OpenAI 兼容的 `content` 字符串或 `content` 数组。
+- 纯文本调用方仍可使用 **`completeChat(..., messages: [[String: String]], ...)`** 便捷重载（内部转为单段 text）。
 
 ### 2.2 目标 JSON 形态（与 OpenAI Chat Completions 对齐）
 
@@ -57,10 +58,10 @@
 
 **注意**：部分供应商支持 `detail: low|high|auto` 字段，实施时作为可选参数透传；未支持则应剥离以免 400。
 
-### 2.3 Swift 侧建模建议（规格，非强制命名）
+### 2.3 Swift 侧建模（已实现命名）
 
-- 引入 `ChatMessage` / `ChatContentPart` 枚举（`text(String)`、`imageData(mime: Data)` 或 `imageBase64URL(String)`），由统一 builder 序列化为 JSON。
-- `AgentClient` 保留一条 **纯文本便捷重载**（内部转为单段 `text`），保证现有调用方零改动或最小改动。
+- 类型名：`AgentAPIChatContentPart`、`AgentAPIChatUserMessage`（见 `Core/Agent/AgentClient.swift`）；多会话/附件拼装见 `ChatMultimodalAPIBuilder` 等。
+- 若规格与实现字段不一致，以 **Xcode 工程内源码** 为准并回写本节。
 
 ### 2.4 错误与回退
 
