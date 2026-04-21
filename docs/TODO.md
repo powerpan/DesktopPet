@@ -1,6 +1,6 @@
 # DesktopPet 待办 / 后续工作
 
-> 与 `docs/requirements.md` 目标对照后的缺口清单；完成项请勾掉并可在 PR 中注明。
+> 与 `docs/requirements.md` 对照的**缺口与后续工作**清单。已在主分支落地的能力见 `README.md` 与 PRD §9 验收清单；本文件只保留未勾选或可选项。
 
 ## 产品方向（与当前实现对齐）
 
@@ -35,15 +35,6 @@
 ## 工程与发布
 
 - [x] **README 许可证**：已添加根目录 `LICENSE`（MIT），README 已链接。
-- [ ] **验收清单**：在 `docs/requirements.md` 第 9 节将已实现项改为 `[x]`，并保留为发版前检查表。
-- [ ] **PRD 结构树对齐**：文档中 `KeyboardMonitor` / `GIFPlayer` 等与当前仓库文件名不一致处，择期与源码同步或标注「规划中」。
+- [ ] **验收清单**：发版前按 `docs/requirements.md` §9 与 `README` 快速回归一遍。
+- [ ] **PRD 结构树**：若新增模块，同步更新 PRD §10 目录树（避免与源码漂移）。
 - [ ] **分发**（若对公众发布）：Developer ID 签名、公证、分发说明；若考虑 Mac App Store，需单独评估沙盒与权限方案。
-
-## 已完成（便于对照，可随进度删减）
-
-- [x] **饲养 + DeepSeek 对话 + 触发器 MVP**：`Core/Care`、`Core/Agent`、`Features/Overlay`、`ExtensionOverlayController`；菜单栏饲养/对话显隐与智能体设置；`README` / `docs` 已同步摘要。
-- [x] 菜单栏 accessory、`NSPanel` 桌宠窗口、穿透与命中包络、`petScale` 与窗口锚定缩放。
-- [x] 辅助功能引导、Bundle ID、`NSAccessibilityUsageDescription`、TCC 诊断与延迟重检、全局键与 ⌘K。
-- [x] 状态机骨架、巡逻调度、设置持久化（穿透/巡逻/缩放）、`visualBaselineFactor` 默认体量。
-- [x] **桌前镜像 v1**：`Resources/DeskMirror`（`cover` / `nohand_cover`、`left-keys`、`right-keys`）+ `DeskMirrorKeyImage` / `DeskMirrorTextView` / `DeskMirrorModel`；整幅叠层同比例；空闲与有输入切换底图；**keyUp** 清除物理键高亮；展示层 **~0.3s** 保持最后一键/最后一向；鼠标静止采样不反复重置清除计时器；设置项「关闭按键镜像」与无 AX 降级文案。
-- [x] 桌镜卡片 UI：标题「七七猫1.0」、底部英文 `PetState.rawValue`、键入历史行样式与边距；卡片内左右边距不对称以尽量占满桌镜宽度。

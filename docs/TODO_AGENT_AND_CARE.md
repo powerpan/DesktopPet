@@ -12,7 +12,7 @@
 | 饲养 | `Core/Care/PetCareState.swift`、`PetCareModel.swift`；UI `Features/Overlay/CareOverlayView.swift`。 |
 | 智能体 | `Core/Agent/*`；UI `ChatOverlayView.swift`、`AgentSettingsView.swift`。 |
 
-里程碑 M1～M5 中，**截屏多模态**与**流式 SSE** 仍为后续项；其余 MVP 已在主分支落地（见下文勾选）。
+里程碑 M1～M5 及截屏多模态主路径已在主分支落地；**流式 SSE** 等仍见下文待办。
 
 ---
 
@@ -129,22 +129,12 @@ Trigger: id, enabled, kind(enum), cooldownSeconds, lastFiredAt, configJSON
 
 ## 5. 与主工程 `docs/TODO.md` 的关系
 
-- **主 TODO**：拖窗动画、巡逻静默、测试等继续跟主线。
-- **本文档**：饲养 + 智能体 + 叠加 UI + 菜单栏设置；**较大功能**，建议单独分支（如 `feature/agent-care`）分 PR 合并。
+- **`docs/TODO.md`**：桌宠主线（拖窗动画、巡逻与测试等）。
+- **本文档**：饲养、智能体、叠加 UI、集成（Slack 等）的**补充**待办与合规提醒；大改动仍建议独立分支分 PR。
 
 ---
 
-## 6. 建议里程碑（可选）
-
-1. **M1**：叠加空壳面板 + 菜单栏显隐 + 本地占位文案。（已完成）  
-2. **M2**：饲养状态模型 + 简单 UI + 持久化。（已完成）  
-3. **M3**：DeepSeek 文本对话 MVP + Keychain + 基础设置页。（已完成）  
-4. **M4**：定时 + 随机空闲触发器。（已完成）  
-5. **M5**：键盘模式触发（安全流程）→ 前台应用名（已完成）→ **截屏/多模态**（已实现 ScreenCaptureKit + 多模态 API，见 4.3）。
-
----
-
-## 7. 文档与合规
+## 6. 文档与合规
 
 - [x] README 增加「扩展功能」小节链接到本文档。
 - [ ] 用户可见：DeepSeek 使用条款、数据出境说明（若适用）、截屏与键位监听的双重同意文案（当前设置内已有简要风险提示，正式发版前可再补独立说明页）。
