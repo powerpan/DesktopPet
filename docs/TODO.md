@@ -34,7 +34,7 @@
 
 ## 工程与发布
 
-- [ ] **README 许可证**：由「待补充」改为 MIT 或实际许可证全文。
+- [x] **README 许可证**：已添加根目录 `LICENSE`（MIT），README 已链接。
 - [ ] **验收清单**：在 `docs/requirements.md` 第 9 节将已实现项改为 `[x]`，并保留为发版前检查表。
 - [ ] **PRD 结构树对齐**：文档中 `KeyboardMonitor` / `GIFPlayer` 等与当前仓库文件名不一致处，择期与源码同步或标注「规划中」。
 - [ ] **分发**（若对公众发布）：Developer ID 签名、公证、分发说明；若考虑 Mac App Store，需单独评估沙盒与权限方案。

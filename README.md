@@ -117,12 +117,22 @@ xcodebuild -scheme DesktopPet -configuration Debug -derivedDataPath ./build/Deri
 - **`NSXPCDecoder` / `NSSecureCoding` / `Allowed class list` 含 `NSObject`**：多为 **macOS 系统或 SwiftUI（菜单栏场景、`Settings`、窗口服务）** 在 XPC 解码时的内部告警，**不一定来自本仓库业务代码**。本工程已对各 `NSWindow` / `NSPanel` 设置 **`isRestorable = false`**，以降低与窗口状态恢复相关的噪声；若仍偶发出现，可在 Xcode 控制台按进程过滤 **DesktopPet**，或忽略该条（Apple 文档称未来可能升级为硬错误，届时需随系统/SDK 更新）。
 - **`decode: bad range`**：常与上述系统侧解码或调试器注入有关；若应用界面与功能正常，一般可视为良性日志。
 
-## 需求文档
+## 文档索引
 
-- 详细 PRD：`docs/requirements.md`
-- 待办与后续工作：`docs/TODO.md`
-- **扩展规划与实现对照**（饲养、智能体 DeepSeek、叠加 UI、触发器与合规待办）：`docs/TODO_AGENT_AND_CARE.md`
+| 文档 | 说明 |
+|------|------|
+| [`docs/requirements.md`](docs/requirements.md) | 需求文档（PRD） |
+| [`docs/TODO.md`](docs/TODO.md) | 待办与后续工作 |
+| [`docs/TODO_AGENT_AND_CARE.md`](docs/TODO_AGENT_AND_CARE.md) | 饲养、智能体、叠加 UI、触发器与合规对照 |
+| [`docs/SCREEN_SNAP_TRIGGER_SPEC.md`](docs/SCREEN_SNAP_TRIGGER_SPEC.md) | 截屏触发规格 |
+| [`docs/UI_CONVENTIONS.md`](docs/UI_CONVENTIONS.md) | UI 约定 |
+| [`docs/SECURITY_AND_PRIVACY.md`](docs/SECURITY_AND_PRIVACY.md) | **安全与隐私**：密钥不落库、推送前自检命令 |
+
+## 安全与隐私（贡献者）
+
+- API Key 与 Slack Token **仅保存在本机钥匙串**，不写入 `UserDefaults` 或仓库；推送前请阅读 [`docs/SECURITY_AND_PRIVACY.md`](docs/SECURITY_AND_PRIVACY.md) 并按文中命令自检。
+- 用户侧敏感能力说明见上文 **隐私提示** 与设置内文案。
 
 ## 许可证
 
-待补充（建议 MIT）。
+本项目以 [MIT License](LICENSE) 授权。
