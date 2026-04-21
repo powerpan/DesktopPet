@@ -66,9 +66,14 @@ final class PetWindowController: NSWindowController {
             }
             .store(in: &cancellables)
 
-        Publishers.Merge(
+        // accessory 形态下点击其他应用时，NSApplication 的 active 通知常常不来，但 NSWorkspace 会播报前台切换；
+        // 与跨屏拖动触发的 didChangeScreen 一样，用来拉回透明 NSPanel 上 SwiftUI `glassEffect` 的合成状态。
+        Publishers.MergeMany(
             NotificationCenter.default.publisher(for: NSWindow.didChangeScreenNotification, object: window),
-            NotificationCenter.default.publisher(for: NSWindow.didChangeBackingPropertiesNotification, object: window)
+            NotificationCenter.default.publisher(for: NSWindow.didChangeBackingPropertiesNotification, object: window),
+            NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification),
+            NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification),
+            NotificationCenter.default.publisher(for: NSWorkspace.didActivateApplicationNotification)
         )
         .debounce(for: .milliseconds(40), scheduler: DispatchQueue.main)
         .sink { [weak self] _ in

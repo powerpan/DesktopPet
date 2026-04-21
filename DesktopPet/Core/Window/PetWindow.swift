@@ -34,4 +34,23 @@ final class PetWindow: NSPanel {
     override var canBecomeKey: Bool { true }
 
     override var canBecomeMain: Bool { false }
+
+    /// 焦点离开宠窗时，系统对透明 `NSPanel` 上 SwiftUI `glassEffect` 的合成路径会切换，若不及时重绘会像「液态玻璃失效」；`becomeKey` 时同样刷新以恢复一致。
+    override func resignKey() {
+        super.resignKey()
+        scheduleHostedSwiftUIChromeRefresh()
+    }
+
+    override func becomeKey() {
+        super.becomeKey()
+        scheduleHostedSwiftUIChromeRefresh()
+    }
+
+    private func scheduleHostedSwiftUIChromeRefresh() {
+        (contentView as? PetRootContainerView)?.refreshHostedSwiftUIDisplay()
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            (self.contentView as? PetRootContainerView)?.refreshHostedSwiftUIDisplay()
+        }
+    }
 }

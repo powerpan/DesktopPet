@@ -26,6 +26,15 @@ final class ExtensionOverlayController {
         petWindow = window
         bubbleScaleSettings = settings
         appearanceCancellables.removeAll()
+
+        NotificationCenter.default.publisher(for: NSWorkspace.didActivateApplicationNotification)
+            .receive(on: DispatchQueue.main)
+            .debounce(for: .milliseconds(40), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.refreshOverlayChromeHostingViews()
+            }
+            .store(in: &appearanceCancellables)
+
         guard let s = settings else { return }
         applyChromeWindowsNSAppearance()
         Publishers.Merge(
@@ -45,6 +54,16 @@ final class ExtensionOverlayController {
         chatPanel?.appearance = appearance
         bubblePanel?.appearance = appearance
         agentSettingsWindow?.appearance = appearance
+    }
+
+    /// 与 `PetRootContainerView.refreshHostedSwiftUIDisplay` 同因：透明 `NSPanel` 上 `glassEffect` 在前台应用切换后偶发停在旧合成；accessory 应用未必收到 `NSApplication.didResignActive`。
+    private func refreshOverlayChromeHostingViews() {
+        for view in [carePanel?.contentView, chatPanel?.contentView, bubblePanel?.contentView].compactMap({ $0 }) {
+            view.needsLayout = true
+            view.needsDisplay = true
+            view.layoutSubtreeIfNeeded()
+            view.layer?.setNeedsDisplay()
+        }
     }
 
     private var bubbleFontScale: Double {
